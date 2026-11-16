@@ -1,0 +1,59 @@
+{
+  "outcome": "PASS",
+  "files": 10,
+  "passed": 340,
+  "failed": 0,
+  "sourceReport": "artifacts/p31-unit-final.json",
+  "suites": [
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/App.test.tsx",
+      "outcome": "passed",
+      "tests": 7
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/assets.test.ts",
+      "outcome": "passed",
+      "tests": 7
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/classes.test.ts",
+      "outcome": "passed",
+      "tests": 258
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/library.test.ts",
+      "outcome": "passed",
+      "tests": 15
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/p11.test.tsx",
+      "outcome": "passed",
+      "tests": 5
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/resources.test.ts",
+      "outcome": "passed",
+      "tests": 19
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/security.test.ts",
+      "outcome": "passed",
+      "tests": 4
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/store.test.ts",
+      "outcome": "passed",
+      "tests": 10
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/use-rules.test.ts",
+      "outcome": "passed",
+      "tests": 8
+    },
+    {
+      "path": "C:/Users/HIKI/Desktop/DnD_TCG-FY/DnD_TCGfy_v1_0_Codex_Handoff/tests/UseRulesUI.test.tsx",
+      "outcome": "passed",
+      "tests": 7
+    }
+  ]
+}

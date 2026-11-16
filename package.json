@@ -1,7 +1,7 @@
 {
   "name": "dnd-tcg-fy",
   "productName": "DnD TCG-fy",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "오프라인 TCG 스타일 D&D 카드 보드",
   "author": "DnD TCG-fy",

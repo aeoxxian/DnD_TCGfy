@@ -48,7 +48,7 @@ export function planUse(card: CardDefinition, optionId: string, resources: Resou
   for (const cost of option.costs) {
     if(cost.type==='slot'&&card.kind==='spell'&&card.spellLevel===0)continue;
     let resource:ResourceView;
-    try{resource=boundResource(card.id,cost.costKey,resources,bindings);}catch(error){throw new ResourceError((error as Error).message);}
+    try{resource=boundResource(card.id,cost.costKey,resources,bindings,cost.type==='slot'&&cost.autoBind?cost.slotSelection:undefined);}catch(error){throw new ResourceError((error as Error).message);}
     let slotLevel=cost.type==='slot'?undefined:cost.slotLevel;
     if(cost.type==='slot'){
       let levels:number[];try{levels=slotLevels(card,option,cost.costKey,resources,bindings);}catch(error){throw new ResourceError((error as Error).message);}

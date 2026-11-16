@@ -61,7 +61,7 @@ export const resourceActionSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('delete_resource'), resourceId: idSchema }),
   z.strictObject({ type: z.literal('configure_class'), configuration: classInputSchema, quote: z.string().length(64), confirmRetire: z.boolean().default(false) }),
   z.strictObject({ type: z.literal('clear_cost_override'), cardId: idSchema }),
-  z.strictObject({ type: z.literal('save_costs'), scope: z.enum(['shared','character']).default('shared'), confirmShared: z.boolean().default(false), expectedCardVersion: z.string().optional(), cardId: idSchema, castOptions: cardSchema.shape.castOptions.max(12).refine(options => options.reduce((total, option) => total + option.costs.length, 0) <= 100, '카드 한 장에 비용은 100개까지 지정할 수 있습니다.'), bindings: z.array(z.strictObject({ costKey: z.string().min(1).max(128), resourceInstanceId: idSchema })).max(100) }),
+  z.strictObject({ type: z.literal('save_costs'), spellLevel: z.number().int().min(0).max(9).optional(), scope: z.enum(['shared','character']).default('shared'), confirmShared: z.boolean().default(false), expectedCardVersion: z.string().optional(), cardId: idSchema, castOptions: cardSchema.shape.castOptions.max(12).refine(options => options.reduce((total, option) => total + option.costs.length, 0) <= 100, '카드 한 장에 비용은 100개까지 지정할 수 있습니다.'), bindings: z.array(z.strictObject({ costKey: z.string().min(1).max(128), resourceInstanceId: idSchema })).max(100) }),
   usePreviewActionSchema.extend({ quote: z.string().length(64), override: z.boolean().default(false) }),
   recoverActionSchema, adjustActionSchema, z.strictObject({ type: z.literal('undo') }),
 ]);

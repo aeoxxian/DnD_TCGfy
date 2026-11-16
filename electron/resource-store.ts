@@ -196,8 +196,12 @@ export class ResourceStore {
           }
           const shared=this.getCard(card.id);
           if(action.expectedCardVersion!==undefined&&action.expectedCardVersion!==shared.updatedAt)throw new UserInputError('공통 카드가 변경됐습니다. 비용 설정을 다시 열어 주세요.');
+          const baseChanged=action.spellLevel!==undefined&&action.spellLevel!==shared.spellLevel;
+          if(action.spellLevel!==undefined&&shared.kind!=='spell')throw new UserInputError('주문 카드에만 기본 주문 레벨을 지정할 수 있습니다.');
+          if((baseChanged||action.scope==='shared'&&JSON.stringify(shared.castOptions)!==JSON.stringify(options))&&(snapshot.sharedCostUsers?.[card.id]??0)>0&&!action.confirmShared)throw new UserInputError('다른 캐릭터에 영향을 주는 공통 비용/기본 주문 레벨 수정에 동의해 주세요.');
+          configuration={cardId:card.id,scope:action.scope,before:{spellLevel:shared.spellLevel,castOptions:action.scope==='shared'?shared.castOptions:card.castOptions,bindings:snapshot.bindings.filter(binding=>binding.cardId===card.id)},after:{spellLevel:action.spellLevel??shared.spellLevel,castOptions:options,bindings:action.bindings}};
+          if(baseChanged)this.db.prepare('UPDATE card_definitions SET spell_level=?,updated_at=? WHERE id=?').run(action.spellLevel!,new Date().toISOString(),card.id);
           if(action.scope==='shared'){
-            if(JSON.stringify(shared.castOptions)!==JSON.stringify(options)&&(snapshot.sharedCostUsers?.[card.id]??0)>0&&!action.confirmShared)throw new UserInputError('다른 캐릭터에 영향을 주는 공통 비용 수정에 동의해 주세요.');
             this.db.prepare("UPDATE card_definitions SET attributes_json=json_set(attributes_json,'$.castOptions',json(?)),updated_at=? WHERE id=?").run(JSON.stringify(options),new Date().toISOString(),card.id);
           }else this.db.prepare('INSERT INTO character_cost_overrides VALUES (?,?,?,?) ON CONFLICT(character_id,card_id) DO UPDATE SET cast_options_json=excluded.cast_options_json,updated_at=excluded.updated_at').run(characterId,card.id,JSON.stringify(options),new Date().toISOString());
           this.db.prepare('DELETE FROM card_bindings WHERE character_id=? AND card_id=?').run(characterId,card.id);

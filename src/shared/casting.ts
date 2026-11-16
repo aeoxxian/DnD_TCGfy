@@ -15,8 +15,13 @@ export function castingLevels(card:CardDefinition,option:CastOption):number[] {
   const max=Math.min(9,config?.maxSlotLevel??9,config?.allowUpcast===false?base:9);
   return Array.from({length:9},(_,i)=>i+1).filter(level=>level>=min&&level<=max);
 }
-export function boundResource(cardId:string,costKey:string,resources:ResourceView[],bindings:CardBinding[]):ResourceView {
+export function boundResource(cardId:string,costKey:string,resources:ResourceView[],bindings:CardBinding[],autoSlot?:'standard'|'pact'):ResourceView {
   const matches=bindings.filter(binding=>binding.cardId===cardId&&binding.costKey===costKey);
+  if(matches.length===0&&autoSlot){
+    const candidates=resources.filter(resource=>resource.presetKey?.startsWith('2014:')&&resource.kind==='slot_track'&&resource.template.slotKind===autoSlot&&resource.overrides.scope==='character');
+    if(candidates.length===1)return candidates[0];
+    throw new Error(candidates.length?'클래스 슬롯이 여러 개입니다. 카드 사용 규칙에서 사용할 자원을 골라 주세요.':'자동으로 사용할 클래스 슬롯이 없습니다. 클래스 설정 또는 카드 사용 규칙에서 자원을 선택해 주세요.');
+  }
   if(matches.length!==1)throw new Error('비용에 연결된 자원이 없습니다. 비용 설정에서 연결해 주세요.');
   const resource=resources.find(resource=>resource.id===matches[0].resourceInstanceId&&resource.characterId===matches[0].characterId);
   if(!resource)throw new Error('연결 자원이 삭제되었거나 현재 캐릭터의 자원이 아닙니다.');
@@ -27,7 +32,7 @@ export function slotLevels(card:CardDefinition,option:CastOption,costKey:string,
   const cost=option.costs.find(cost=>cost.costKey===costKey&&cost.type==='slot');
   if(!cost||cost.type!=='slot')throw new Error('슬롯 비용을 찾을 수 없습니다.');
   if(card.kind==='spell'&&card.spellLevel===0)return [];
-  const resource=boundResource(card.id,costKey,resources,bindings);
+  const resource=boundResource(card.id,costKey,resources,bindings,cost.autoBind?cost.slotSelection:undefined);
   if(resource.kind!=='slot_track'||resource.template.slotKind!==cost.slotSelection)throw new Error('일반 주문 슬롯과 계약 마법 슬롯의 연결 종류가 다릅니다. 자원 설정을 확인해 주세요.');
   if(option.casting&&option.casting.mode!=='homebrew'&&option.casting.mode!==cost.slotSelection)throw new Error('시전 방식과 슬롯 종류가 일치하지 않습니다.');
   const tiers=Object.entries(resource.capacityByLevel??{}).filter(([,max])=>max>0).map(([level])=>Number(level));

@@ -1,0 +1,29 @@
+{
+  "appVersion": "0.4.1",
+  "os": "Windows NT 10.0.26200.0 x64",
+  "electron": "45.3.3",
+  "embeddedNode": "24.22.3",
+  "sqliteSchema": 4,
+  "schemaMigrationAdded": false,
+  "lint": "PASS (0 warnings)",
+  "typecheck": "PASS",
+  "unitTests": {
+    "files": 10,
+    "passed": 340,
+    "failed": 0
+  },
+  "build": "PASS",
+  "packaging": "PASS",
+  "artifacts": [
+    {
+      "path": "release/win-unpacked/DnD TCG-fy.exe",
+      "bytes": 250093056,
+      "sha256": "4593587372ad5225e50ebbbe059e1f2351aee897756d465b04751d8e1b503351"
+    },
+    {
+      "path": "release/win-unpacked/resources/app.asar",
+      "bytes": 15805936,
+      "sha256": "80c380d57f298bc9a5bf3dd9b166f43e6012a970f7d56aea80530d628d9cb6d6"
+    }
+  ]
+}

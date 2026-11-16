@@ -17,7 +17,7 @@ export const rangeSchema = z.enum(['self', 'touch', 'melee', 'ranged', 'special'
 
 export const costSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('fixed'), costKey: z.string().min(1), amount: z.number().int().nonnegative(), slotLevel: z.number().int().min(1).max(9).optional() }),
-  z.strictObject({ type: z.literal('slot'), costKey: z.string().min(1), slotSelection: z.enum(['standard', 'pact']) }),
+  z.strictObject({ type: z.literal('slot'), costKey: z.string().min(1), slotSelection: z.enum(['standard', 'pact']), autoBind: z.boolean().optional() }),
   z.strictObject({ type: z.literal('variable'), costKey: z.string().min(1), min: z.number().int().nonnegative(), max: z.number().int().nonnegative(), step: z.number().int().positive(), slotLevel: z.number().int().min(1).max(9).optional() }).refine(v => v.min <= v.max),
 ]);
 const castingSchema = z.strictObject({
