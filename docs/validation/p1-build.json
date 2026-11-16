@@ -1,0 +1,12 @@
+{
+  "appVersion": "0.2.0",
+  "sourceCommit": "66a41cdc8c1e998461067d4f471432bd1e8acf39",
+  "exe": "release/win-unpacked/DnD TCG-fy.exe",
+  "exeSha256": "F733CA3F14E00C290326A0D3E6FAC304240974EBF6448D0601A46CB716023D6E",
+  "asarSha256": "3F974D696E1ED365FD24A4E0EFF4E7834A274CE14E05448200C2B595750D0F76",
+  "nativeFiles": [
+    "libvips-42.dll",
+    "libvips-cpp-8.18.7.dll",
+    "sharp-win32-x64-0.35.5.node"
+  ]
+}
