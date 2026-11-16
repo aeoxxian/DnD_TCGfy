@@ -14,6 +14,7 @@ const userData = join(runPath, 'user-data'); const fixtures = join(runPath, 'fix
 await mkdir(join(userData, 'data'), { recursive: true }); await mkdir(fixtures);
 const dbPath = join(userData, 'data', 'app.sqlite3');
 const binary = process.env.DND_TCG_EXECUTABLE;
+const fromVersion = process.argv.includes('--from-v2') ? 2 : 1;
 const devMode = process.argv.includes('--dev'); assert(!(binary && devMode));
 const env = { ...process.env, DND_TCG_TEST_USER_DATA: userData };
 delete env.ELECTRON_RUN_AS_NODE; delete env.DND_TCG_DEV_URL;
@@ -33,7 +34,8 @@ db.exec(`INSERT INTO character_profiles(id,name,ruleset,level) VALUES ('p0-chara
   INSERT INTO resource_instances VALUES ('p0-resource','p0-character','p0-template','{}','{"remaining":3}');
   INSERT INTO card_bindings VALUES ('p0-binding','p0-character','p0-card','spirit','p0-resource');
   INSERT INTO play_events VALUES ('p0-event','p0-character','manual_adjustment','{"changes":[]}','2026-11-16T00:00:00.000Z');`);
-const resourceBefore = db.prepare('SELECT * FROM resource_instances').all(); const eventsBefore = db.prepare('SELECT * FROM play_events').all(); db.close();
+if (fromVersion === 2) { db.exec(migrations[1].sql); db.exec('PRAGMA user_version=2'); db.exec("INSERT INTO schema_migrations VALUES (2,'2026-11-16T00:00:00.000Z')"); }
+const resourceBefore = db.prepare('SELECT id,character_id,template_id,overrides_json,current_state_json FROM resource_instances').all(); const eventsBefore = db.prepare('SELECT * FROM play_events').all(); db.close();
 
 const sources = [];
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -91,18 +93,18 @@ try {
   await launch();
   const runtime = await app.evaluate(({ app, BrowserWindow }) => {
     const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
-    return { packaged: app.isPackaged, electron: process.versions.electron, node: process.versions.node, userData: app.getPath('userData'), sandbox: prefs.sandbox, nodeIntegration: prefs.nodeIntegration, contextIsolation: prefs.contextIsolation, webSecurity: prefs.webSecurity };
+    return { packaged: app.isPackaged, appVersion: app.getVersion(), electron: process.versions.electron, node: process.versions.node, userData: app.getPath('userData'), sandbox: prefs.sandbox, nodeIntegration: prefs.nodeIntegration, contextIsolation: prefs.contextIsolation, webSecurity: prefs.webSecurity };
   });
-  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true);
+  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.3.0');
   assert.equal(runtime.sandbox, true); assert.equal(runtime.nodeIntegration, false); assert.equal(runtime.contextIsolation, true); assert.equal(runtime.webSecurity, true);
-  let data = await state(); assert.equal(data.schemaVersion, 2); assert.deepEqual(data.settings, initialSettings);
+  let data = await state(); assert.equal(data.schemaVersion, 3); assert.deepEqual(data.settings, initialSettings);
   assert.deepEqual(data.cards[0].castOptions, legacyCard.castOptions); assert.equal(data.cards[0].id, 'p0-card');
   assert.equal(data.tags[0].id, 'legacy-tag'); assert.equal(data.decks[0].cardIds[0], 'p0-card');
   assert.equal((await readdir(join(userData, 'backups'))).length, 1);
   const isolation = await page.evaluate(() => ({ require: typeof window.require, process: typeof window.process, keys: Object.keys(window.desktop).sort() }));
   assert.equal(isolation.require, 'undefined'); assert.equal(isolation.process, 'undefined');
   assert(!isolation.keys.includes('invoke')); assert(!isolation.keys.includes('getPathForFile'));
-  recordCheck('P0 v1 DB → v2 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified');
+  recordCheck(`v${fromVersion} DB → v3 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified`);
 
   await page.getByRole('button', { name: '카드 등록', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: '카드 등록', exact: true });
@@ -253,7 +255,7 @@ try {
     assert.equal(sha(await readFile(join(userData, asset.relative_path))), source.hash);
     assert.equal(sha(await readFile(source.path)), source.hash); assert.equal(asset.sha256, source.hash);
   }
-  assert.deepEqual(finalDb.prepare('SELECT * FROM resource_instances').all(), resourceBefore); assert.deepEqual(finalDb.prepare('SELECT * FROM play_events').all(), eventsBefore);
+  assert.deepEqual(finalDb.prepare('SELECT id,character_id,template_id,overrides_json,current_state_json FROM resource_instances').all(), resourceBefore); assert.deepEqual(finalDb.prepare('SELECT * FROM play_events').all(), eventsBefore);
   assert.equal(finalDb.prepare('SELECT count(*) AS n FROM card_definitions WHERE archived_at IS NOT NULL').get().n, 1);
   assert.deepEqual(finalDb.prepare('PRAGMA foreign_key_check').all(), []); finalDb.close();
   assert.equal((await state()).cards.find(card => card.id === 'p0-card').castOptions[0].costs[0].amount, 2);
@@ -316,7 +318,56 @@ try {
   assert(context.decks.find(deck => deck.id === targetA).cardIds.includes(autoA.id)); assert(context.decks.find(deck => deck.id === playerB.activeDeckId).cardIds.includes(autoB.id));
   assert.equal(context.cards.find(card => card.id === autoA.id).name, 'P11 A 수정');
   recordCheck('P1.1 restart preserves new card metadata and automatic deck links');
-  const result = { outcome: 'PASS', mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, imageFilesRegistered: 20, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
+  // P2 acceptance uses the same renderer/preload/main transaction path as a player.
+  await page.getByLabel('활성 캐릭터', { exact: true }).selectOption(playerA.id); await page.getByRole('status').filter({ hasText: '필터 저장됨' }).waitFor(); await showAll();
+  async function resourceState(characterId=playerA.id){const result=await page.evaluate(id=>window.desktop.getResources(id),characterId);assert.equal(result.ok,true,result.error);return result.value;}
+  async function waitRemaining(name,value,characterId=playerA.id){await page.waitForFunction(async ({id,name,value})=>{const result=await window.desktop.getResources(id);return result.ok&&result.value.resources.find(resource=>resource.name===name)?.remaining===value;},{id:characterId,name,value});}
+  let aside=page.getByRole('complementary',{name:'자원 패널'});
+  async function createModule(name,max,recovery=false){
+    await aside.getByRole('button',{name:'자원 관리',exact:true}).click();let manager=page.getByRole('dialog',{name:'자원 관리',exact:true});await manager.getByRole('button',{name:'새 자원 만들기'}).click();
+    const form=page.getByRole('dialog',{name:'새 자원',exact:true});await form.getByLabel('자원 이름',{exact:true}).fill(name);await form.getByLabel('최대치',{exact:true}).fill(String(max));
+    if(recovery){await form.getByLabel('짧은 휴식 회복 방식',{exact:true}).selectOption('fixed');await form.getByLabel('짧은 휴식 회복량',{exact:true}).fill('2');await form.getByLabel('긴 휴식 회복 방식',{exact:true}).selectOption('full');await form.getByLabel('새벽 경과 회복 방식',{exact:true}).selectOption('full');await form.getByLabel('수동 회복 회복 방식',{exact:true}).selectOption('fixed');await form.getByLabel('수동 회복 회복량',{exact:true}).fill('1');}
+    await form.getByRole('button',{name:'자원 저장',exact:true}).click();await form.waitFor({state:'hidden'});manager=page.getByRole('dialog',{name:'자원 관리',exact:true});await manager.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();await waitRemaining(name,max);return(await resourceState()).resources.find(resource=>resource.name===name);
+  }
+  const energy=await createModule('검수 영력',5,true);const material=await createModule('검수 촉매',1);
+  async function configure(title,costs){await selectCard(title);await page.getByRole('button',{name:'비용 설정',exact:true}).click();const form=page.getByRole('dialog',{name:'카드 비용 설정',exact:true});for(let i=0;i<costs.length;i++){if(await form.getByLabel(`연결 자원 1-${i+1}`,{exact:true}).count()===0)await form.getByRole('button',{name:'비용 추가 1',exact:true}).click();await form.getByLabel(`연결 자원 1-${i+1}`,{exact:true}).selectOption(costs[i].id);await form.getByLabel(`소모량 1-${i+1}`,{exact:true}).fill(String(costs[i].amount));}await form.getByRole('button',{name:'비용 연결 저장',exact:true}).click();await form.waitFor({state:'hidden'});await page.waitForFunction(()=>!document.querySelector('.use-button').disabled);}
+  await configure('치유의 카드',[{id:energy.id,amount:2},{id:material.id,amount:1}]);const beforeSelection=await resourceState();await page.keyboard.press('Escape');await selectCard('치유의 카드');assert.deepEqual(await resourceState(),beforeSelection);
+  await page.getByRole('button',{name:'사용 확정',exact:true}).click({clickCount:2});await waitRemaining('검수 영력',3);await waitRemaining('검수 촉매',0);assert.equal((await resourceState()).events.filter(event=>event.type==='card_used').length,1);
+  await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',5);await waitRemaining('검수 촉매',1);
+  await page.waitForFunction(()=>!document.querySelector('.use-button').disabled);await page.getByRole('button',{name:'사용 확정',exact:true}).click();await waitRemaining('검수 영력',3);await waitRemaining('검수 촉매',0);
+  await page.waitForFunction(()=>document.querySelector('.exception-button'));assert.equal(await page.getByRole('button',{name:'사용 확정',exact:true}).isDisabled(),true);const shortState=await resourceState();await capture('p2-insufficient');
+  await page.getByRole('button',{name:'예외 사용 · 자원 미차감',exact:true}).click();await page.getByRole('button',{name:'예외 사용 확정',exact:true}).click();await page.getByRole('dialog',{name:'예외 사용 확인'}).waitFor({state:'hidden'});assert.deepEqual((await resourceState()).resources,shortState.resources);
+  recordCheck('P2 multi-resource confirmation, double-click suppression, atomic insufficiency, multi-resource Undo and explicit no-spend exception');
+  await aside.getByRole('button',{name:'검수 영력 1 증가',exact:true}).click();await waitRemaining('검수 영력',4);await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',3);
+  for(const [trigger,expected]of[['짧은 휴식',5],['긴 휴식',5],['새벽 경과',5],['수동 회복',4]]){await aside.getByRole('button',{name:trigger,exact:true}).click();const rest=page.getByRole('dialog',{name:`${trigger} 확인`,exact:true});await rest.getByRole('button',{name:'회복 확정',exact:true}).click();await rest.waitFor({state:'hidden'});await waitRemaining('검수 영력',expected);await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',3);}
+  const energyEntry=aside.locator('.resource-entry').filter({has:page.getByRole('heading',{name:'검수 영력',exact:true})});await energyEntry.getByRole('button',{name:'수동 조정',exact:true}).click();let modal=page.getByRole('dialog',{name:'자원 수동 조정'});await modal.getByLabel('새 현재량').fill('2');await modal.getByRole('button',{name:'현재량 변경 확정'}).click();await modal.waitFor({state:'hidden'});await waitRemaining('검수 영력',2);await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',3);
+  await configure('반응의 카드',[{id:energy.id,amount:1}]);await page.getByRole('button',{name:'사용 확정',exact:true}).click();await waitRemaining('검수 영력',2);
+  recordCheck('P2 shared pool across cards, four explicit recovery events, manual set/plus and persistent sequential Undo');
+  await page.getByLabel('활성 캐릭터',{exact:true}).selectOption(playerB.id);await page.getByRole('status').filter({hasText:'필터 저장됨'}).waitFor();await aside.getByRole('button',{name:'자원 관리',exact:true}).click();let manager=page.getByRole('dialog',{name:'자원 관리',exact:true});await manager.getByRole('button',{name:'검수 영력 템플릿 장착',exact:true}).click();modal=page.getByRole('dialog',{name:'템플릿 장착',exact:true});await modal.getByRole('button',{name:'장착 확정'}).click();await modal.waitFor({state:'hidden'});await page.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();await waitRemaining('검수 영력',5,playerB.id);
+  const bEnergy=(await resourceState(playerB.id)).resources.find(resource=>resource.name==='검수 영력');assert.notEqual(bEnergy.id,energy.id);await configure('반응의 카드',[{id:bEnergy.id,amount:1}]);await page.getByRole('button',{name:'사용 확정',exact:true}).click();await waitRemaining('검수 영력',4,playerB.id);assert.equal((await resourceState(playerA.id)).resources.find(resource=>resource.id===energy.id).remaining,2);await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',5,playerB.id);
+  await page.getByLabel('활성 캐릭터',{exact:true}).selectOption(playerA.id);await page.getByRole('status').filter({hasText:'필터 저장됨'}).waitFor();await waitRemaining('검수 영력',2);const persistedResources=await resourceState();await app.close();app=undefined;await launch();aside=page.getByRole('complementary',{name:'자원 패널'});assert.deepEqual(await resourceState(),persistedResources);await waitRemaining('검수 영력',2);await capture('p2-restart');
+  recordCheck('P2 same template and card with independent A/B instances, bindings, histories and Undo; restart preserves exact resource snapshot');
+  const replayResult=await page.evaluate(async characterId=>{const snapshot=(await window.desktop.getResources(characterId)).value;const data=(await window.desktop.getBootstrap()).value;const card=data.cards.find(card=>card.name==='반응의 카드');const action={type:'use',cardId:card.id,optionId:card.castOptions[0].id,choices:{}};const preview=(await window.desktop.previewResource({characterId,action})).value;const request={requestId:crypto.randomUUID(),characterId,expectedRevision:snapshot.revision,action:{...action,quote:preview.quote}};return await Promise.all([window.desktop.changeResource(request),window.desktop.changeResource(request)]);},playerA.id);
+  assert(replayResult.every(result=>result.ok));assert.equal(replayResult.filter(result=>result.value.replayed).length,1);await waitRemaining('검수 영력',1);await page.reload();await page.getByRole('button',{name:'카드 등록',exact:true}).waitFor();await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',2);
+  await aside.getByRole('button',{name:'자원 관리',exact:true}).click();manager=page.getByRole('dialog',{name:'자원 관리',exact:true});await manager.getByRole('button',{name:'검수 영력 자원 설정',exact:true}).click();modal=page.getByRole('dialog',{name:'장착 자원 설정',exact:true});await modal.getByLabel('최대치',{exact:true}).fill('7');await modal.getByRole('button',{name:'설정 변경 확정'}).click();await modal.waitFor({state:'hidden'});await page.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();await waitRemaining('검수 영력',4);assert.equal((await resourceState(playerB.id)).resources.find(resource=>resource.id===bEnergy.id).remaining,5);
+  await selectCard('반응의 카드');await page.getByRole('button',{name:'비용 설정',exact:true}).click();modal=page.getByRole('dialog',{name:'카드 비용 설정',exact:true});
+  await modal.getByLabel('소모 방식 1-1',{exact:true}).selectOption('variable');await modal.getByLabel('min 1-1',{exact:true}).fill('1');await modal.getByLabel('max 1-1',{exact:true}).fill('3');await modal.getByLabel('step 1-1',{exact:true}).fill('2');await modal.getByRole('button',{name:'사용 방식 추가',exact:true}).click();await modal.getByLabel('방식 이름 2',{exact:true}).fill('무소모 검수');await capture('p2-cost-editor');await modal.getByRole('button',{name:'비용 연결 저장',exact:true}).click();await modal.waitFor({state:'hidden'});
+  await page.getByLabel('가변 소모량 1',{exact:true}).fill('3');await page.waitForFunction(()=>document.querySelector('.card-use .change-list')?.textContent.includes('4 → 1'));await page.getByRole('button',{name:'사용 확정',exact:true}).click();await waitRemaining('검수 영력',1);
+  await page.getByLabel('사용 방식',{exact:true}).selectOption({label:'무소모 검수'});await page.waitForFunction(()=>!document.querySelector('.use-button').disabled);const freeBefore=await resourceState();await page.getByRole('button',{name:'사용 확정',exact:true}).click();await page.waitForFunction(async ({id,revision})=>(await window.desktop.getResources(id)).value.revision>revision,{id:playerA.id,revision:freeBefore.revision});assert.deepEqual((await resourceState()).resources,freeBefore.resources);
+  await selectCard('치유의 카드');await page.waitForFunction(()=>document.querySelector('.exception-button'));await capture('p2-board-insufficient');await aside.getByRole('button',{name:'자원 관리',exact:true}).click();await capture('p2-resource-manager');await page.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();
+  recordCheck('P2 variable cost min/max/step, selectable use options and free use through the actual Windows forms');
+  await aside.getByRole('button',{name:'자원 관리',exact:true}).click();manager=page.getByRole('dialog',{name:'자원 관리',exact:true});await manager.getByRole('button',{name:'검수 촉매 자원 연결 해제',exact:true}).click();await manager.getByRole('button',{name:'자원 삭제 확인',exact:true}).click();await manager.getByRole('button',{name:'검수 촉매 자원 연결 해제',exact:true}).waitFor({state:'hidden'});await manager.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();await selectCard('치유의 카드');await page.waitForFunction(()=>document.querySelector('.card-use .resource-error')?.textContent.includes('삭제'));assert.equal(await page.getByRole('button',{name:'사용 확정',exact:true}).isDisabled(),true);await page.getByRole('button',{name:'치유의 카드 미리보기 확대',exact:true}).click();await capture('p2-exhausted-preview');await page.keyboard.press('Escape');await capture('p2-board');
+  recordCheck('P2 duplicate RPC receipts, spent-preserving instance maximum edit, deleted binding rejection and readable exhausted cards');
+  for(const zoom of [1,1.25,1.5]){
+    await app.evaluate(({BrowserWindow},zoom)=>{const win=BrowserWindow.getAllWindows()[0];win.setContentSize(1280,720);win.webContents.setZoomFactor(zoom);},zoom);
+    await page.getByRole('button',{name:'사용 확정',exact:true}).scrollIntoViewIfNeeded();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);await capture(`p2-layout-${zoom}`);
+    await page.getByRole('button',{name:'치유의 카드 미리보기 확대',exact:true}).click();await page.getByRole('dialog',{name:'치유의 카드 원본 보기',exact:true}).waitFor();await page.keyboard.press('Escape');
+    await aside.getByRole('button',{name:'긴 휴식',exact:true}).scrollIntoViewIfNeeded();assert.equal(await aside.getByRole('button',{name:'긴 휴식',exact:true}).isVisible(),true);
+  }
+  recordCheck('P2 populated resource panel and card use controls at 1280x720 with 100/125/150% Chromium scaling, original preview and scroll access preserved');
+  for(const asset of assets){const source=sources.find(source=>source.fileName===asset.original_name);assert.equal(sha(await readFile(join(userData,asset.relative_path))),source.hash);assert.equal(sha(await readFile(source.path)),source.hash);}
+  assert.deepEqual(pageErrors,[]);assert.deepEqual(securityWarnings,[]);const verificationDb=new DatabaseSync(dbPath,{readOnly:true});assert.deepEqual(verificationDb.prepare('PRAGMA foreign_key_check').all(),[]);assert.equal(verificationDb.prepare('PRAGMA integrity_check').get().integrity_check,'ok');verificationDb.close();
+  const result = { outcome: 'PASS', migration: {fromVersion,toVersion:3,backupCount:(await readdir(join(userData,'backups'))).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, imageFilesRegistered: 20, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
   await writeFile(join(runPath,'result.json'),JSON.stringify(result,null,2)); console.log(JSON.stringify(result,null,2));
 } catch (error) {
   if (app && page) { try { await capture('failure'); } catch { /* Preserve the original error. */ } }

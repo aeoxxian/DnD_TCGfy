@@ -10,6 +10,7 @@ import { IPC, settingsSchema, type Result } from '../src/shared/contracts';
 import { LibraryStore } from './library-store';
 import { AssetService } from './assets';
 import { UserInputError } from './errors';
+import { ResourceStore } from './resource-store';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const development = !app.isPackaged && process.env.DND_TCG_DEV_URL === DEV_URL;
@@ -30,6 +31,7 @@ else {
     store = new AppStore(app.getPath('userData'));
     const library = new LibraryStore(store);
     const assets = new AssetService(app.getPath('userData'), library);
+    const resources = new ResourceStore(store);
     // Read settings now: corrupted persisted settings stop startup without resetting data.
     store.getSettings();
     const ses = session.defaultSession;
@@ -77,6 +79,9 @@ else {
     safeHandler(IPC.createDeck, input => library.createDeck(input));
     safeHandler(IPC.selectDeck, input => library.selectDeck(input));
     safeHandler(IPC.setDeckCards, input => library.setDeckCards(input));
+    safeHandler(IPC.getResources, input => resources.snapshot(input));
+    safeHandler(IPC.previewResource, input => resources.preview(input));
+    safeHandler(IPC.changeResource, input => resources.change(input));
     mainWindow = new BrowserWindow({
       title: 'DnD TCG-fy', width: 1440, height: 900, minWidth: 960, minHeight: 600, backgroundColor: '#14161b',
       show: false, autoHideMenuBar: true,

@@ -65,8 +65,8 @@ describe('card library persistence', () => {
     library.createProfile({ name: '테스트 캐릭터' });
     const profile = library.getLibrary().profiles[0]; const deckId = profile.activeDeckId!;
     library.setDeckCards({ deckId, cardIds: [first.id, other.id] });
-    store.db.prepare("INSERT INTO resource_templates VALUES ('t','spirit','영력','counter','{}','user',1)").run();
-    store.db.prepare("INSERT INTO resource_instances VALUES ('r',?,'t','{}','{\"remaining\":3}')").run(profile.id);
+    store.db.prepare("INSERT INTO resource_templates(id,key,name,kind,definition_json,source,version) VALUES ('t','spirit','영력','counter','{}','user',1)").run();
+    store.db.prepare("INSERT INTO resource_instances(id,character_id,template_id,overrides_json,current_state_json) VALUES ('r',?,'t','{}','{\"remaining\":3}')").run(profile.id);
     store.db.prepare("INSERT INTO card_bindings VALUES ('b',?,?,'spirit','r')").run(profile.id, first.id);
     const costs = [{ id: 'future-cost', label: '강화', costs: [{ type: 'fixed', costKey: 'spirit', amount: 2 }] }];
     store.db.prepare("UPDATE card_definitions SET attributes_json=json_set(attributes_json,'$.castOptions',json(?)) WHERE id=?").run(JSON.stringify(costs), first.id);

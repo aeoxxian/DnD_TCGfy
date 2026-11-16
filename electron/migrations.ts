@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 export const migrations = [{
   version: 1,
   sql: `
@@ -33,6 +33,17 @@ export const migrations = [{
       SELECT c.id,j.value FROM card_definitions c,json_each(c.attributes_json,'$.tags') j WHERE j.type='text';
     CREATE INDEX idx_card_tags_tag ON card_tags(tag_id);
     CREATE INDEX idx_cards_active ON card_definitions(archived_at,created_at);
+  `,
+}, {
+  version: 3,
+  sql: `
+    ALTER TABLE resource_templates ADD COLUMN archived_at TEXT;
+    ALTER TABLE resource_instances ADD COLUMN archived_at TEXT;
+    CREATE TABLE resource_revisions(character_id TEXT PRIMARY KEY REFERENCES character_profiles(id), revision INTEGER NOT NULL CHECK(revision>=0));
+    INSERT INTO resource_revisions SELECT id,0 FROM character_profiles;
+    CREATE TABLE resource_requests(request_id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES character_profiles(id), fingerprint TEXT NOT NULL, event_id TEXT REFERENCES play_events(id), occurred_at TEXT NOT NULL);
+    CREATE TABLE resource_undos(target_event_id TEXT PRIMARY KEY REFERENCES play_events(id), undo_event_id TEXT NOT NULL UNIQUE REFERENCES play_events(id));
+    CREATE INDEX idx_resource_requests_character ON resource_requests(character_id,occurred_at);
   `,
 }];
 

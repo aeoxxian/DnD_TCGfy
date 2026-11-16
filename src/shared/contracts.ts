@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ResourceBridge } from './resources';
 
 export const settingsSchema = z.strictObject({
   viewMode: z.enum(['hand', 'grid']),
@@ -14,10 +15,10 @@ export const actionSchema = z.enum(['action', 'bonus_action', 'reaction', 'no_ac
 export const kindSchema = z.enum(['spell', 'attack', 'feature', 'feat', 'item', 'other']);
 export const rangeSchema = z.enum(['self', 'touch', 'melee', 'ranged', 'special']);
 
-const costSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('fixed'), costKey: z.string().min(1), amount: z.number().int().nonnegative() }),
+export const costSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('fixed'), costKey: z.string().min(1), amount: z.number().int().nonnegative(), slotLevel: z.number().int().min(1).max(9).optional() }),
   z.strictObject({ type: z.literal('slot'), costKey: z.string().min(1), slotSelection: z.enum(['standard', 'pact']) }),
-  z.strictObject({ type: z.literal('variable'), costKey: z.string().min(1), min: z.number().int().nonnegative(), max: z.number().int().nonnegative(), step: z.number().int().positive() }).refine(v => v.min <= v.max),
+  z.strictObject({ type: z.literal('variable'), costKey: z.string().min(1), min: z.number().int().nonnegative(), max: z.number().int().nonnegative(), step: z.number().int().positive(), slotLevel: z.number().int().min(1).max(9).optional() }).refine(v => v.min <= v.max),
 ]);
 const castingSchema = z.strictObject({
   mode: z.enum(['standard', 'pact', 'homebrew']), allowUpcast: z.boolean(), allowBelowBase: z.boolean(),
@@ -36,6 +37,7 @@ export const cardSchema = z.strictObject({
 }).refine(v => v.spellLevel === undefined || v.kind === 'spell');
 export type CardDefinition = z.infer<typeof cardSchema>;
 export type Role = CardDefinition['roles'][number];
+export type CastOption = CardDefinition['castOptions'][number];
 
 export const cardDraftSchema = z.strictObject({
   id: idSchema.optional(),
@@ -82,7 +84,7 @@ export interface Bootstrap extends Library {
   schemaVersion: number;
 }
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-export interface DesktopBridge {
+export interface DesktopBridge extends ResourceBridge {
   getBootstrap(): Promise<Result<Bootstrap>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   saveLibraryState(state: LibraryState): Promise<Result<LibraryState>>;
@@ -100,4 +102,5 @@ export const IPC = {
   getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save', saveLibraryState: 'library:state',
   importImages: 'assets:import', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
   createProfile: 'profiles:create', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
+  getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
 } as const;

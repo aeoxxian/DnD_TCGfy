@@ -19,5 +19,8 @@ const bridge: DesktopBridge = {
   createDeck: input => ipcRenderer.invoke(IPC.createDeck, input),
   selectDeck: input => ipcRenderer.invoke(IPC.selectDeck, input),
   setDeckCards: input => ipcRenderer.invoke(IPC.setDeckCards, input),
+  getResources: characterId => ipcRenderer.invoke(IPC.getResources, characterId),
+  previewResource: input => ipcRenderer.invoke(IPC.previewResource, input),
+  changeResource: input => ipcRenderer.invoke(IPC.changeResource, input),
 };
 contextBridge.exposeInMainWorld('desktop', Object.freeze(bridge));

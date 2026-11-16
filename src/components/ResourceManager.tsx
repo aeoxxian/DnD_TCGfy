@@ -1,0 +1,74 @@
+import { useState, type FormEvent } from 'react';
+import type { CardDefinition } from '../shared/contracts';
+import { templateDraftSchema, type ResourceOverrides, type ResourceTemplate, type ResourceView, type RecoveryTrigger, type TemplateDraft } from '../shared/resources';
+import type { ResourceController } from './ResourcePanel';
+import { Modal } from './Modal';
+
+type Mode = 'new'|'clone'|'edit_template'|'attach'|'instance';
+const triggerNames: Record<RecoveryTrigger,string> = { short_rest: '짧은 휴식', long_rest: '긴 휴식', dawn: '새벽 경과', manual: '수동 회복' };
+interface FormSelection { mode: Mode; template?: ResourceTemplate; resource?: ResourceView }
+
+function ResourceForm({ selection, cards, controller, onClose }: { selection: FormSelection; cards: CardDefinition[]; controller: ResourceController; onClose: () => void }) {
+  const { mode, resource } = selection; const initial = selection.template ?? resource?.template;
+  const [revision] = useState(controller.snapshot!.revision);
+  const [name,setName] = useState(resource?.name ?? (initial ? `${initial.name}${mode === 'clone' ? ' 복제' : ''}` : ''));
+  const [unit,setUnit] = useState(initial?.unit ?? '점'); const [customUnit,setCustomUnit] = useState(initial?.unit ?? '');
+  const [kind,setKind] = useState<'counter'|'slot_track'>(initial?.kind ?? 'counter');
+  const [capacity,setCapacity] = useState(resource?.capacity ?? (initial?.capacity?.type === 'fixed' ? initial.capacity.value : 5));
+  const [slots,setSlots] = useState<Record<string,number>>(() => resource?.capacityByLevel ?? Object.fromEntries(Array.from({length:9},(_,i) => [String(i+1),initial?.slotCapacity?.[String(i+1)]?.type === 'fixed' ? (initial.slotCapacity[String(i+1)] as {value:number}).value : i === 0 ? 2 : 0])));
+  const [preserveRule,setPreserveRule] = useState(!resource && !!initial && (initial.kind === 'counter' ? initial.capacity?.type !== 'fixed' : !!initial.slotCapacityByClassLevel || Object.values(initial.slotCapacity ?? {}).some(rule => rule.type !== 'fixed')));
+  const [recovery,setRecovery] = useState<Record<string,{type:'none'|'full'|'fixed';value:number}>>(() => Object.fromEntries(Object.keys(triggerNames).map(trigger => {const rule=initial?.recovery.find(rule=>rule.triggers.includes(trigger as RecoveryTrigger));return [trigger,{type:rule?.amount.type ?? 'none',value:rule?.amount.type === 'fixed' ? rule.amount.value : 1}];})));
+  const [scope,setScope] = useState<ResourceOverrides['scope']>(resource?.overrides.scope ?? 'character');
+  const [owner,setOwner] = useState(resource?.overrides.ownerCardId ?? ''); const [templateOnly,setTemplateOnly] = useState(false); const [error,setError] = useState('');
+  const locked = mode === 'attach' || mode === 'instance'; const busy = controller.busy;
+  const allowedOwners = cards.filter(card => scope !== 'item' || card.kind === 'item');
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setError('');
+    const actualUnit = ['점','회','개','슬롯'].includes(unit) ? unit : customUnit;
+    const scopeInfo = { scope, ownerCardId: scope === 'character' ? undefined : owner || undefined };
+    if (mode === 'attach') { if (await controller.perform({ type:'attach',templateId:initial!.id,...scopeInfo },revision)) onClose(); return; }
+    if (mode === 'instance') {
+      const overrides: ResourceOverrides = { ...scopeInfo,nameOverride:name,capacityOverride:kind === 'counter' ? capacity : undefined,slotCapacityOverride:kind === 'slot_track' ? Object.fromEntries(Object.entries(slots).filter(([,n])=>n>0)) : undefined };
+      if (await controller.perform({ type:'edit_resource',resourceId:resource!.id,overrides },revision)) onClose(); return;
+    }
+    const draft: TemplateDraft = {
+      id: mode === 'edit_template' ? initial?.id : undefined,name,unit:actualUnit,kind,
+      capacity: kind === 'counter' ? preserveRule ? initial?.capacity : {type:'fixed',value:capacity} : undefined,
+      slotCapacity: kind === 'slot_track' && !(preserveRule && initial?.slotCapacityByClassLevel) ? preserveRule ? initial?.slotCapacity : Object.fromEntries(Object.entries(slots).filter(([,n])=>n>0).map(([level,value])=>[level,{type:'fixed' as const,value}])) : undefined,
+      slotCapacityByClassLevel: kind === 'slot_track' && preserveRule ? initial?.slotCapacityByClassLevel : undefined,
+      recovery:Object.entries(recovery).filter(([,rule])=>rule.type !== 'none').map(([trigger,rule])=>({triggers:[trigger as RecoveryTrigger],amount:rule.type === 'fixed' ? {type:'fixed' as const,value:rule.value} : {type:'full' as const}})),
+    };
+    const parsed=templateDraftSchema.safeParse(draft); if(!parsed.success){setError(parsed.error.issues[0].message);return;}
+    const action = mode === 'edit_template' || templateOnly ? {type:'save_template' as const,template:draft} : {type:'create_resource' as const,template:draft,...scopeInfo};
+    if(await controller.perform(action,revision)) onClose();
+  }
+  const title = mode === 'instance' ? '장착 자원 설정' : mode === 'attach' ? '템플릿 장착' : mode === 'edit_template' ? '템플릿 편집' : mode === 'clone' ? '자원 템플릿 복제' : '새 자원';
+  return <Modal title={title} onClose={()=>{if(!busy)onClose();}}><form onSubmit={event=>void submit(event)}>
+    <label className="form-field">자원 이름<input required maxLength={100} value={name} disabled={busy || mode === 'attach'} onChange={event=>setName(event.target.value)} /></label>
+    <div className="form-columns"><label className="form-field">자원 종류<select aria-label="자원 종류" value={kind} disabled={busy || locked || mode === 'edit_template'} onChange={event=>{setKind(event.target.value as typeof kind);setPreserveRule(false);if(event.target.value==='slot_track')setRecovery(current=>Object.fromEntries(Object.entries(current).map(([key,rule])=>[key,rule.type==='fixed'?{...rule,type:'none' as const}:rule])));}}><option value="counter">횟수 / 포인트</option><option value="slot_track">레벨별 슬롯 트랙</option></select></label><label className="form-field">단위<select aria-label="단위" value={['점','회','개','슬롯'].includes(unit)?unit:'custom'} disabled={busy || locked} onChange={event=>setUnit(event.target.value)}>{['점','회','개','슬롯'].map(unit=><option key={unit}>{unit}</option>)}<option value="custom">사용자 정의</option></select></label></div>
+    {!['점','회','개','슬롯'].includes(unit) && <label className="form-field">사용자 정의 단위<input required maxLength={30} value={customUnit} disabled={busy||locked} onChange={event=>setCustomUnit(event.target.value)} /></label>}
+    {preserveRule ? <div><p className="muted">레벨/능력치에 따른 최대치 규칙을 그대로 유지합니다.</p>{!locked&&<button type="button" onClick={()=>setPreserveRule(false)}>고정 최대치로 변경</button>}</div> : kind === 'counter' ? <label className="form-field">최대치<input type="number" required min={0} max={1000000} step={1} value={capacity} disabled={busy || mode === 'attach'} onChange={event=>setCapacity(Number(event.target.value))} /></label> : <fieldset className="editor-checks"><legend>레벨별 최대치 · 0은 사용 안 함</legend><div className="slot-editor">{Array.from({length:9},(_,i)=>String(i+1)).map(level=><label key={level}>{level}레벨<input type="number" aria-label={`${level}레벨 최대치`} min={0} max={1000000} step={1} value={slots[level]??0} disabled={busy||mode==='attach'} onChange={event=>setSlots({...slots,[level]:Number(event.target.value)})}/></label>)}</div></fieldset>}
+    {mode === 'instance' && <p className="registration-note">현재 소비량을 보존해 적용합니다.{kind==='counter' ? ` ${resource!.remaining}/${resource!.capacity} → ${Math.max(0,capacity-(resource!.capacity!-resource!.remaining!))}/${capacity}` : ' 새 레벨별 최대치에 맞게 현재량을 제한합니다.'} 설정 변경 이전의 사용 기록은 실행 취소 경계가 됩니다.</p>}
+    {!locked && <fieldset className="editor-checks"><legend>회복 조건과 회복량</legend>{(Object.keys(triggerNames) as RecoveryTrigger[]).map(trigger=><div className="recovery-rule" key={trigger}><label>{triggerNames[trigger]}<select aria-label={`${triggerNames[trigger]} 회복 방식`} value={kind==='slot_track'&&recovery[trigger].type==='fixed'?'none':recovery[trigger].type} disabled={busy} onChange={event=>setRecovery({...recovery,[trigger]:{...recovery[trigger],type:event.target.value as 'none'|'full'|'fixed'}})}><option value="none">회복 안 함</option><option value="full">전량</option>{kind==='counter'&&<option value="fixed">정량 · 사용자 지정</option>}</select></label>{kind==='counter'&&recovery[trigger].type==='fixed'&&<label>회복량<input aria-label={`${triggerNames[trigger]} 회복량`} type="number" min={0} max={1000000} step={1} value={recovery[trigger].value} onChange={event=>setRecovery({...recovery,[trigger]:{...recovery[trigger],value:Number(event.target.value)}})}/></label>}</div>)}<p className="muted">긴 휴식은 전용 규칙이 없을 때 짧은 휴식 규칙을 한 번 적용합니다.</p></fieldset>}
+    {mode !== 'edit_template' && !templateOnly && <div className="form-columns"><label className="form-field">소유 범위<select aria-label="소유 범위" value={scope} disabled={busy} onChange={event=>{setScope(event.target.value as typeof scope);setOwner('');}}><option value="character">캐릭터 공유</option><option value="card">카드 전용</option><option value="item">아이템 소유</option></select></label>{scope!=='character'&&<label className="form-field">소유 카드/아이템<select aria-label="소유 카드/아이템" required value={owner} disabled={busy} onChange={event=>setOwner(event.target.value)}><option value="">선택하세요</option>{allowedOwners.map(card=><option key={card.id} value={card.id}>{card.name}</option>)}</select></label>}</div>}
+    {!locked&&mode!=='edit_template'&&<label className="checkbox-line"><input type="checkbox" checked={templateOnly} onChange={event=>setTemplateOnly(event.target.checked)}/>템플릿만 저장 · 지금 장착하지 않음</label>}
+    {mode==='attach'&&<p className="muted">선택한 캐릭터에 최대량으로 새 자원을 장착합니다. 기존 캐릭터의 현재량은 바뀌지 않습니다.</p>}
+    {(error||controller.error)&&<p className="error-banner" role="alert">{error||controller.error}</p>}
+    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>취소</button><button type="submit" disabled={busy}>{mode==='attach'?'장착 확정':mode==='instance'?'설정 변경 확정':'자원 저장'}</button></div>
+  </form></Modal>;
+}
+
+export function ResourceManager({ cards, controller, onClose }: { cards: CardDefinition[]; controller: ResourceController; onClose: () => void }) {
+  const [selection,setSelection] = useState<FormSelection>();
+  const [deletion,setDeletion] = useState<{id:string;name:string;template:boolean}>();
+  const snapshot=controller.snapshot;
+  if(selection&&snapshot)return <ResourceForm key={`${selection.mode}-${selection.template?.id??selection.resource?.id??'new'}`} selection={selection} cards={cards} controller={controller} onClose={()=>setSelection(undefined)}/>;
+  return <Modal title="자원 관리" wide onClose={onClose}>{!snapshot?<p>상단에서 캐릭터를 선택해 주세요.</p>:<>
+    <p className="manager-help">장착 자원의 현재량과 템플릿은 별도입니다. 사용 중인 템플릿은 복제해서 편집합니다. 아래 설정 변경은 이전 자원 변경 기록의 실행 취소 경계가 됩니다.</p>
+    <button className="primary" disabled={controller.busy} onClick={()=>setSelection({mode:'new'})}>새 자원 만들기</button>
+    <h3 className="manager-subtitle">이 캐릭터에 장착한 자원</h3><div className="module-list">{snapshot.resources.map(resource=><section className="module-row" key={resource.id}><div><strong>{resource.name}</strong><p className="muted">{resource.kind==='counter'?`${resource.remaining} / ${resource.capacity} ${resource.unit}`:'레벨별 슬롯 트랙'} · {resource.overrides.scope==='character'?'공유':resource.overrides.scope==='card'?'카드 전용':'아이템'}</p></div><div><button disabled={controller.busy} aria-label={`${resource.name} 자원 설정`} onClick={()=>setSelection({mode:'instance',resource})}>설정</button><button disabled={controller.busy} aria-label={`${resource.name} 자원 연결 해제`} onClick={()=>setDeletion({id:resource.id,name:resource.name,template:false})}>연결 해제</button></div></section>)}</div>
+    <h3 className="manager-subtitle">자원 템플릿 라이브러리</h3><div className="module-list">{snapshot.templates.map(template=><section className="module-row" key={template.id}><div><strong>{template.name}</strong><p className="muted">{template.unit} · v{template.version}</p></div><div><button disabled={controller.busy} aria-label={`${template.name} 템플릿 장착`} onClick={()=>setSelection({mode:'attach',template})}>장착</button><button disabled={controller.busy} aria-label={`${template.name} 템플릿 복제`} onClick={()=>setSelection({mode:'clone',template})}>복제</button><button disabled={controller.busy} aria-label={`${template.name} 템플릿 편집`} onClick={()=>setSelection({mode:'edit_template',template})}>편집</button><button disabled={controller.busy} aria-label={`${template.name} 템플릿 보관 해제`} onClick={()=>setDeletion({id:template.id,name:template.name,template:true})}>보관 해제</button></div></section>)}</div>
+    {deletion&&<div className="inline-confirm"><p>{deletion.template?`“${deletion.name}” 템플릿을 라이브러리에서 숨깁니다. 이미 장착된 자원은 유지됩니다.`:`“${deletion.name}” 자원을 연결 해제합니다. 연결된 카드 비용은 사용 불가 상태가 되며 다른 자원으로 자동 연결하지 않습니다.`}</p><button disabled={controller.busy} onClick={async()=>{if(await controller.perform(deletion.template?{type:'archive_template',templateId:deletion.id}:{type:'delete_resource',resourceId:deletion.id}))setDeletion(undefined);}}>자원 삭제 확인</button><button onClick={()=>setDeletion(undefined)}>취소</button></div>}
+    {controller.error&&<p className="error-banner" role="alert">{controller.error}</p>}
+  </>}</Modal>;
+}

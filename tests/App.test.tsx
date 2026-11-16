@@ -22,6 +22,7 @@ beforeEach(() => {
     createDeck: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     selectDeck: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     setDeckCards: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
+    getResources: vi.fn(), previewResource: vi.fn(), changeResource: vi.fn(),
   };
 });
 afterEach(cleanup);
@@ -32,10 +33,10 @@ describe('P0 card board', () => {
     const card = await screen.findByRole('button', { name: '상처 치료 카드 선택' });
     expect(screen.getByRole('complementary', { name: '자원 패널' })).toBeDefined();
     fireEvent.click(card);
-    expect(screen.getByRole('button', { name: '사용 · 준비 중' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: '사용 확정' }).hasAttribute('disabled')).toBe(true);
     expect(window.desktop.saveSettings).not.toHaveBeenCalled();
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(screen.queryByRole('button', { name: '사용 · 준비 중' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '사용 확정' })).toBeNull();
     expect(document.activeElement).toBe(card);
   });
   it('saves view mode through the allowlisted bridge', async () => {

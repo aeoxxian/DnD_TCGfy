@@ -1,0 +1,32 @@
+{
+  "appVersion": "0.3.0",
+  "os": "Windows NT 10.0.26200.0 x64",
+  "lint": "PASS (0 warnings)",
+  "typecheck": "PASS",
+  "unitTests": {
+    "files": 7,
+    "passed": 67,
+    "failed": 0
+  },
+  "sqliteVersion": 3,
+  "build": "PASS",
+  "packaging": "PASS",
+  "artifacts": [
+    {
+      "path": "release/win-unpacked/DnD TCG-fy.exe",
+      "bytes": 250093056,
+      "sha256": "23357447f516b21da1f616c4b2edd51704811434d1b8c9120bd48f8434283204"
+    },
+    {
+      "path": "release/win-unpacked/resources/app.asar",
+      "bytes": 15677343,
+      "sha256": "0d026df4cc817c7342a41ddf3f97f8a1954c505d348740e6610bd1aca9d65e5a"
+    }
+  ],
+  "notes": [
+    "Node 24.22.1 development; Electron 45.3.3 / embedded Node 24.22.3",
+    "No dependency versions changed in P2; root app version only",
+    "Rollup removed two unsupported PURE comment annotations in Zod; build succeeded",
+    "Direct electron-builder used dependency-tree traversal fallback because global npm was absent; Windows native Sharp and EXE passed actual tests"
+  ]
+}
