@@ -1,7 +1,7 @@
 {
   "name": "dnd-tcg-fy",
   "productName": "DnD TCG-fy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "오프라인 TCG 스타일 D&D 카드 보드",
   "author": "DnD TCG-fy",
@@ -26,6 +26,7 @@
   "dependencies": {
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "sharp": "0.35.5",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -78,6 +79,10 @@
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,
       "artifactName": "DnD-TCG-fy-Setup-${version}-${arch}.${ext}"
-    }
+    },
+    "asarUnpack": [
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
+    ]
   }
 }

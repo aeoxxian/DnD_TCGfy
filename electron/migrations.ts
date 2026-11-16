@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const migrations = [{
   version: 1,
   sql: `
@@ -19,6 +19,20 @@ export const migrations = [{
     CREATE INDEX idx_instances_character ON resource_instances(character_id);
     CREATE INDEX idx_events_character_time ON play_events(character_id, occurred_at);
     CREATE INDEX idx_cards_name ON card_definitions(name);
+  `,
+}, {
+  version: 2,
+  sql: `
+    ALTER TABLE card_definitions ADD COLUMN archived_at TEXT;
+    ALTER TABLE assets ADD COLUMN original_name TEXT;
+    CREATE TABLE tags(id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE card_tags(card_id TEXT NOT NULL REFERENCES card_definitions(id) ON DELETE CASCADE, tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE, PRIMARY KEY(card_id, tag_id));
+    INSERT OR IGNORE INTO tags(id,name,created_at,updated_at)
+      SELECT j.value,j.value,c.created_at,c.updated_at FROM card_definitions c,json_each(c.attributes_json,'$.tags') j WHERE j.type='text';
+    INSERT OR IGNORE INTO card_tags(card_id,tag_id)
+      SELECT c.id,j.value FROM card_definitions c,json_each(c.attributes_json,'$.tags') j WHERE j.type='text';
+    CREATE INDEX idx_card_tags_tag ON card_tags(tag_id);
+    CREATE INDEX idx_cards_active ON card_definitions(archived_at,created_at);
   `,
 }];
 

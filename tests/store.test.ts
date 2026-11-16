@@ -122,7 +122,7 @@ describe('SQLite persistence and compatibility', () => {
     store.db.exec(`INSERT INTO character_profiles(id,name,ruleset,level) VALUES ('a','가','homebrew',1),('b','나','homebrew',1);
       INSERT INTO resource_templates VALUES ('t','points','점수','counter','{}','user',1);
       INSERT INTO resource_instances VALUES ('r','a','t','{}','{}');
-      INSERT INTO card_definitions VALUES ('c','카드',NULL,'other',NULL,'{}','now','now');`);
+      INSERT INTO card_definitions(id,name,image_asset_id,kind,spell_level,attributes_json,created_at,updated_at) VALUES ('c','카드',NULL,'other',NULL,'{}','now','now');`);
     expect(() => store.db.exec("INSERT INTO card_bindings VALUES ('bad','b','c','points','r')")).toThrow();
     store.db.exec("INSERT INTO card_bindings VALUES ('good','a','c','points','r')");
     expect(store.db.prepare('SELECT count(*) AS n FROM card_bindings').get()).toMatchObject({ n: 1 });

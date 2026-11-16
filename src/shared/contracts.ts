@@ -8,6 +8,12 @@ export const settingsSchema = z.strictObject({
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };
 
+export const idSchema = z.string().min(1).max(128);
+export const roleSchema = z.enum(['damage', 'heal', 'protect', 'buff', 'debuff', 'utility', 'revive', 'other']);
+export const actionSchema = z.enum(['action', 'bonus_action', 'reaction', 'no_action', 'passive', 'special']);
+export const kindSchema = z.enum(['spell', 'attack', 'feature', 'feat', 'item', 'other']);
+export const rangeSchema = z.enum(['self', 'touch', 'melee', 'ranged', 'special']);
+
 const costSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('fixed'), costKey: z.string().min(1), amount: z.number().int().nonnegative() }),
   z.strictObject({ type: z.literal('slot'), costKey: z.string().min(1), slotSelection: z.enum(['standard', 'pact']) }),
@@ -20,9 +26,9 @@ const castingSchema = z.strictObject({
   .refine(v => v.minSlotLevel === undefined || v.maxSlotLevel === undefined || v.minSlotLevel <= v.maxSlotLevel);
 export const cardSchema = z.strictObject({
   id: z.string().min(1), name: z.string().min(1), imageAssetId: z.string().min(1).optional(),
-  kind: z.enum(['spell', 'feature', 'attack', 'item', 'feat', 'other']),
-  roles: z.array(z.enum(['heal', 'damage', 'utility', 'other'])),
-  actions: z.array(z.enum(['action', 'bonus_action', 'reaction', 'no_action', 'passive', 'special'])),
+  kind: kindSchema,
+  roles: z.array(roleSchema),
+  actions: z.array(actionSchema),
   range: z.strictObject({ kind: z.enum(['self', 'touch', 'melee', 'ranged', 'special']), feet: z.number().nonnegative().optional() }),
   tags: z.array(z.string().min(1)), description: z.string().optional(), spellLevel: z.number().int().min(0).max(9).optional(),
   castOptions: z.array(z.strictObject({ id: z.string().min(1), label: z.string().min(1), costs: z.array(costSchema), casting: castingSchema.optional() })).min(1),
@@ -31,7 +37,43 @@ export const cardSchema = z.strictObject({
 export type CardDefinition = z.infer<typeof cardSchema>;
 export type Role = CardDefinition['roles'][number];
 
-export interface Bootstrap {
+export const cardDraftSchema = z.strictObject({
+  id: idSchema.optional(),
+  name: z.string().trim().min(1, '카드 이름을 입력해 주세요.').max(200),
+  imageAssetId: idSchema.optional(),
+  kind: kindSchema,
+  roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
+  range: z.strictObject({ kind: rangeSchema, feet: z.number().int().min(0).max(100000).optional() }),
+  tags: z.array(idSchema).max(100), description: z.string().max(10000).optional(),
+  spellLevel: z.number().int().min(0).max(9).optional(),
+}).refine(v => v.spellLevel === undefined || v.kind === 'spell', '주문에만 주문 레벨을 지정할 수 있습니다.');
+export type CardDraft = z.infer<typeof cardDraftSchema>;
+export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100) });
+export const libraryStateSchema = z.strictObject({
+  query: z.string().max(200), roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
+  kinds: z.array(kindSchema).max(6), ranges: z.array(rangeSchema).max(5), tagIds: z.array(idSchema).max(100),
+  viewScope: z.enum(['library', 'deck']), activeCharacterId: idSchema.optional(),
+});
+export type LibraryState = z.infer<typeof libraryStateSchema>;
+export const DEFAULT_LIBRARY_STATE: LibraryState = { query: '', roles: [], actions: [], kinds: [], ranges: [], tagIds: [], viewScope: 'library' };
+export const tagMutationSchema = z.strictObject({ id: idSchema.optional(), name: z.string().trim().min(1).max(60) });
+export interface Tag { id: string; name: string; usageCount: number }
+export interface AssetPreview { id: string; name: string; url: string; thumbnailUrl: string; width: number; height: number }
+export interface ImportBatch { assets: AssetPreview[]; errors: { name: string; message: string }[] }
+export interface ProfileSummary { id: string; name: string; activeDeckId?: string }
+export interface Deck { id: string; characterId: string; name: string; cardIds: string[] }
+export const createProfileSchema = z.strictObject({ name: z.string().trim().min(1).max(100) });
+export const createDeckSchema = z.strictObject({ characterId: idSchema, name: z.string().trim().min(1).max(100) });
+export const selectDeckSchema = z.strictObject({ characterId: idSchema, deckId: idSchema });
+export const deckCardsSchema = z.strictObject({ deckId: idSchema, cardIds: z.array(idSchema).max(5000) });
+export const importPathsSchema = z.array(z.string().min(1).max(32767)).min(1).max(100);
+
+export interface Library {
+  cards: CardDefinition[]; tags: Tag[]; profiles: ProfileSummary[]; decks: Deck[];
+  libraryState: LibraryState; warnings: string[];
+}
+
+export interface Bootstrap extends Library {
   settings: Settings;
   cards: CardDefinition[];
   appVersion: string;
@@ -41,5 +83,19 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 export interface DesktopBridge {
   getBootstrap(): Promise<Result<Bootstrap>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
+  saveLibraryState(state: LibraryState): Promise<Result<LibraryState>>;
+  importImages(files: File[]): Promise<Result<ImportBatch>>;
+  saveCards(input: z.infer<typeof saveCardsSchema>): Promise<Result<Library>>;
+  archiveCard(id: string): Promise<Result<Library>>;
+  saveTag(input: z.infer<typeof tagMutationSchema>): Promise<Result<Library>>;
+  deleteTag(id: string): Promise<Result<Library>>;
+  createProfile(input: z.infer<typeof createProfileSchema>): Promise<Result<Library>>;
+  createDeck(input: z.infer<typeof createDeckSchema>): Promise<Result<Library>>;
+  selectDeck(input: z.infer<typeof selectDeckSchema>): Promise<Result<Library>>;
+  setDeckCards(input: z.infer<typeof deckCardsSchema>): Promise<Result<Library>>;
 }
-export const IPC = { getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save' } as const;
+export const IPC = {
+  getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save', saveLibraryState: 'library:state',
+  importImages: 'assets:import', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
+  createProfile: 'profiles:create', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
+} as const;

@@ -7,7 +7,9 @@ import { AppStore } from './store';
 import { SCHEMA_VERSION } from './migrations';
 import { APP_URL, DEV_URL, PRODUCTION_CSP, isAllowedRequest, isTrustedPage, resolveBundleAsset } from './security';
 import { IPC, settingsSchema, type Result } from '../src/shared/contracts';
-import { SAMPLE_CARDS } from '../src/shared/sample-cards';
+import { LibraryStore } from './library-store';
+import { AssetService } from './assets';
+import { UserInputError } from './errors';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const development = !app.isPackaged && process.env.DND_TCG_DEV_URL === DEV_URL;
@@ -26,6 +28,8 @@ else {
   app.on('second-instance', () => { if (mainWindow?.isMinimized()) mainWindow.restore(); mainWindow?.focus(); });
   app.whenReady().then(async () => {
     store = new AppStore(app.getPath('userData'));
+    const library = new LibraryStore(store);
+    const assets = new AssetService(app.getPath('userData'), library);
     // Read settings now: corrupted persisted settings stop startup without resetting data.
     store.getSettings();
     const ses = session.defaultSession;
@@ -34,6 +38,13 @@ else {
     ses.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !isAllowedRequest(details.url, development) }));
     const rendererRoot = join(__dirname, '..', 'dist');
     protocol.handle('app', async request => {
+      if (new URL(request.url).host === 'assets') {
+        try {
+          const asset = await assets.readAsset(request.url);
+          if (!asset) return new Response('Image unavailable', { status: 404 });
+          return new Response(Uint8Array.from(asset.bytes), { headers: { 'Content-Type': asset.mime, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-cache' } });
+        } catch { return new Response('Image unavailable', { status: 404 }); }
+      }
       const filePath = resolveBundleAsset(request.url, rendererRoot);
       if (!filePath) return new Response('Forbidden', { status: 403 });
       const contentTypes: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
@@ -42,20 +53,30 @@ else {
       } catch { return new Response('Not found', { status: 404 }); }
     });
     const safeHandler = (channel: string, action: (input: unknown) => unknown) => {
-      ipcMain.handle(channel, (event, input: unknown): Result<unknown> => {
+      ipcMain.handle(channel, async (event, input: unknown): Promise<Result<unknown>> => {
         if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame || !isTrustedPage(event.senderFrame.url, development)) return { ok: false, error: '허용되지 않은 요청입니다.' };
-        try { return { ok: true, value: action(input) }; }
+        try { return { ok: true, value: await action(input) }; }
         catch (error) {
           console.error(`[${channel}]`, error);
-          return { ok: false, error: '설정 처리에 실패했습니다. 입력과 저장 공간을 확인해 주세요. 기존 데이터를 초기화하지 않았습니다.' };
+          return { ok: false, error: error instanceof UserInputError ? error.message : error instanceof z.ZodError ? '입력값의 형식이나 길이가 올바르지 않습니다.' : '저장 처리에 실패했습니다. 저장 공간을 확인하고 다시 시도해 주세요. 기존 데이터를 초기화하지 않았습니다.' };
         }
       });
     };
     safeHandler(IPC.getBootstrap, input => {
       z.undefined().parse(input);
-      return { settings: store!.getSettings(), cards: SAMPLE_CARDS, appVersion: app.getVersion(), schemaVersion: SCHEMA_VERSION };
+      return { settings: store!.getSettings(), ...library.getLibrary(), appVersion: app.getVersion(), schemaVersion: SCHEMA_VERSION };
     });
     safeHandler(IPC.saveSettings, input => store!.saveSettings(settingsSchema.parse(input)));
+    safeHandler(IPC.saveLibraryState, input => library.saveState(input));
+    safeHandler(IPC.importImages, input => assets.importPaths(input));
+    safeHandler(IPC.saveCards, input => library.saveCards(input));
+    safeHandler(IPC.archiveCard, input => library.archiveCard(input));
+    safeHandler(IPC.saveTag, input => library.saveTag(input));
+    safeHandler(IPC.deleteTag, input => library.deleteTag(input));
+    safeHandler(IPC.createProfile, input => library.createProfile(input));
+    safeHandler(IPC.createDeck, input => library.createDeck(input));
+    safeHandler(IPC.selectDeck, input => library.selectDeck(input));
+    safeHandler(IPC.setDeckCards, input => library.setDeckCards(input));
     mainWindow = new BrowserWindow({
       title: 'DnD TCG-fy', width: 1440, height: 900, minWidth: 960, minHeight: 600, backgroundColor: '#14161b',
       show: false, autoHideMenuBar: true,
