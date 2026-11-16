@@ -2,6 +2,11 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC, type DesktopBridge, type Settings } from '../src/shared/contracts';
 
 const bridge: DesktopBridge = {
+  getTrash: () => ipcRenderer.invoke(IPC.getTrash),
+  previewTrash: input => ipcRenderer.invoke(IPC.previewTrash,input),
+  changeTrash: input => ipcRenderer.invoke(IPC.changeTrash,input),
+  retryImageCleanup: () => ipcRenderer.invoke(IPC.retryImageCleanup),
+  getUseHistory: input => ipcRenderer.invoke(IPC.getUseHistory,input),
   previewEdit: action => ipcRenderer.invoke(IPC.previewEdit, action),
   applyEdit: input => ipcRenderer.invoke(IPC.applyEdit, input),
   getEditHistory: () => ipcRenderer.invoke(IPC.getEditHistory),

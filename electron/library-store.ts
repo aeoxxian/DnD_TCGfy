@@ -1,3 +1,4 @@
+import { moveCardsToTrash } from './trash-store';
 import { randomUUID } from 'node:crypto';
 import {
   cardSchema, saveCardsSchema, libraryStateSchema, DEFAULT_LIBRARY_STATE, tagMutationSchema, idSchema,
@@ -63,7 +64,7 @@ export class LibraryStore {
     const profiles: ProfileSummary[] = profileRows.map(row => ({ id: row.id, name: row.name, activeDeckId: row.active_deck_id ?? undefined,classId:row.class_id??undefined,level:row.level,ruleset:row.ruleset }));
     const decks = (this.db.prepare('SELECT id,character_id,name FROM decks ORDER BY rowid').all() as { id: string; character_id: string; name: string }[]).map(row => ({
       id: row.id, characterId: row.character_id, name: row.name,
-      cardIds: (this.db.prepare('SELECT card_id FROM deck_cards WHERE deck_id=? ORDER BY position').all(row.id) as { card_id: string }[]).map(v => v.card_id),
+      cardIds: (this.db.prepare('SELECT dc.card_id FROM deck_cards dc JOIN card_definitions c ON c.id=dc.card_id WHERE dc.deck_id=? AND c.archived_at IS NULL ORDER BY dc.position').all(row.id) as { card_id: string }[]).map(v => v.card_id),
     } satisfies Deck));
     return { cards, tags, profiles, decks, libraryState: this.getState(), warnings };
   }
@@ -106,7 +107,7 @@ export class LibraryStore {
   archiveCard(input: unknown): Library {
     const id = idSchema.parse(input);
     this.getCard(id);
-    transaction(this.db, () => this.db.prepare('UPDATE card_definitions SET archived_at=?,updated_at=? WHERE id=?').run(new Date().toISOString(), new Date().toISOString(), id));
+    transaction(this.db, () => moveCardsToTrash(this.db,[id],randomUUID()));
     return this.getLibrary();
   }
   saveTag(input: unknown): Library {
@@ -176,7 +177,7 @@ export class LibraryStore {
     return this.getLibrary();
   }
   getAsset(id: string): AssetRecord | undefined {
-    return this.db.prepare('SELECT * FROM assets WHERE id=?').get(id) as unknown as AssetRecord | undefined;
+    return this.db.prepare('SELECT * FROM assets WHERE id=? AND NOT EXISTS(SELECT 1 FROM asset_cleanup WHERE asset_id=assets.id)').get(id) as unknown as AssetRecord | undefined;
   }
   addAsset(asset: AssetRecord): void {
     transaction(this.db, () => this.db.prepare('INSERT INTO assets(id,relative_path,sha256,mime_type,width,height,original_name) VALUES (?,?,?,?,?,?,?)')

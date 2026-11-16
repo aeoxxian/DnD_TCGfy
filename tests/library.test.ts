@@ -116,14 +116,14 @@ describe('card library persistence', () => {
     const row = store.db.prepare('SELECT attributes_json FROM card_definitions WHERE id=?').get(first.id) as { attributes_json: string };
     expect(JSON.parse(row.attributes_json).tags).toEqual([otherTag.id]); store.close();
   });
-  it('archives a card while preserving its row, asset and deck references', () => {
+  it('moves an archived card to trash, preserving metadata and deck snapshots', () => {
     const { store, library } = fixture(); const card = library.saveCards({ cards: [draft()] }).cards[0];
     library.createProfile({ name: '프로필' }); const deck = library.getLibrary().decks[0];
     library.setDeckCards({ deckId: deck.id, cardIds: [card.id] });
     const result = library.archiveCard(card.id);
-    expect(result.cards).toEqual([]); expect(result.decks[0].cardIds).toEqual([card.id]);
+    expect(result.cards).toEqual([]); expect(result.decks[0].cardIds).toEqual([]);expect(JSON.parse(String(store.db.prepare('SELECT decks_json FROM card_trash WHERE card_id=?').get(card.id)!.decks_json))[0].id).toBe(deck.id);
     const fresh = library.saveCards({ cards: [draft('다른 카드')] }).cards[0];
-    expect(library.setDeckCards({ deckId: deck.id, cardIds: [card.id, fresh.id] }).decks[0].cardIds).toEqual([card.id, fresh.id]);
+    expect(()=>library.setDeckCards({ deckId: deck.id, cardIds: [card.id, fresh.id] })).toThrow();expect(library.getLibrary().decks[0].cardIds).toEqual([fresh.id]);
     expect(store.db.prepare('SELECT archived_at FROM card_definitions WHERE id=?').get(card.id)).not.toMatchObject({ archived_at: null });
     expect(() => library.saveCards({ cards: [editable(card)] })).toThrow(); store.close();
   });

@@ -37,6 +37,8 @@ async function readBounded(path: string): Promise<Buffer> {
 }
 
 export class AssetService {
+  private readonly activeReads = new Map<string,Set<Promise<unknown>>>();
+  async waitForReads(id:string){await Promise.allSettled([...(this.activeReads.get(id)??[])]);}
   private readonly pendingThumbnails = new Map<string, Promise<Buffer>>();
   constructor(readonly userData: string, readonly library: LibraryStore) {}
   private cachePath(id: string): string { return join(this.userData, 'cache', 'thumbnails', `${createHash('sha256').update(id).digest('hex')}.webp`); }
@@ -108,9 +110,14 @@ export class AssetService {
     const asset = this.library.getAsset(id);
     if (!asset) return;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(asset.mime_type)) return;
+    const task=this.readManagedAsset(asset,parts.length===2);
+    const reads=this.activeReads.get(id)??new Set<Promise<unknown>>();reads.add(task);this.activeReads.set(id,reads);
+    try{return await task;}finally{reads.delete(task);if(!reads.size)this.activeReads.delete(id);}
+  }
+  private async readManagedAsset(asset:AssetRecord,thumbnail:boolean):Promise<{bytes:Buffer;mime:string}|undefined>{
     const path = await this.managedPath(asset.relative_path);
     if (!(await stat(path)).isFile()) return;
-    if (parts.length === 2) return { bytes: await this.readThumbnail(asset, path), mime: 'image/webp' };
+    if (thumbnail) return { bytes: await this.readThumbnail(asset, path), mime: 'image/webp' };
     const bytes = await readBounded(path);
     if (createHash('sha256').update(bytes).digest('hex') !== asset.sha256) return;
     return { bytes, mime: asset.mime_type };

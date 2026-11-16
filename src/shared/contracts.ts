@@ -1,3 +1,4 @@
+import type { TrashBridge } from './trash';
 import type { EditBridge } from './bulk';
 import { z } from 'zod';
 import type { ResourceBridge } from './resources';
@@ -85,7 +86,7 @@ export interface Bootstrap extends Library {
   schemaVersion: number;
 }
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-export interface DesktopBridge extends ResourceBridge, EditBridge {
+export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge {
   getBootstrap(): Promise<Result<Bootstrap>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   saveLibraryState(state: LibraryState): Promise<Result<LibraryState>>;
@@ -100,6 +101,7 @@ export interface DesktopBridge extends ResourceBridge, EditBridge {
   setDeckCards(input: z.infer<typeof deckCardsSchema>): Promise<Result<Library>>;
 }
 export const IPC = {
+  getTrash:'trash:get', previewTrash:'trash:preview', changeTrash:'trash:change', retryImageCleanup:'trash:cleanup', getUseHistory:'resources:history',
   previewEdit: 'edits:preview', applyEdit: 'edits:apply', getEditHistory: 'edits:history',
   getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save', saveLibraryState: 'library:state',
   importImages: 'assets:import', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',

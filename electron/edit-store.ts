@@ -16,7 +16,7 @@ const tables = {
 type Table = keyof typeof tables;
 type Row = Record<string, SQLInputValue>;
 interface Patch { table: Table; key: Row; before: Row | null; after: Row | null }
-interface JournalRow { id: string; label: string; action_json: string; summary_json: string; patches_json: string; created_at: string; restored_at: string | null }
+interface JournalRow { id: string; label: string; action_json: string; summary_json: string; patches_json: string; created_at: string; restored_at: string | null; invalidated_at?:string | null }
 const json = (v: unknown) => JSON.stringify(v);
 const hash = (v: unknown) => createHash('sha256').update(json(v)).digest('hex');
 const requireValue = <T>(v: T | undefined, message: string): T => { if (!v) throw new UserInputError(message); return v; };
@@ -54,7 +54,7 @@ export class EditStore {
     this.db.prepare('INSERT INTO resource_revisions VALUES (?,1) ON CONFLICT(character_id) DO UPDATE SET revision=revision+1').run(characterId);
   }
   private restore(id: string): EditSummary {
-    const batch = requireValue(this.db.prepare('SELECT * FROM edit_batches WHERE id=? AND restored_at IS NULL').get(id) as unknown as JournalRow | undefined, '복원 가능한 일괄 기록이 없습니다.');
+    const batch = requireValue(this.db.prepare('SELECT * FROM edit_batches WHERE id=? AND restored_at IS NULL AND invalidated_at IS NULL').get(id) as unknown as JournalRow | undefined, '복원 가능한 일괄 기록이 없습니다.');
     const patches: Patch[] = JSON.parse(batch.patches_json); const summary: EditSummary = JSON.parse(batch.summary_json);
     // Compare every row first. Later edits/spending must never be overwritten.
     for (const patch of patches) {
@@ -173,10 +173,10 @@ export class EditStore {
       if (p.summary.requiresImpact && !request.confirmImpact) throw new UserInputError('다른 캐릭터와 공통 데이터에 미치는 영향을 확인해 주세요.');
       const before = this.rows(); const summary = this.execute(request.action); const patches = this.diff(before,this.rows());
       const batchId = request.action.type === 'restore' ? request.action.batchId : randomUUID(); const now = new Date().toISOString();
-      if (request.action.type !== 'restore') this.db.prepare('INSERT INTO edit_batches VALUES (?,?,?,?,?,?,NULL)').run(batchId,summary.label,json(request.action),json(summary),json(patches),now);
+      if (request.action.type !== 'restore') this.db.prepare('INSERT INTO edit_batches(id,label,action_json,summary_json,patches_json,created_at,restored_at) VALUES (?,?,?,?,?,?,NULL)').run(batchId,summary.label,json(request.action),json(summary),json(patches),now);
       this.db.prepare('INSERT INTO edit_requests VALUES (?,?,?,?)').run(request.requestId,fingerprint,batchId,now);
       return {batchId,replayed:false};
     });
   }
-  history(input?: unknown): EditBatch[] { z.undefined().parse(input); return (this.db.prepare('SELECT * FROM edit_batches ORDER BY rowid DESC').all() as unknown as JournalRow[]).map(row=>({...JSON.parse(row.summary_json),id:row.id,createdAt:row.created_at,restoredAt:row.restored_at??undefined})); }
+  history(input?: unknown): EditBatch[] { z.undefined().parse(input); return (this.db.prepare('SELECT * FROM edit_batches ORDER BY rowid DESC').all() as unknown as JournalRow[]).map(row=>({...JSON.parse(row.summary_json),id:row.id,createdAt:row.created_at,restoredAt:row.restored_at??undefined,unavailable:!!row.invalidated_at})); }
 }

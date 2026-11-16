@@ -1,3 +1,4 @@
+import { useHistoryInputSchema, type UseHistory } from '../src/shared/trash';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AppStore } from './store';
@@ -56,6 +57,11 @@ export class ResourceStore {
       label: typeof raw.label === 'string' ? raw.label : '이전 버전 기록', changes: Array.isArray(raw.changes) ? raw.changes : [],
       reversible: raw.engineVersion === 1 && raw.reversible === true, barrier: raw.engineVersion !== 1 || raw.barrier === true,
       classUndo:raw.classUndo, costSnapshot:raw.costSnapshot, selectedSlotLevels:raw.selectedSlotLevels, castingLevel:raw.castingLevel, engineVersion: raw.engineVersion, cardId: raw.cardId, castOptionId: raw.castOptionId, undoesEventId: raw.undoesEventId, override: raw.override };
+  }
+  history(input:unknown):UseHistory {
+    const {characterId,beforeRow}=useHistoryInputSchema.parse(input);this.profile(characterId);
+    const rows=this.db.prepare("SELECT rowid AS history_row,* FROM play_events WHERE character_id=? AND event_type='card_used' AND rowid<? ORDER BY rowid DESC LIMIT 51").all(characterId,beforeRow??Number.MAX_SAFE_INTEGER) as unknown as (EventRow & {history_row:number})[];
+    return {events:rows.slice(0,50).map(row=>this.readEvent(row)),nextRow:rows.length>50?rows[49].history_row:undefined};
   }
   private undoTarget(characterId: string): ResourceEvent | undefined {
     const rows = this.db.prepare(`SELECT p.* FROM play_events p LEFT JOIN resource_undos u ON u.target_event_id=p.id

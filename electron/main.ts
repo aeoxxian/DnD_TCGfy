@@ -1,3 +1,5 @@
+import { TrashStore } from './trash-store';
+import { AssetCleanup } from './asset-cleanup';
 import { EditStore } from './edit-store';
 import { app, BrowserWindow, dialog, ipcMain, protocol, session } from 'electron';
 import { readFile } from 'node:fs/promises';
@@ -34,6 +36,9 @@ else {
     const assets = new AssetService(app.getPath('userData'), library);
     const resources = new ResourceStore(store);
     const edits = new EditStore(store);
+    const trash = new TrashStore(store);
+    const cleanup = new AssetCleanup(store,assets);
+    await cleanup.run();
     // Read settings now: corrupted persisted settings stop startup without resetting data.
     store.getSettings();
     const ses = session.defaultSession;
@@ -81,6 +86,11 @@ else {
     safeHandler(IPC.createDeck, input => library.createDeck(input));
     safeHandler(IPC.selectDeck, input => library.selectDeck(input));
     safeHandler(IPC.setDeckCards, input => library.setDeckCards(input));
+    safeHandler(IPC.getTrash, input => trash.state(input));
+    safeHandler(IPC.previewTrash, input => trash.preview(input));
+    safeHandler(IPC.changeTrash, async input => { const result=trash.change(input); return result.type==='purge'||result.type==='empty'?{...result,cleanup:await cleanup.run()}:result; });
+    safeHandler(IPC.retryImageCleanup, input => {z.undefined().parse(input);return cleanup.run();});
+    safeHandler(IPC.getUseHistory, input => resources.history(input));
     safeHandler(IPC.previewEdit, input => edits.preview(input));
     safeHandler(IPC.applyEdit, input => edits.apply(input));
     safeHandler(IPC.getEditHistory, input => edits.history(input));

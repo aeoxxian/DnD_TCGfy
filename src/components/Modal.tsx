@@ -9,7 +9,7 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
     dialog.showModal();
     return () => { dialog.close(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
   }, []);
-  return <dialog ref={ref} className={`modal ${wide ? 'modal-wide' : ''}`} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }}>
+  return <dialog ref={ref} className={`modal ${wide ? 'modal-wide' : ''}`} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
     <div className="modal-heading"><h2 id={titleId}>{title}</h2><button aria-label={`${title} 닫기`} onClick={onClose}>닫기</button></div>
     {children}
   </dialog>;

@@ -328,3 +328,17 @@ summary { cursor: pointer; font-size: 12px; color: #c3c8d2; }
 .batch-tag { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:8px 0; }
 .batch-select { display:flex; align-items:center; gap:8px; margin:8px 0; }
 @media (min-width:1700px) { .hand .card-item { flex-basis:220px; } }
+
+.trash-move { border-color:#8b7447; color:#edcf91; }
+button.danger { background:#662b31; border-color:#a04c55; color:#fff1f1; }
+button.danger:hover:not(:disabled) { background:#86323b; }
+.trash-list { display:grid; gap:12px; margin:16px 0; }
+.trash-row { display:grid; grid-template-columns:24px 100px minmax(0,1fr) auto; align-items:center; gap:16px; padding:12px; border:1px solid var(--border); border-radius:8px; }
+.trash-image { padding:0; background:transparent; }
+.trash-image .card-face { width:100%; }
+.trash-row-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.cleanup-notice { padding:12px; border:1px solid #8b7447; margin:12px 0; }
+.use-history-list li { padding:16px 4px; border-bottom:1px solid var(--border); }
+@media(max-width:800px) { .trash-row { grid-template-columns:24px 72px minmax(0,1fr); gap:8px; } .trash-row-actions { grid-column:2 / -1; } }
+
+.board-status { flex-wrap:wrap; gap:8px; }

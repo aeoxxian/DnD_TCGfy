@@ -15,7 +15,7 @@ export type EditAction = z.input<typeof editActionSchema>;
 export const editCommitSchema = z.strictObject({ requestId: z.uuid(), action: editActionSchema, quote: z.string().length(64), confirmImpact: z.boolean() });
 export interface EditSummary { label: string; details: string[]; characters: string[]; targets: string[]; requiresImpact: boolean }
 export interface EditPreview extends EditSummary { quote: string }
-export interface EditBatch extends EditSummary { id: string; createdAt: string; restoredAt?: string }
+export interface EditBatch extends EditSummary { id: string; createdAt: string; restoredAt?: string; unavailable?:boolean }
 export interface EditBridge {
   previewEdit(action: EditAction): Promise<Result<EditPreview>>;
   applyEdit(input: z.input<typeof editCommitSchema>): Promise<Result<{ batchId: string; replayed: boolean }>>;

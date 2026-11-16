@@ -42,7 +42,7 @@ export interface ResourceChange { resourceInstanceId: string; slotLevel?: number
 export interface CardBinding { id: string; characterId: string; cardId: string; costKey: string; resourceInstanceId: string }
 export interface ResourceEvent {
   id: string; characterId: string; type: string; label: string; changes: ResourceChange[]; timestamp: string;
-  cardId?: string; castOptionId?: string; selectedSlotLevels?: Record<string,number>; castingLevel?: number; costSnapshot?: { name: string; spellLevel?: number; option: import('./contracts').CastOption }; classUndo?: { before: unknown; after: unknown }; undoesEventId?: string; reversible: boolean; barrier: boolean; engineVersion?: number; override?: boolean;
+  cardId?: string; castOptionId?: string; selectedSlotLevels?: Record<string,number>; castingLevel?: number; costSnapshot?: { nameAtDeletion?:boolean; unavailable?:boolean; name: string; spellLevel?: number; option: import('./contracts').CastOption }; classUndo?: { before: unknown; after: unknown }; undoesEventId?: string; reversible: boolean; barrier: boolean; engineVersion?: number; override?: boolean;
 }
 export interface ResourceSnapshot { profile?: CharacterConfiguration; costOverrides?: {cardId:string;castOptions:import('./contracts').CastOption[]}[]; sharedCostUsers?: Record<string,number>; characterId: string; revision: number; resources: ResourceView[]; templates: ResourceTemplate[]; bindings: CardBinding[]; events: ResourceEvent[]; warnings: string[]; undoTargetId?: string }
 export const choicesSchema = z.record(z.string().min(1).max(128), resourceInteger).default({});

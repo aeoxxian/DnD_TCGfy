@@ -1,3 +1,4 @@
+import { runTrash } from './trash-scenarios.mjs';
 import { runBulk } from './bulk-scenarios.mjs';
 import { openAdvancedRules } from './use-rule-helpers.mjs';
 import { _electron as electron } from 'playwright';
@@ -18,7 +19,7 @@ const userData = join(runPath, 'user-data'); const fixtures = join(runPath, 'fix
 await mkdir(join(userData, 'data'), { recursive: true }); await mkdir(fixtures);
 const dbPath = join(userData, 'data', 'app.sqlite3');
 const binary = process.env.DND_TCG_EXECUTABLE;
-const fromVersion = process.argv.includes('--from-v4')?4:process.argv.includes('--from-v3')?3:process.argv.includes('--from-v2') ? 2 : 1;
+const fromVersion = process.argv.includes('--from-v5')?5:process.argv.includes('--from-v4')?4:process.argv.includes('--from-v3')?3:process.argv.includes('--from-v2') ? 2 : 1;
 const devMode = process.argv.includes('--dev'); assert(!(binary && devMode));
 const env = { ...process.env, DND_TCG_TEST_USER_DATA: userData };
 delete env.ELECTRON_RUN_AS_NODE; delete env.DND_TCG_DEV_URL;
@@ -40,7 +41,8 @@ db.exec(`INSERT INTO character_profiles(id,name,ruleset,level,class_id) VALUES (
   INSERT INTO play_events VALUES ('p0-event','p0-character','manual_adjustment','{"changes":[]}','2026-11-16T00:00:00.000Z');`);
 if (fromVersion >= 2) { db.exec(migrations[1].sql); db.exec('PRAGMA user_version=2'); db.exec("INSERT INTO schema_migrations VALUES (2,'2026-11-16T00:00:00.000Z')"); }
 if(fromVersion>=3){db.exec(migrations[2].sql);db.exec('PRAGMA user_version=3');db.exec("INSERT INTO schema_migrations VALUES (3,'2026-11-16T00:00:00.000Z')");}
-if(fromVersion===4){db.exec(migrations[3].sql);db.exec('PRAGMA user_version=4');db.exec("INSERT INTO schema_migrations VALUES (4,'2026-11-17T00:00:00.000Z')");}
+if(fromVersion>=4){db.exec(migrations[3].sql);db.exec('PRAGMA user_version=4');db.exec("INSERT INTO schema_migrations VALUES (4,'2026-11-17T00:00:00.000Z')");}
+if(fromVersion>=5){db.exec(migrations[4].sql);db.exec('PRAGMA user_version=5');db.exec("INSERT INTO schema_migrations VALUES (5,'2026-11-17T00:00:00.000Z')");}
 const resourceBefore = db.prepare('SELECT id,character_id,template_id,overrides_json,current_state_json FROM resource_instances').all(); const eventsBefore = db.prepare('SELECT * FROM play_events').all(); db.close();
 
 const sources = [];
@@ -101,16 +103,16 @@ try {
     const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
     return { packaged: app.isPackaged, appVersion: app.getVersion(), electron: process.versions.electron, node: process.versions.node, userData: app.getPath('userData'), sandbox: prefs.sandbox, nodeIntegration: prefs.nodeIntegration, contextIsolation: prefs.contextIsolation, webSecurity: prefs.webSecurity };
   });
-  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.4.2');
+  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.4.3');
   assert.equal(runtime.sandbox, true); assert.equal(runtime.nodeIntegration, false); assert.equal(runtime.contextIsolation, true); assert.equal(runtime.webSecurity, true);
-  let data = await state(); assert.equal(data.schemaVersion, 5); assert.deepEqual(data.settings, initialSettings);
+  let data = await state(); assert.equal(data.schemaVersion, 6); assert.deepEqual(data.settings, initialSettings);
   assert.deepEqual(data.cards[0].castOptions, legacyCard.castOptions); assert.equal(data.cards[0].id, 'p0-card');
   assert.equal(data.tags[0].id, 'legacy-tag'); assert.equal(data.decks[0].cardIds[0], 'p0-card');
   assert.equal((await readdir(join(userData, 'backups'))).length, 1);
   const isolation = await page.evaluate(() => ({ require: typeof window.require, process: typeof window.process, keys: Object.keys(window.desktop).sort() }));
   assert.equal(isolation.require, 'undefined'); assert.equal(isolation.process, 'undefined');
   assert(!isolation.keys.includes('invoke')); assert(!isolation.keys.includes('getPathForFile'));
-  recordCheck(`v${fromVersion} DB → v5 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified`);
+  recordCheck(`v${fromVersion} DB → v6 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified`);
 
   await page.getByRole('button', { name: '카드 등록', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: '카드 등록', exact: true });
@@ -132,6 +134,13 @@ try {
   const sharedTag = data.tags.find(tag => tag.name === '검수 공통'); assert.equal(sharedTag.usageCount, 20);
   recordCheck('20 actual PNG/JPEG/WebP files imported through file input; malformed file rejected; bulk metadata saved atomically');
 
+  if(process.argv.includes('--trash-only')){
+    const profiles=await page.evaluate(async()=>{await window.desktop.createProfile({name:'휴지통 A'});await window.desktop.createProfile({name:'휴지통 B'});return(await window.desktop.getBootstrap()).value.profiles.filter(p=>p.name.startsWith('휴지통'));});
+    await page.evaluate(async()=>{const lib=(await window.desktop.getBootstrap()).value;await window.desktop.archiveCard(lib.cards.find(c=>c.name==='TEST-20').id);});
+    const [a,b]=profiles;const readResources=async(id=a.id)=>(await page.evaluate(id=>window.desktop.getResources(id),id)).value;
+    const trash=await runTrash({getPage:()=>page,getApp:()=>app,state,resourceState:readResources,selectCard,edit,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA:a,playerB:b,imagePath:inputPaths[0],dbPath,userData});
+    assert.deepEqual(pageErrors,[]);assert.deepEqual(securityWarnings,[]);const result={outcome:'PASS',mode:'targeted-trash',trash,checks,pageErrors,securityWarnings,artifacts:runPath};await writeFile(join(runPath,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+  }else{
   await edit('TEST-01', async dialog => {
     await dialog.getByLabel('카드 이름', { exact: true }).fill('치유의 카드'); await checksTo(dialog, '카드 역할', ['치유', '보호']);
   });
@@ -156,7 +165,7 @@ try {
   for (const card of beforeReplacement.filter(card => card.id !== first.id)) assert.deepEqual(data.cards.find(next => next.id === card.id), card);
   recordCheck('Per-card metadata/tag edits and image replacement preserve stable IDs, cost options, other cards and old originals');
 
-  await page.getByRole('button', { name: '태그 관리', exact: true }).click(); dialog = page.getByRole('dialog', { name: '공통 태그 관리' });
+  await page.getByRole('button',{name:'라이브러리 관리',exact:true}).click();await page.getByRole('button', { name: '태그 관리', exact: true }).click(); dialog = page.getByRole('dialog', { name: '공통 태그 관리' });
   await dialog.getByLabel('검수 공통 태그 이름', { exact: true }).fill('공유 태그 수정');
   await dialog.getByRole('button', { name: '검수 공통 태그 이름 저장' }).click();
   await dialog.getByLabel('공유 태그 수정 태그 이름', { exact: true }).waitFor();
@@ -235,12 +244,12 @@ try {
 
   const independentTag = (await state()).tags.find(tag => tag.name === '독립 태그');
   await page.locator('.extra-filters summary').click(); await page.getByRole('group', { name: '태그 필터' }).getByRole('button', { name: '독립 태그', exact: true }).click(); await countVisible(1);
-  await page.getByRole('button', { name: '태그 관리', exact: true }).click(); dialog = page.getByRole('dialog', { name: '공통 태그 관리' });
+  await page.getByRole('button',{name:'라이브러리 관리',exact:true}).click();await page.getByRole('button', { name: '태그 관리', exact: true }).click(); dialog = page.getByRole('dialog', { name: '공통 태그 관리' });
   await dialog.getByRole('button', { name: '독립 태그 태그 삭제', exact: true }).click(); await dialog.getByRole('button', { name: '태그 삭제 확인' }).click();
   await dialog.getByLabel('독립 태그 태그 이름', { exact: true }).waitFor({ state: 'hidden' }); await dialog.getByRole('button', { name: '공통 태그 관리 닫기' }).click();
   data = await state(); assert(!data.libraryState.tagIds.includes(independentTag.id)); assert(!data.cards.find(card => card.id === second.id).tags.includes(independentTag.id)); assert(data.cards.find(card => card.id === first.id).tags.includes(sharedTag.id));
-  await showAll(); await selectCard('DROPPED'); await page.getByRole('button', { name: '등록 해제', exact: true }).click();
-  const archiveDialog = page.getByRole('dialog', { name: '카드 등록 해제' }); await archiveDialog.getByRole('button', { name: '등록 해제 확인' }).click(); await archiveDialog.waitFor({ state: 'hidden' }); await waitCount(21);
+  await showAll(); await selectCard('DROPPED');await page.getByRole('button',{name:'선택 관리',exact:true}).click();await page.getByRole('button',{name:'휴지통으로 이동',exact:true}).click();
+  const archiveDialog=page.getByRole('dialog',{name:'휴지통 이동 확인',exact:true});await archiveDialog.getByRole('button',{name:'휴지통으로 이동 확정',exact:true}).click();await archiveDialog.waitFor({state:'hidden'});await waitCount(21);await page.getByRole('button',{name:'선택 관리 종료',exact:true}).click();
   recordCheck('Explicit common-tag deletion clears only that tag and its saved filter; archive preserves original data and references');
 
   await page.getByRole('button', { name: '손패', exact: true }).click(); await page.getByRole('status').filter({ hasText: '환경 설정 저장됨' }).waitFor();
@@ -374,11 +383,13 @@ try {
   const p3=await runP3({getPage:()=>page,getApp:()=>app,state,resourceState,selectCard,edit,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA,playerB});
   const p31=await runP31({getPage:()=>page,getApp:()=>app,state,resourceState,selectCard,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA,playerB,imagePath:inputPaths[3],dbPath});
   const bulk=await runBulk({getPage:()=>page,getApp:()=>app,state,resourceState,selectCard,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA,playerB});
+  const trash=await runTrash({getPage:()=>page,getApp:()=>app,state,resourceState,selectCard,edit,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA,playerB,imagePath:inputPaths[0],dbPath,userData});
   const hashDb=new DatabaseSync(dbPath,{readOnly:true});const allAssets=hashDb.prepare('SELECT * FROM assets').all();hashDb.close();
   for(const asset of allAssets){const source=sources.find(source=>source.fileName===asset.original_name);assert.equal(sha(await readFile(join(userData,asset.relative_path))),source.hash);assert.equal(sha(await readFile(source.path)),source.hash);}
   assert.deepEqual(pageErrors,[]);assert.deepEqual(securityWarnings,[]);const verificationDb=new DatabaseSync(dbPath,{readOnly:true});assert.deepEqual(verificationDb.prepare('PRAGMA foreign_key_check').all(),[]);assert.equal(verificationDb.prepare('PRAGMA integrity_check').get().integrity_check,'ok');verificationDb.close();
-  const result = { outcome: 'PASS', p3, p31, bulk, migration: {fromVersion,toVersion:5,backupCount:(await readdir(join(userData,'backups'))).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, initialBatchImagesRegistered: 20, finalManagedAssets: allAssets.length, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
+  const result = { outcome: 'PASS', p3, p31, bulk, trash, migration: {fromVersion,toVersion:6,backupCount:(await readdir(join(userData,'backups'))).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, initialBatchImagesRegistered: 20, finalManagedAssets: allAssets.length, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
   await writeFile(join(runPath,'result.json'),JSON.stringify(result,null,2)); console.log(JSON.stringify(result,null,2));
+  }
 } catch (error) {
   if (app && page) { try { await capture('failure'); } catch { /* Preserve the original error. */ } }
   await writeFile(join(runPath,'failure.txt'),String(error.stack ?? error)); throw error;
