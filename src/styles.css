@@ -149,7 +149,7 @@ summary { cursor: pointer; font-size: 12px; color: #c3c8d2; }
 .cards-area.hand { min-height: 370px; }
 .hand .card-button { flex-basis: 196px; }
 .cards-area.grid { grid-template-columns: repeat(auto-fill,minmax(170px,1fr)); }
-.card-face.image-face { padding: 0; background: #11141a; border-radius: 5px; }
+.card-face.image-face { padding: 0; background: #11141a; border-radius: 0; overflow: visible; }
 .image-face img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .image-fallback { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 100%; padding: 12px; }
 .image-fallback>span { color: var(--accent); font-size: 36px; margin-bottom: 18px; }

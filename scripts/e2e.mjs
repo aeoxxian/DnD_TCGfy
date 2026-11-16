@@ -119,6 +119,8 @@ try {
   data = await state(); const importedCards = data.cards.filter(card => card.id !== 'p0-card');
   assert.equal(new Set(importedCards.map(card => card.id)).size, 20);
   assert(importedCards.every(card => card.imageAssetId && card.spellLevel === 1 && card.roles.includes('damage') && card.actions.includes('bonus_action')));
+  assert.equal(await page.locator('.image-face').first().evaluate(face => getComputedStyle(face).overflow), 'visible');
+  assert.equal(await page.locator('.image-face img').first().evaluate(img => getComputedStyle(img).objectFit), 'contain');
   const sharedTag = data.tags.find(tag => tag.name === '검수 공통'); assert.equal(sharedTag.usageCount, 20);
   recordCheck('20 actual PNG/JPEG/WebP files imported through file input; malformed file rejected; bulk metadata saved atomically');
 
