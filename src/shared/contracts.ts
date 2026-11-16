@@ -48,7 +48,9 @@ export const cardDraftSchema = z.strictObject({
   spellLevel: z.number().int().min(0).max(9).optional(),
 }).refine(v => v.spellLevel === undefined || v.kind === 'spell', '주문에만 주문 레벨을 지정할 수 있습니다.');
 export type CardDraft = z.infer<typeof cardDraftSchema>;
-export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100) });
+export const registrationTargetSchema = z.strictObject({ characterId: idSchema, deckId: idSchema });
+export type RegistrationTarget = z.infer<typeof registrationTargetSchema>;
+export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional() });
 export const libraryStateSchema = z.strictObject({
   query: z.string().max(200), roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
   kinds: z.array(kindSchema).max(6), ranges: z.array(rangeSchema).max(5), tagIds: z.array(idSchema).max(100),

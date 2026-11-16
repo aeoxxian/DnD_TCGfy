@@ -68,10 +68,16 @@ export class LibraryStore {
     return { cards, tags, profiles, decks, libraryState: this.getState(), warnings };
   }
   saveCards(input: unknown): Library {
-    const { cards: drafts } = saveCardsSchema.parse(input);
+    const { cards: drafts, registrationTarget } = saveCardsSchema.parse(input);
     const ids = drafts.flatMap(card => card.id ? [card.id] : []);
     if (new Set(ids).size !== ids.length) throw new UserInputError('같은 카드를 한 번에 두 번 수정할 수 없습니다.');
     transaction(this.db, () => {
+      const state = this.getState();
+      const profile = state.activeCharacterId ? this.db.prepare('SELECT id,active_deck_id FROM character_profiles WHERE id=?').get(state.activeCharacterId) as { id: string; active_deck_id: string | null } | undefined : undefined;
+      const currentTarget = profile?.active_deck_id ? { characterId: profile.id, deckId: profile.active_deck_id } : null;
+      if (drafts.some(card => !card.id) && registrationTarget !== undefined && (registrationTarget?.characterId !== currentTarget?.characterId || registrationTarget?.deckId !== currentTarget?.deckId)) throw new UserInputError('활성 캐릭터 또는 덱이 바뀌었습니다. 등록 창을 다시 열어 목적지를 확인해 주세요.');
+      const target = registrationTarget === undefined ? currentTarget : registrationTarget;
+      if (drafts.some(card => !card.id) && target && !this.db.prepare('SELECT id FROM decks WHERE id=? AND character_id=?').get(target.deckId, target.characterId)) throw new UserInputError('선택한 덱의 소유 캐릭터가 일치하지 않습니다.');
       for (const draft of drafts) {
         const existing = draft.id ? this.getCard(draft.id) : undefined;
         const imageAssetId = draft.imageAssetId ?? existing?.imageAssetId;
@@ -92,6 +98,7 @@ export class LibraryStore {
         this.db.prepare('DELETE FROM card_tags WHERE card_id=?').run(id);
         const insertTag = this.db.prepare('INSERT INTO card_tags(card_id,tag_id) VALUES (?,?)');
         for (const tagId of card.tags) insertTag.run(id, tagId);
+        if (!existing && target) this.db.prepare('INSERT INTO deck_cards(deck_id,card_id,position) VALUES (?,?,(SELECT COALESCE(MAX(position),-1)+1 FROM deck_cards WHERE deck_id=?))').run(target.deckId, id, target.deckId);
       }
     });
     return this.getLibrary();
