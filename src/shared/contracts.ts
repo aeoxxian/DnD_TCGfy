@@ -21,7 +21,7 @@ export const costSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('variable'), costKey: z.string().min(1), min: z.number().int().nonnegative(), max: z.number().int().nonnegative(), step: z.number().int().positive(), slotLevel: z.number().int().min(1).max(9).optional() }).refine(v => v.min <= v.max),
 ]);
 const castingSchema = z.strictObject({
-  mode: z.enum(['standard', 'pact', 'homebrew']), allowUpcast: z.boolean(), allowBelowBase: z.boolean(),
+  mode: z.enum(['standard', 'pact', 'homebrew']), allowUpcast: z.boolean().default(true), allowBelowBase: z.boolean().default(false),
   minSlotLevel: z.number().int().min(1).max(9).optional(), maxSlotLevel: z.number().int().min(1).max(9).optional(),
 }).refine(v => !v.allowBelowBase || v.mode === 'homebrew', '다운캐스팅은 홈브루 옵션에만 허용됩니다.')
   .refine(v => v.minSlotLevel === undefined || v.maxSlotLevel === undefined || v.minSlotLevel <= v.maxSlotLevel);
@@ -64,7 +64,7 @@ export const tagMutationSchema = z.strictObject({ id: idSchema.optional(), name:
 export interface Tag { id: string; name: string; usageCount: number }
 export interface AssetPreview { id: string; name: string; url: string; thumbnailUrl: string; width: number; height: number }
 export interface ImportBatch { assets: AssetPreview[]; errors: { name: string; message: string }[] }
-export interface ProfileSummary { id: string; name: string; activeDeckId?: string }
+export interface ProfileSummary { id: string; name: string; activeDeckId?: string; classId?: string; level?: number; ruleset?: 'dnd5e_2014'|'homebrew' }
 export interface Deck { id: string; characterId: string; name: string; cardIds: string[] }
 export const createProfileSchema = z.strictObject({ name: z.string().trim().min(1).max(100) });
 export const createDeckSchema = z.strictObject({ characterId: idSchema, name: z.string().trim().min(1).max(100) });
@@ -102,5 +102,5 @@ export const IPC = {
   getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save', saveLibraryState: 'library:state',
   importImages: 'assets:import', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
   createProfile: 'profiles:create', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
-  getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
+  previewClass: 'classes:preview', getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
 } as const;

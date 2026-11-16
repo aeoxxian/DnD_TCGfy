@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export const migrations = [{
   version: 1,
   sql: `
@@ -44,6 +44,13 @@ export const migrations = [{
     CREATE TABLE resource_requests(request_id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES character_profiles(id), fingerprint TEXT NOT NULL, event_id TEXT REFERENCES play_events(id), occurred_at TEXT NOT NULL);
     CREATE TABLE resource_undos(target_event_id TEXT PRIMARY KEY REFERENCES play_events(id), undo_event_id TEXT NOT NULL UNIQUE REFERENCES play_events(id));
     CREATE INDEX idx_resource_requests_character ON resource_requests(character_id,occurred_at);
+  `,
+}, {
+  version: 4,
+  sql: `
+    ALTER TABLE resource_instances ADD COLUMN preset_key TEXT;
+    CREATE UNIQUE INDEX idx_preset_owner ON resource_instances(character_id,preset_key) WHERE preset_key IS NOT NULL AND archived_at IS NULL;
+    CREATE TABLE character_cost_overrides(character_id TEXT NOT NULL REFERENCES character_profiles(id), card_id TEXT NOT NULL REFERENCES card_definitions(id), cast_options_json TEXT NOT NULL CHECK(json_valid(cast_options_json)), updated_at TEXT NOT NULL, PRIMARY KEY(character_id,card_id));
   `,
 }];
 

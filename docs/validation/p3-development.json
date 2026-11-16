@@ -1,0 +1,65 @@
+{
+  "outcome": "PASS",
+  "p3": {
+    "classId": "warlock",
+    "level": 2,
+    "privateCards": 3,
+    "managedResources": 1
+  },
+  "migration": {
+    "fromVersion": 3,
+    "toVersion": 4,
+    "backupCount": 1
+  },
+  "mode": "vite-development",
+  "runtime": {
+    "packaged": false,
+    "appVersion": "0.4.0",
+    "electron": "45.3.3",
+    "node": "24.22.3",
+    "userData": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p1-e2e-aQ41UW\\user-data",
+    "sandbox": true,
+    "nodeIntegration": false,
+    "contextIsolation": true,
+    "webSecurity": true
+  },
+  "imageFilesRegistered": 20,
+  "imageFormats": {
+    "png": 12,
+    "jpeg": 4,
+    "webp": 4
+  },
+  "finalActiveCards": 26,
+  "checks": [
+    "v3 DB → v4 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified",
+    "20 actual PNG/JPEG/WebP files imported through file input; malformed file rejected; bulk metadata saved atomically",
+    "Per-card metadata/tag edits and image replacement preserve stable IDs, cost options, other cards and old originals",
+    "Original contain display, fit/natural-size enlargement, ESC return, hand/grid and lazy thumbnail rendering",
+    "OR roles + AND action/type/range/tag/title filtering; cards, tag labels, filters and P0 view settings restored after full restart",
+    "Two characters share one card with independent decks; extra deck creation/selection/membership and library/deck scope",
+    "Disk-backed File drag-and-drop follows the secure preload import pipeline",
+    "Missing managed image shows a safe fallback while metadata and editing remain available",
+    "Explicit common-tag deletion clears only that tag and its saved filter; archive preserves original data and references",
+    "1280x720 + Chromium 125%/150% scaling; no document horizontal overflow, controls remain scroll-accessible",
+    "All managed/source SHA-256 values match; old replacement/archive assets retained; P0 resources/events/bindings untouched",
+    "P1.1 new cards auto-link to the captured active deck atomically; character switch, edits and no-deck registration stay isolated",
+    "P1.1 attack role, attack kind and their AND intersection select independent, persisted metadata",
+    "P1.1 wheel/drag on 24 cards, no accidental selection, normal click and outside wheel preserved; wheel response 37 ms",
+    "P1.1 restart preserves new card metadata and automatic deck links",
+    "P2 multi-resource confirmation, double-click suppression, atomic insufficiency, multi-resource Undo and explicit no-spend exception",
+    "P2 shared pool across cards, four explicit recovery events, manual set/plus and persistent sequential Undo",
+    "P2 same template and card with independent A/B instances, bindings, histories and Undo; restart preserves exact resource snapshot",
+    "P2 variable cost min/max/step, selectable use options and free use through the actual Windows forms",
+    "P2 duplicate RPC receipts, spent-preserving instance maximum edit, deleted binding rejection and readable exhausted cards",
+    "P2 populated resource panel and card use controls at 1280x720 with 100/125/150% Chromium scaling, original preview and scroll access preserved",
+    "P3 2014 upcast selected tier only, below-base rejection, explicit homebrew downcast and character-only cost definition through Windows UI",
+    "P3 shared edit review, immutable past cost snapshots, independent private override and class/level change preview + Undo preserving spent slots",
+    "P3 pact automatic fixed level with no extra selector; independent Mystic Arcanum use, short-rest exclusion and long-rest restoration",
+    "P3 cantrip with a slot-based option uses no slot/binding/selector; P3 slot and cost forms remain accessible at 1280x720 and 125/150% scaling",
+    "P3 legacy custom homebrew class ID opens settings safely, survives level change and Undo, and keeps its P2 resource remaining unchanged",
+    "P3 pact tier conversion carries total spent count, class Undo and restart preserve exact profile/resources/private costs/history; other character isolated and original preview retained"
+  ],
+  "pageErrors": [],
+  "securityWarnings": [],
+  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p1-e2e-aQ41UW"
+}

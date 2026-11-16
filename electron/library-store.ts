@@ -59,8 +59,8 @@ export class LibraryStore {
     const tags = this.db.prepare(`SELECT t.id,t.name,COUNT(c.id) AS usageCount FROM tags t
       LEFT JOIN card_tags ct ON ct.tag_id=t.id LEFT JOIN card_definitions c ON c.id=ct.card_id AND c.archived_at IS NULL
       GROUP BY t.id ORDER BY t.name`).all() as unknown as Tag[];
-    const profileRows = this.db.prepare('SELECT id,name,active_deck_id FROM character_profiles ORDER BY rowid').all() as { id: string; name: string; active_deck_id: string | null }[];
-    const profiles: ProfileSummary[] = profileRows.map(row => ({ id: row.id, name: row.name, activeDeckId: row.active_deck_id ?? undefined }));
+    const profileRows = this.db.prepare('SELECT id,name,active_deck_id,class_id,level,ruleset FROM character_profiles ORDER BY rowid').all() as { id: string; name: string; active_deck_id: string | null; class_id:string|null; level:number;ruleset:'dnd5e_2014'|'homebrew' }[];
+    const profiles: ProfileSummary[] = profileRows.map(row => ({ id: row.id, name: row.name, activeDeckId: row.active_deck_id ?? undefined,classId:row.class_id??undefined,level:row.level,ruleset:row.ruleset }));
     const decks = (this.db.prepare('SELECT id,character_id,name FROM decks ORDER BY rowid').all() as { id: string; character_id: string; name: string }[]).map(row => ({
       id: row.id, characterId: row.character_id, name: row.name,
       cardIds: (this.db.prepare('SELECT card_id FROM deck_cards WHERE deck_id=? ORDER BY position').all(row.id) as { card_id: string }[]).map(v => v.card_id),

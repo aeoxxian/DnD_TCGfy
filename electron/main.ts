@@ -79,6 +79,7 @@ else {
     safeHandler(IPC.createDeck, input => library.createDeck(input));
     safeHandler(IPC.selectDeck, input => library.selectDeck(input));
     safeHandler(IPC.setDeckCards, input => library.setDeckCards(input));
+    safeHandler(IPC.previewClass, input => resources.previewClass(input));
     safeHandler(IPC.getResources, input => resources.snapshot(input));
     safeHandler(IPC.previewResource, input => resources.preview(input));
     safeHandler(IPC.changeResource, input => resources.change(input));

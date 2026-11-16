@@ -8,10 +8,13 @@ import { cardSchema, idSchema } from '../src/shared/contracts';
 import { templateDraftSchema, overrideSchema, resourceInteger, previewRequestSchema, resourceRequestSchema,
   type ResourceSnapshot, type ResourceTemplate, type ResourceView, type ResourceEvent, type ResourceChange,
   type ResourceOverrides, type ResourcePlan, type ResourcePreview, type ResourceResult, type TemplateDraft } from '../src/shared/resources';
+import { ClassStore, type ClassUndo } from './class-store';
+import { classInputSchema } from '../src/shared/class-contracts';
+import type { ClassInput } from '../src/shared/class-contracts';
 import { ResourceError, maximums, assertResource, planUse, planRecovery, planAdjustment, applyChanges, type CapacityProfile } from '../src/shared/resource-engine';
 
 interface TemplateRow { id: string; key: string; name: string; kind: 'counter'|'slot_track'; source: 'class_2014'|'user'; version: number; definition_json: string }
-interface InstanceRow { id: string; character_id: string; template_id: string; overrides_json: string; current_state_json: string }
+interface InstanceRow { id: string; character_id: string; template_id: string; overrides_json: string; current_state_json: string; preset_key?: string | null }
 interface EventRow { id: string; character_id: string; event_type: string; payload_json: string; occurred_at: string }
 const stateSchema = z.union([z.strictObject({ remaining: resourceInteger }),z.strictObject({ remainingByLevel: z.record(z.string().regex(/^[1-9]$/), resourceInteger) })]);
 function canonical(value: unknown): string {
@@ -24,6 +27,8 @@ const digest = (value: unknown) => createHash('sha256').update(canonical(value))
 export class ResourceStore {
   readonly db; readonly library;
   constructor(store: AppStore) { this.db = store.db; this.library = new LibraryStore(store); }
+  private classes() { return new ClassStore(this.db,id=>this.snapshot(id)); }
+  previewClass(input:unknown) { try{const value=z.strictObject({characterId:idSchema,configuration:classInputSchema}).parse(input); return this.classes().preview(value.characterId,value.configuration);}catch(error){if(error instanceof ResourceError)throw new UserInputError(error.message);throw error;} }
   private profile(id: string): CapacityProfile {
     const row = this.db.prepare('SELECT level,ability_scores_json FROM character_profiles WHERE id=?').get(id) as { level: number; ability_scores_json: string | null } | undefined;
     if (!row) throw new UserInputError('먼저 캐릭터를 선택해 주세요.');
@@ -31,7 +36,7 @@ export class ResourceStore {
   }
   private template(row: TemplateRow): ResourceTemplate {
     const raw = JSON.parse(row.definition_json);
-    const draft = templateDraftSchema.parse({ id: row.id, name: row.name, kind: row.kind, unit: raw.unit ?? '점', capacity: raw.capacity, slotCapacity: raw.slotCapacity, slotCapacityByClassLevel: raw.slotCapacityByClassLevel, recovery: raw.recovery ?? [] });
+    const draft = templateDraftSchema.parse({ id: row.id, name: row.name, kind: row.kind, unit: raw.unit ?? '점', unlimited:raw.unlimited, slotKind:raw.slotKind, capacity: raw.capacity, slotCapacity: raw.slotCapacity, slotCapacityByClassLevel: raw.slotCapacityByClassLevel, recovery: raw.recovery ?? [] });
     return { ...draft, id: row.id, key: row.key, source: row.source, version: row.version };
   }
   private getTemplate(id: string): ResourceTemplate {
@@ -41,7 +46,7 @@ export class ResourceStore {
   private readInstance(row: InstanceRow, profile: CapacityProfile): ResourceView {
     const template = this.getTemplate(row.template_id); const overrides = overrideSchema.parse(JSON.parse(row.overrides_json));
     const state = stateSchema.parse(JSON.parse(row.current_state_json));
-    const view: ResourceView = { id: row.id, characterId: row.character_id, templateId: row.template_id, name: overrides.nameOverride ?? template.name, unit: template.unit, kind: template.kind, template, overrides, ...maximums(template, profile, overrides), ...state };
+    const view: ResourceView = { id: row.id, characterId: row.character_id, templateId: row.template_id, presetKey:row.preset_key??undefined, unlimited:overrides.unlimitedOverride??template.unlimited, name: overrides.nameOverride ?? template.name, unit: template.unit, kind: template.kind, template, overrides, ...maximums(template, profile, overrides), ...state };
     if ((view.kind === 'counter') !== ('remaining' in state)) throw new ResourceError('자원 종류와 현재 상태가 일치하지 않습니다.');
     assertResource(view); return view;
   }
@@ -50,7 +55,7 @@ export class ResourceStore {
     return { id: row.id, characterId: row.character_id, type: row.event_type, timestamp: row.occurred_at,
       label: typeof raw.label === 'string' ? raw.label : '이전 버전 기록', changes: Array.isArray(raw.changes) ? raw.changes : [],
       reversible: raw.engineVersion === 1 && raw.reversible === true, barrier: raw.engineVersion !== 1 || raw.barrier === true,
-      engineVersion: raw.engineVersion, cardId: raw.cardId, castOptionId: raw.castOptionId, undoesEventId: raw.undoesEventId, override: raw.override };
+      classUndo:raw.classUndo, costSnapshot:raw.costSnapshot, selectedSlotLevels:raw.selectedSlotLevels, castingLevel:raw.castingLevel, engineVersion: raw.engineVersion, cardId: raw.cardId, castOptionId: raw.castOptionId, undoesEventId: raw.undoesEventId, override: raw.override };
   }
   private undoTarget(characterId: string): ResourceEvent | undefined {
     const rows = this.db.prepare(`SELECT p.* FROM play_events p LEFT JOIN resource_undos u ON u.target_event_id=p.id
@@ -59,13 +64,13 @@ export class ResourceStore {
       const event = this.readEvent(row as unknown as EventRow);
       if (event.type === 'undo') continue;
       if (event.barrier) return;
-      if (event.reversible && event.changes.length) return event;
+      if (event.reversible && (event.changes.length || event.classUndo)) return event;
     }
   }
   snapshot(input: unknown): ResourceSnapshot {
     const characterId = idSchema.parse(input); const profile = this.profile(characterId); const warnings: string[] = [];
     const templates: ResourceTemplate[] = [];
-    for (const row of this.db.prepare('SELECT * FROM resource_templates WHERE archived_at IS NULL ORDER BY rowid').all() as unknown as TemplateRow[]) {
+    for (const row of this.db.prepare("SELECT * FROM resource_templates WHERE archived_at IS NULL AND (source='user' OR id IN (SELECT template_id FROM resource_instances WHERE character_id=? AND archived_at IS NULL)) ORDER BY rowid").all(characterId) as unknown as TemplateRow[]) {
       try { templates.push(this.template(row)); } catch { warnings.push(`“${row.name}” 템플릿 설정이 불완전합니다. 기존 데이터는 보존했습니다.`); }
     }
     const resources: ResourceView[] = [];
@@ -75,11 +80,15 @@ export class ResourceStore {
     const revision = (this.db.prepare('SELECT revision FROM resource_revisions WHERE character_id=?').get(characterId) as { revision: number } | undefined)?.revision ?? 0;
     const bindings = (this.db.prepare('SELECT * FROM card_bindings WHERE character_id=?').all(characterId) as { id: string; character_id: string; card_id: string; cost_key: string; resource_instance_id: string }[]).map(row => ({ id: row.id, characterId: row.character_id, cardId: row.card_id, costKey: row.cost_key, resourceInstanceId: row.resource_instance_id }));
     const events = (this.db.prepare('SELECT * FROM play_events WHERE character_id=? ORDER BY rowid DESC LIMIT 40').all(characterId) as unknown as EventRow[]).map(row => this.readEvent(row));
-    return { characterId, revision, resources, templates, bindings, events, warnings, undoTargetId: this.undoTarget(characterId)?.id };
+    const costOverrides=(this.db.prepare('SELECT card_id,cast_options_json FROM character_cost_overrides WHERE character_id=?').all(characterId) as {card_id:string;cast_options_json:string}[]).map(row=>({cardId:row.card_id,castOptions:cardSchema.shape.castOptions.parse(JSON.parse(row.cast_options_json))}));
+    const users=this.db.prepare(`SELECT card_id,COUNT(DISTINCT character_id) AS n FROM (SELECT card_id,character_id FROM card_bindings WHERE character_id<>? UNION SELECT dc.card_id,d.character_id FROM deck_cards dc JOIN decks d ON d.id=dc.deck_id WHERE d.character_id<>?) GROUP BY card_id`).all(characterId,characterId) as {card_id:string;n:number}[];
+    return { profile:this.classes().profile(characterId),costOverrides,sharedCostUsers:Object.fromEntries(users.map(row=>[row.card_id,row.n])),characterId, revision, resources, templates, bindings, events, warnings, undoTargetId: this.undoTarget(characterId)?.id };
   }
-  private getCard(id: string) {
+  private getCard(id: string, characterId?:string) {
     const card = this.library.getLibrary().cards.find(card => card.id === id);
-    if (!card) throw new UserInputError('등록된 카드를 찾을 수 없습니다.'); return card;
+    if (!card) throw new UserInputError('등록된 카드를 찾을 수 없습니다.');
+    const row=characterId?this.db.prepare('SELECT cast_options_json FROM character_cost_overrides WHERE character_id=? AND card_id=?').get(characterId,id) as {cast_options_json:string}|undefined:undefined;
+    return row?{...card,castOptions:cardSchema.shape.castOptions.parse(JSON.parse(row.cast_options_json))}:card;
   }
   private checkScope(overrides: ResourceOverrides): void {
     if (overrides.scope === 'character') { if (overrides.ownerCardId) throw new UserInputError('캐릭터 공유 자원에는 소유 카드를 지정하지 않습니다.'); return; }
@@ -93,16 +102,16 @@ export class ResourceStore {
       const resource = snapshot.resources.find(resource => resource.id === action.resourceId); if (!resource) throw new UserInputError('현재 캐릭터의 자원이 아닙니다.');
       return planAdjustment(resource, action.delta, action.slotLevel);
     }
-    const card = this.getCard(action.cardId);
+    const card = this.getCard(action.cardId,snapshot.characterId);
     const keys = new Set(card.castOptions.find(option => option.id === action.optionId)?.costs.map(cost => cost.costKey));
     for (const binding of snapshot.bindings.filter(binding => binding.cardId === card.id && keys.has(binding.costKey))) {
       const resource = snapshot.resources.find(resource => resource.id === binding.resourceInstanceId);
       if (resource?.overrides.scope === 'item') this.checkScope(resource.overrides);
     }
-    return planUse(card, action.optionId, snapshot.resources, snapshot.bindings, action.choices);
+    return planUse(card, action.optionId, snapshot.resources, snapshot.bindings, action.choices,action.castingLevel);
   }
   private quote(snapshot: ResourceSnapshot, action: z.output<typeof previewRequestSchema>['action']): string {
-    return digest({ characterId: snapshot.characterId, revision: snapshot.revision, action, card: action.type === 'use' ? this.getCard(action.cardId) : undefined, bindings: snapshot.bindings, resources: snapshot.resources });
+    return digest({ characterId: snapshot.characterId, revision: snapshot.revision, action, card: action.type === 'use' ? this.getCard(action.cardId,snapshot.characterId) : undefined, bindings: snapshot.bindings, resources: snapshot.resources });
   }
   preview(input: unknown): ResourcePreview {
     try {
@@ -141,8 +150,12 @@ export class ResourceStore {
         if (prior) { if (prior.fingerprint !== fingerprint) throw new UserInputError('같은 요청 ID로 다른 내용을 처리할 수 없습니다.'); return { snapshot: this.snapshot(characterId), eventId: prior.event_id ?? undefined, replayed: true }; }
         const snapshot = this.snapshot(characterId);
         if (snapshot.revision !== request.expectedRevision) throw new UserInputError('자원 상태가 바뀌었습니다. 최신 상태에서 다시 확인해 주세요.');
-        let changes: ResourceChange[] = []; let label = ''; let eventType = 'profile_changed'; let barrier = true; let undoId: string | undefined; let configuration: unknown;
-        if (action.type === 'create_resource') {
+        let changes: ResourceChange[] = []; let label = ''; let eventType = 'profile_changed'; let barrier = true; let undoId: string | undefined; let configuration: unknown; let classUndo:ClassUndo|undefined; let usePlan:ResourcePlan|undefined;
+        if(action.type==='configure_class'){
+          const result=this.classes().apply(characterId,action.configuration as ClassInput,action.quote,action.confirmRetire);classUndo=result.undo;label=result.label;barrier=false;
+        }else if(action.type==='clear_cost_override'){
+          this.getCard(action.cardId);this.db.prepare('DELETE FROM character_cost_overrides WHERE character_id=? AND card_id=?').run(characterId,action.cardId);label='캐릭터 전용 비용 해제 · 공통 정의 사용';
+        }else if (action.type === 'create_resource') {
           if (action.template.id) throw new UserInputError('새 자원은 새 템플릿으로 만듭니다. 기존 템플릿은 장착을 이용하세요.');
           const templateId = this.saveTemplate(action.template); this.attach(characterId, templateId, { scope: action.scope, ownerCardId: action.ownerCardId }); label = `${action.template.name} 자원 생성`;
         } else if (action.type === 'save_template') { this.saveTemplate(action.template); label = `${action.template.name} 템플릿 저장`;
@@ -170,7 +183,7 @@ export class ResourceStore {
           const resource = snapshot.resources.find(resource => resource.id === action.resourceId); if (!resource) throw new UserInputError('현재 캐릭터의 자원이 아닙니다.');
           this.db.prepare('UPDATE resource_instances SET archived_at=? WHERE id=? AND character_id=?').run(new Date().toISOString(),resource.id,characterId); label = `${resource.name} 연결 해제`;
         } else if (action.type === 'save_costs') {
-          const card = this.getCard(action.cardId); const options = cardSchema.shape.castOptions.max(12).parse(action.castOptions);
+          const card = this.getCard(action.cardId,snapshot.characterId); const options = cardSchema.shape.castOptions.max(12).parse(action.castOptions);
           if (new Set(options.map(option => option.id)).size !== options.length) throw new UserInputError('사용 방식 ID가 중복됩니다.');
           const keys = new Set(options.flatMap(option => option.costs.map(cost => cost.costKey)));
           if (new Set(action.bindings.map(binding => binding.costKey)).size !== action.bindings.length) throw new UserInputError('비용별 연결이 중복됩니다.');
@@ -181,17 +194,23 @@ export class ResourceStore {
             this.checkScope(resource.overrides);
             if (resource.overrides.scope === 'card' && resource.overrides.ownerCardId !== card.id) throw new UserInputError('다른 카드 전용 자원입니다.');
           }
-          this.db.prepare("UPDATE card_definitions SET attributes_json=json_set(attributes_json,'$.castOptions',json(?)),updated_at=? WHERE id=?").run(JSON.stringify(options),new Date().toISOString(),card.id);
+          const shared=this.getCard(card.id);
+          if(action.expectedCardVersion!==undefined&&action.expectedCardVersion!==shared.updatedAt)throw new UserInputError('공통 카드가 변경됐습니다. 비용 설정을 다시 열어 주세요.');
+          if(action.scope==='shared'){
+            if(JSON.stringify(shared.castOptions)!==JSON.stringify(options)&&(snapshot.sharedCostUsers?.[card.id]??0)>0&&!action.confirmShared)throw new UserInputError('다른 캐릭터에 영향을 주는 공통 비용 수정에 동의해 주세요.');
+            this.db.prepare("UPDATE card_definitions SET attributes_json=json_set(attributes_json,'$.castOptions',json(?)),updated_at=? WHERE id=?").run(JSON.stringify(options),new Date().toISOString(),card.id);
+          }else this.db.prepare('INSERT INTO character_cost_overrides VALUES (?,?,?,?) ON CONFLICT(character_id,card_id) DO UPDATE SET cast_options_json=excluded.cast_options_json,updated_at=excluded.updated_at').run(characterId,card.id,JSON.stringify(options),new Date().toISOString());
           this.db.prepare('DELETE FROM card_bindings WHERE character_id=? AND card_id=?').run(characterId,card.id);
           for (const binding of action.bindings) this.db.prepare('INSERT INTO card_bindings(id,character_id,card_id,cost_key,resource_instance_id) VALUES (?,?,?,?,?)').run(randomUUID(),characterId,card.id,binding.costKey,binding.resourceInstanceId);
           label = `${card.name} 사용 방식/비용 연결`;
         } else if (action.type === 'undo') {
           const target = this.undoTarget(characterId); if (!target) throw new UserInputError('되돌릴 자원 변경이 없습니다. 설정 변경 이전 기록은 되돌리지 않습니다.');
+          if(target.classUndo)this.classes().undo(characterId,target.classUndo as ClassUndo);
           changes = target.changes.map(change => ({ ...change, before: change.after, after: change.before }));
-          this.writeStates(applyChanges(snapshot.resources, changes),changes,characterId); label = `${target.label} 실행 취소`; eventType = 'undo'; barrier = false; undoId = target.id;
+          if(!target.classUndo)this.writeStates(applyChanges(snapshot.resources, changes),changes,characterId); label = `${target.label} 실행 취소`; eventType = 'undo'; barrier = false; undoId = target.id;
         } else {
-          const previewAction = action.type === 'use' ? { type: 'use' as const, cardId: action.cardId, optionId: action.optionId, choices: action.choices } : action;
-          const plan = this.plan(snapshot, previewAction);
+          const previewAction = action.type === 'use' ? { type: 'use' as const, cardId: action.cardId, optionId: action.optionId, choices: action.choices,castingLevel:action.castingLevel } : action;
+          const plan = this.plan(snapshot, previewAction);usePlan=plan;
           if (action.type === 'use') {
             if (action.quote !== this.quote(snapshot,previewAction)) throw new UserInputError('카드 비용 또는 자원이 바뀌었습니다. 비용을 다시 확인해 주세요.');
             if (!plan.canUse && !(action.override && plan.canOverride)) throw new UserInputError(plan.reason ?? '사용할 수 없습니다.');
@@ -200,11 +219,12 @@ export class ResourceStore {
           } else { changes = plan.changes; eventType = action.type === 'recover' ? 'recovery' : 'manual_adjustment'; }
           this.writeStates(applyChanges(snapshot.resources, changes), changes, characterId); label = plan.label; barrier = false;
         }
-        const shouldRecord = barrier || changes.length > 0 || action.type === 'use';
+        const shouldRecord = barrier || changes.length > 0 || action.type === 'use' || action.type==='configure_class' || undoId!==undefined;
         let eventId: string | undefined;
         if (shouldRecord) {
           eventId = randomUUID();
-          const event = { engineVersion: 1, label, changes, reversible: !barrier && eventType !== 'undo' && changes.length > 0, barrier,
+          const usedCard=action.type==='use'?this.getCard(action.cardId,characterId):undefined;
+          const event = { classUndo,costSnapshot:usedCard&&action.type==='use'?{name:usedCard.name,spellLevel:usedCard.spellLevel,option:usedCard.castOptions.find(option=>option.id===action.optionId)}:undefined,selectedSlotLevels:usePlan?.selectedSlotLevels,castingLevel:usePlan?.castingLevel,engineVersion: 1, label, changes, reversible: !barrier && eventType !== 'undo' && (changes.length > 0 || !!classUndo), barrier,
             cardId: action.type === 'use' ? action.cardId : undefined, castOptionId: action.type === 'use' ? action.optionId : undefined,
             configuration, choices: action.type === 'use' ? action.choices : undefined, override: action.type === 'use' ? action.override : undefined, undoesEventId: undoId };
           this.db.prepare('INSERT INTO play_events(id,character_id,event_type,payload_json,occurred_at) VALUES (?,?,?,?,?)').run(eventId,characterId,eventType,JSON.stringify(event),new Date().toISOString());

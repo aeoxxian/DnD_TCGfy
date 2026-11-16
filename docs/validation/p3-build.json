@@ -1,0 +1,33 @@
+{
+  "appVersion": "0.4.0",
+  "os": "Windows NT 10.0.26200.0 x64",
+  "electron": "45.3.3",
+  "embeddedNode": "24.22.3",
+  "sqliteSchema": 4,
+  "lint": {
+    "outcome": "PASS",
+    "warnings": 0
+  },
+  "typecheck": "PASS",
+  "build": "PASS",
+  "packaging": "PASS",
+  "licenseNoticeIncludedInAsar": true,
+  "sourceValidation": {
+    "url": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
+    "pdfSha256": "2504d2a0abb0a4d491a939be4f17910a2dde0312570ab8d208080225ccf0a1f0",
+    "standardSlotRowsMatched": 140,
+    "classLevelParameterCases": 240
+  },
+  "artifacts": [
+    {
+      "path": "release/win-unpacked/DnD TCG-fy.exe",
+      "bytes": 250093056,
+      "sha256": "b1db394d94adb7ec3c397cdb72e47acdc9a656db7bc38e8db9c08f9fb9669f89"
+    },
+    {
+      "path": "release/win-unpacked/resources/app.asar",
+      "bytes": 15784204,
+      "sha256": "274c2e412e97271c9b94bb93aa9e8067aa6fae4b50ccb0695d5c188a2edc9ef3"
+    }
+  ]
+}

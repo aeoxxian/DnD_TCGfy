@@ -22,7 +22,7 @@ beforeEach(() => {
     createDeck: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     selectDeck: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     setDeckCards: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
-    getResources: vi.fn(), previewResource: vi.fn(), changeResource: vi.fn(),
+    previewClass:vi.fn(), getResources: vi.fn(), previewResource: vi.fn(), changeResource: vi.fn(),
   };
 });
 afterEach(cleanup);

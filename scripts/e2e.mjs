@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { createServer } from 'vite';
 import sharp from 'sharp';
+import { runP3 } from './p3-scenarios.mjs';
 import { migrations } from '../electron/migrations.ts';
 
 const root = resolve('artifacts'); await mkdir(root, { recursive: true });
@@ -14,7 +15,7 @@ const userData = join(runPath, 'user-data'); const fixtures = join(runPath, 'fix
 await mkdir(join(userData, 'data'), { recursive: true }); await mkdir(fixtures);
 const dbPath = join(userData, 'data', 'app.sqlite3');
 const binary = process.env.DND_TCG_EXECUTABLE;
-const fromVersion = process.argv.includes('--from-v2') ? 2 : 1;
+const fromVersion = process.argv.includes('--from-v3')?3:process.argv.includes('--from-v2') ? 2 : 1;
 const devMode = process.argv.includes('--dev'); assert(!(binary && devMode));
 const env = { ...process.env, DND_TCG_TEST_USER_DATA: userData };
 delete env.ELECTRON_RUN_AS_NODE; delete env.DND_TCG_DEV_URL;
@@ -26,7 +27,7 @@ db.exec("INSERT INTO schema_migrations VALUES (1,'2026-11-16T00:00:00.000Z')");
 db.prepare("INSERT INTO settings VALUES ('preferences',?)").run(JSON.stringify(initialSettings));
 const { id, name, kind, createdAt, updatedAt, ...attrs } = legacyCard;
 db.prepare('INSERT INTO card_definitions VALUES (?,?,NULL,?,NULL,?,?,?)').run(id, name, kind, JSON.stringify(attrs), createdAt, updatedAt);
-db.exec(`INSERT INTO character_profiles(id,name,ruleset,level) VALUES ('p0-character','P0 캐릭터','homebrew',1);
+db.exec(`INSERT INTO character_profiles(id,name,ruleset,level,class_id) VALUES ('p0-character','P0 캐릭터','homebrew',1,'homebrew-legacy');
   INSERT INTO decks VALUES ('p0-deck','p0-character','P0 덱');
   UPDATE character_profiles SET active_deck_id='p0-deck';
   INSERT INTO deck_cards VALUES ('p0-deck','p0-card',0);
@@ -34,7 +35,8 @@ db.exec(`INSERT INTO character_profiles(id,name,ruleset,level) VALUES ('p0-chara
   INSERT INTO resource_instances VALUES ('p0-resource','p0-character','p0-template','{}','{"remaining":3}');
   INSERT INTO card_bindings VALUES ('p0-binding','p0-character','p0-card','spirit','p0-resource');
   INSERT INTO play_events VALUES ('p0-event','p0-character','manual_adjustment','{"changes":[]}','2026-11-16T00:00:00.000Z');`);
-if (fromVersion === 2) { db.exec(migrations[1].sql); db.exec('PRAGMA user_version=2'); db.exec("INSERT INTO schema_migrations VALUES (2,'2026-11-16T00:00:00.000Z')"); }
+if (fromVersion >= 2) { db.exec(migrations[1].sql); db.exec('PRAGMA user_version=2'); db.exec("INSERT INTO schema_migrations VALUES (2,'2026-11-16T00:00:00.000Z')"); }
+if(fromVersion===3){db.exec(migrations[2].sql);db.exec('PRAGMA user_version=3');db.exec("INSERT INTO schema_migrations VALUES (3,'2026-11-16T00:00:00.000Z')");}
 const resourceBefore = db.prepare('SELECT id,character_id,template_id,overrides_json,current_state_json FROM resource_instances').all(); const eventsBefore = db.prepare('SELECT * FROM play_events').all(); db.close();
 
 const sources = [];
@@ -95,16 +97,16 @@ try {
     const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
     return { packaged: app.isPackaged, appVersion: app.getVersion(), electron: process.versions.electron, node: process.versions.node, userData: app.getPath('userData'), sandbox: prefs.sandbox, nodeIntegration: prefs.nodeIntegration, contextIsolation: prefs.contextIsolation, webSecurity: prefs.webSecurity };
   });
-  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.3.0');
+  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.4.0');
   assert.equal(runtime.sandbox, true); assert.equal(runtime.nodeIntegration, false); assert.equal(runtime.contextIsolation, true); assert.equal(runtime.webSecurity, true);
-  let data = await state(); assert.equal(data.schemaVersion, 3); assert.deepEqual(data.settings, initialSettings);
+  let data = await state(); assert.equal(data.schemaVersion, 4); assert.deepEqual(data.settings, initialSettings);
   assert.deepEqual(data.cards[0].castOptions, legacyCard.castOptions); assert.equal(data.cards[0].id, 'p0-card');
   assert.equal(data.tags[0].id, 'legacy-tag'); assert.equal(data.decks[0].cardIds[0], 'p0-card');
   assert.equal((await readdir(join(userData, 'backups'))).length, 1);
   const isolation = await page.evaluate(() => ({ require: typeof window.require, process: typeof window.process, keys: Object.keys(window.desktop).sort() }));
   assert.equal(isolation.require, 'undefined'); assert.equal(isolation.process, 'undefined');
   assert(!isolation.keys.includes('invoke')); assert(!isolation.keys.includes('getPathForFile'));
-  recordCheck(`v${fromVersion} DB → v3 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified`);
+  recordCheck(`v${fromVersion} DB → v4 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified`);
 
   await page.getByRole('button', { name: '카드 등록', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: '카드 등록', exact: true });
@@ -330,7 +332,7 @@ try {
     await form.getByRole('button',{name:'자원 저장',exact:true}).click();await form.waitFor({state:'hidden'});manager=page.getByRole('dialog',{name:'자원 관리',exact:true});await manager.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();await waitRemaining(name,max);return(await resourceState()).resources.find(resource=>resource.name===name);
   }
   const energy=await createModule('검수 영력',5,true);const material=await createModule('검수 촉매',1);
-  async function configure(title,costs){await selectCard(title);await page.getByRole('button',{name:'비용 설정',exact:true}).click();const form=page.getByRole('dialog',{name:'카드 비용 설정',exact:true});for(let i=0;i<costs.length;i++){if(await form.getByLabel(`연결 자원 1-${i+1}`,{exact:true}).count()===0)await form.getByRole('button',{name:'비용 추가 1',exact:true}).click();await form.getByLabel(`연결 자원 1-${i+1}`,{exact:true}).selectOption(costs[i].id);await form.getByLabel(`소모량 1-${i+1}`,{exact:true}).fill(String(costs[i].amount));}await form.getByRole('button',{name:'비용 연결 저장',exact:true}).click();await form.waitFor({state:'hidden'});await page.waitForFunction(()=>!document.querySelector('.use-button').disabled);}
+  async function configure(title,costs){await selectCard(title);await page.getByRole('button',{name:'비용 설정',exact:true}).click();const form=page.getByRole('dialog',{name:'카드 비용 설정',exact:true});for(let i=0;i<costs.length;i++){if(await form.getByLabel(`연결 자원 1-${i+1}`,{exact:true}).count()===0)await form.getByRole('button',{name:'비용 추가 1',exact:true}).click();await form.getByLabel(`연결 자원 1-${i+1}`,{exact:true}).selectOption(costs[i].id);await form.getByLabel(`소모량 1-${i+1}`,{exact:true}).fill(String(costs[i].amount));}if(await form.getByLabel('공통 비용 변경 영향 확인',{exact:true}).count())await form.getByLabel('공통 비용 변경 영향 확인',{exact:true}).check();await form.getByRole('button',{name:'비용 연결 저장',exact:true}).click();await form.waitFor({state:'hidden'});await page.waitForFunction(()=>!document.querySelector('.use-button').disabled);}
   await configure('치유의 카드',[{id:energy.id,amount:2},{id:material.id,amount:1}]);const beforeSelection=await resourceState();await page.keyboard.press('Escape');await selectCard('치유의 카드');assert.deepEqual(await resourceState(),beforeSelection);
   await page.getByRole('button',{name:'사용 확정',exact:true}).click({clickCount:2});await waitRemaining('검수 영력',3);await waitRemaining('검수 촉매',0);assert.equal((await resourceState()).events.filter(event=>event.type==='card_used').length,1);
   await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',5);await waitRemaining('검수 촉매',1);
@@ -351,7 +353,7 @@ try {
   assert(replayResult.every(result=>result.ok));assert.equal(replayResult.filter(result=>result.value.replayed).length,1);await waitRemaining('검수 영력',1);await page.reload();await page.getByRole('button',{name:'카드 등록',exact:true}).waitFor();await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',2);
   await aside.getByRole('button',{name:'자원 관리',exact:true}).click();manager=page.getByRole('dialog',{name:'자원 관리',exact:true});await manager.getByRole('button',{name:'검수 영력 자원 설정',exact:true}).click();modal=page.getByRole('dialog',{name:'장착 자원 설정',exact:true});await modal.getByLabel('최대치',{exact:true}).fill('7');await modal.getByRole('button',{name:'설정 변경 확정'}).click();await modal.waitFor({state:'hidden'});await page.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();await waitRemaining('검수 영력',4);assert.equal((await resourceState(playerB.id)).resources.find(resource=>resource.id===bEnergy.id).remaining,5);
   await selectCard('반응의 카드');await page.getByRole('button',{name:'비용 설정',exact:true}).click();modal=page.getByRole('dialog',{name:'카드 비용 설정',exact:true});
-  await modal.getByLabel('소모 방식 1-1',{exact:true}).selectOption('variable');await modal.getByLabel('min 1-1',{exact:true}).fill('1');await modal.getByLabel('max 1-1',{exact:true}).fill('3');await modal.getByLabel('step 1-1',{exact:true}).fill('2');await modal.getByRole('button',{name:'사용 방식 추가',exact:true}).click();await modal.getByLabel('방식 이름 2',{exact:true}).fill('무소모 검수');await capture('p2-cost-editor');await modal.getByRole('button',{name:'비용 연결 저장',exact:true}).click();await modal.waitFor({state:'hidden'});
+  await modal.getByLabel('소모 방식 1-1',{exact:true}).selectOption('variable');await modal.getByLabel('min 1-1',{exact:true}).fill('1');await modal.getByLabel('max 1-1',{exact:true}).fill('3');await modal.getByLabel('step 1-1',{exact:true}).fill('2');await modal.getByRole('button',{name:'사용 방식 추가',exact:true}).click();await modal.getByLabel('방식 이름 2',{exact:true}).fill('무소모 검수');await capture('p2-cost-editor');if(await modal.getByLabel('공통 비용 변경 영향 확인',{exact:true}).count())await modal.getByLabel('공통 비용 변경 영향 확인',{exact:true}).check();await modal.getByRole('button',{name:'비용 연결 저장',exact:true}).click();await modal.waitFor({state:'hidden'});
   await page.getByLabel('가변 소모량 1',{exact:true}).fill('3');await page.waitForFunction(()=>document.querySelector('.card-use .change-list')?.textContent.includes('4 → 1'));await page.getByRole('button',{name:'사용 확정',exact:true}).click();await waitRemaining('검수 영력',1);
   await page.getByLabel('사용 방식',{exact:true}).selectOption({label:'무소모 검수'});await page.waitForFunction(()=>!document.querySelector('.use-button').disabled);const freeBefore=await resourceState();await page.getByRole('button',{name:'사용 확정',exact:true}).click();await page.waitForFunction(async ({id,revision})=>(await window.desktop.getResources(id)).value.revision>revision,{id:playerA.id,revision:freeBefore.revision});assert.deepEqual((await resourceState()).resources,freeBefore.resources);
   await selectCard('치유의 카드');await page.waitForFunction(()=>document.querySelector('.exception-button'));await capture('p2-board-insufficient');await aside.getByRole('button',{name:'자원 관리',exact:true}).click();await capture('p2-resource-manager');await page.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();
@@ -365,9 +367,10 @@ try {
     await aside.getByRole('button',{name:'긴 휴식',exact:true}).scrollIntoViewIfNeeded();assert.equal(await aside.getByRole('button',{name:'긴 휴식',exact:true}).isVisible(),true);
   }
   recordCheck('P2 populated resource panel and card use controls at 1280x720 with 100/125/150% Chromium scaling, original preview and scroll access preserved');
+  const p3=await runP3({getPage:()=>page,getApp:()=>app,state,resourceState,selectCard,edit,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA,playerB});
   for(const asset of assets){const source=sources.find(source=>source.fileName===asset.original_name);assert.equal(sha(await readFile(join(userData,asset.relative_path))),source.hash);assert.equal(sha(await readFile(source.path)),source.hash);}
   assert.deepEqual(pageErrors,[]);assert.deepEqual(securityWarnings,[]);const verificationDb=new DatabaseSync(dbPath,{readOnly:true});assert.deepEqual(verificationDb.prepare('PRAGMA foreign_key_check').all(),[]);assert.equal(verificationDb.prepare('PRAGMA integrity_check').get().integrity_check,'ok');verificationDb.close();
-  const result = { outcome: 'PASS', migration: {fromVersion,toVersion:3,backupCount:(await readdir(join(userData,'backups'))).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, imageFilesRegistered: 20, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
+  const result = { outcome: 'PASS', p3, migration: {fromVersion,toVersion:4,backupCount:(await readdir(join(userData,'backups'))).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, imageFilesRegistered: 20, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
   await writeFile(join(runPath,'result.json'),JSON.stringify(result,null,2)); console.log(JSON.stringify(result,null,2));
 } catch (error) {
   if (app && page) { try { await capture('failure'); } catch { /* Preserve the original error. */ } }
