@@ -10,6 +10,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   window.desktop = {
+    previewEdit:vi.fn(), applyEdit:vi.fn(), getEditHistory:vi.fn(),
     getBootstrap: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     saveSettings: vi.fn().mockImplementation(async settings => ({ ok: true, value: settings })),
     saveLibraryState: vi.fn().mockImplementation(async state => ({ ok: true, value: state })),
@@ -26,6 +27,27 @@ beforeEach(() => {
   };
 });
 afterEach(cleanup);
+
+describe('bulk selection scope',()=>{
+  it('only shows checks in selection mode and clears selections on every filter change',async()=>{
+    render(<App/>);await screen.findByRole('button',{name:'선택 관리'});
+    expect(screen.queryByRole('checkbox',{name:'상처 치료 일괄 선택'})).toBeNull();
+    fireEvent.click(screen.getByRole('button',{name:'선택 관리'}));
+    fireEvent.click(screen.getByRole('button',{name:'표시 카드 전체 선택'}));
+    expect((screen.getByRole('checkbox',{name:'상처 치료 일괄 선택'}) as HTMLInputElement).checked).toBe(true);
+    fireEvent.change(screen.getByRole('searchbox',{name:'카드 이름 검색'}),{target:{value:'검격'}});
+    expect(screen.queryByRole('checkbox',{name:'상처 치료 일괄 선택'})).toBeNull();
+    expect((screen.getByRole('checkbox',{name:'검격 일괄 선택'}) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByRole('button',{name:'표시 카드 전체 선택'}));
+    expect((screen.getByRole('checkbox',{name:'검격 일괄 선택'}) as HTMLInputElement).checked).toBe(true);
+    fireEvent.change(screen.getByRole('searchbox',{name:'카드 이름 검색'}),{target:{value:''}});
+    expect((screen.getByRole('checkbox',{name:'상처 치료 일괄 선택'}) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole('checkbox',{name:'검격 일괄 선택'}) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByRole('button',{name:'선택 관리 종료'}));
+    expect(screen.queryByRole('checkbox',{name:'검격 일괄 선택'})).toBeNull();
+    expect(window.desktop.applyEdit).not.toHaveBeenCalled();
+  });
+});
 
 describe('P0 card board', () => {
   it('renders a Korean three-panel board and card selection never writes settings or resources', async () => {

@@ -142,10 +142,10 @@ export class ResourceStore {
       this.db.prepare('UPDATE resource_instances SET current_state_json=? WHERE id=? AND character_id=? AND archived_at IS NULL').run(JSON.stringify(state), id, characterId);
     }
   }
-  change(input: unknown): ResourceResult {
+  change(input: unknown, withinTransaction = false): ResourceResult {
     const request = resourceRequestSchema.parse(input); const { characterId, action } = request; const fingerprint = digest(request);
     try {
-      return transaction(this.db, () => {
+      const execute = () => {
         const prior = this.db.prepare('SELECT fingerprint,event_id FROM resource_requests WHERE request_id=?').get(request.requestId) as { fingerprint: string; event_id: string | null } | undefined;
         if (prior) { if (prior.fingerprint !== fingerprint) throw new UserInputError('같은 요청 ID로 다른 내용을 처리할 수 없습니다.'); return { snapshot: this.snapshot(characterId), eventId: prior.event_id ?? undefined, replayed: true }; }
         const snapshot = this.snapshot(characterId);
@@ -237,7 +237,8 @@ export class ResourceStore {
         }
         this.db.prepare('INSERT INTO resource_requests(request_id,character_id,fingerprint,event_id,occurred_at) VALUES (?,?,?,?,?)').run(request.requestId,characterId,fingerprint,eventId ?? null,new Date().toISOString());
         return { snapshot: this.snapshot(characterId), replayed: false, eventId };
-      });
+      };
+      return withinTransaction ? execute() : transaction(this.db, execute);
     } catch (error) { if (error instanceof ResourceError) throw new UserInputError(error.message); throw error; }
   }
 }

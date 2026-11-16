@@ -1,3 +1,4 @@
+import { runBulk } from './bulk-scenarios.mjs';
 import { openAdvancedRules } from './use-rule-helpers.mjs';
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
@@ -100,16 +101,16 @@ try {
     const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
     return { packaged: app.isPackaged, appVersion: app.getVersion(), electron: process.versions.electron, node: process.versions.node, userData: app.getPath('userData'), sandbox: prefs.sandbox, nodeIntegration: prefs.nodeIntegration, contextIsolation: prefs.contextIsolation, webSecurity: prefs.webSecurity };
   });
-  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.4.1');
+  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.4.2');
   assert.equal(runtime.sandbox, true); assert.equal(runtime.nodeIntegration, false); assert.equal(runtime.contextIsolation, true); assert.equal(runtime.webSecurity, true);
-  let data = await state(); assert.equal(data.schemaVersion, 4); assert.deepEqual(data.settings, initialSettings);
+  let data = await state(); assert.equal(data.schemaVersion, 5); assert.deepEqual(data.settings, initialSettings);
   assert.deepEqual(data.cards[0].castOptions, legacyCard.castOptions); assert.equal(data.cards[0].id, 'p0-card');
   assert.equal(data.tags[0].id, 'legacy-tag'); assert.equal(data.decks[0].cardIds[0], 'p0-card');
-  assert.equal((await readdir(join(userData, 'backups'))).length, fromVersion===4?0:1);
+  assert.equal((await readdir(join(userData, 'backups'))).length, 1);
   const isolation = await page.evaluate(() => ({ require: typeof window.require, process: typeof window.process, keys: Object.keys(window.desktop).sort() }));
   assert.equal(isolation.require, 'undefined'); assert.equal(isolation.process, 'undefined');
   assert(!isolation.keys.includes('invoke')); assert(!isolation.keys.includes('getPathForFile'));
-  recordCheck(`${fromVersion===4?'Existing v4 DB unchanged, no migration':`v${fromVersion} DB → v4 migration backup`}; preferences, costs, character/deck IDs preserved; sandbox verified`);
+  recordCheck(`v${fromVersion} DB → v5 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified`);
 
   await page.getByRole('button', { name: '카드 등록', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: '카드 등록', exact: true });
@@ -372,10 +373,11 @@ try {
   recordCheck('P2 populated resource panel and card use controls at 1280x720 with 100/125/150% Chromium scaling, original preview and scroll access preserved');
   const p3=await runP3({getPage:()=>page,getApp:()=>app,state,resourceState,selectCard,edit,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA,playerB});
   const p31=await runP31({getPage:()=>page,getApp:()=>app,state,resourceState,selectCard,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA,playerB,imagePath:inputPaths[3],dbPath});
+  const bulk=await runBulk({getPage:()=>page,getApp:()=>app,state,resourceState,selectCard,capture,restart:async()=>{await app.close();app=undefined;await launch();},recordCheck,playerA,playerB});
   const hashDb=new DatabaseSync(dbPath,{readOnly:true});const allAssets=hashDb.prepare('SELECT * FROM assets').all();hashDb.close();
   for(const asset of allAssets){const source=sources.find(source=>source.fileName===asset.original_name);assert.equal(sha(await readFile(join(userData,asset.relative_path))),source.hash);assert.equal(sha(await readFile(source.path)),source.hash);}
   assert.deepEqual(pageErrors,[]);assert.deepEqual(securityWarnings,[]);const verificationDb=new DatabaseSync(dbPath,{readOnly:true});assert.deepEqual(verificationDb.prepare('PRAGMA foreign_key_check').all(),[]);assert.equal(verificationDb.prepare('PRAGMA integrity_check').get().integrity_check,'ok');verificationDb.close();
-  const result = { outcome: 'PASS', p3, p31, migration: {fromVersion,toVersion:4,backupCount:(await readdir(join(userData,'backups'))).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, initialBatchImagesRegistered: 20, finalManagedAssets: allAssets.length, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
+  const result = { outcome: 'PASS', p3, p31, bulk, migration: {fromVersion,toVersion:5,backupCount:(await readdir(join(userData,'backups'))).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, initialBatchImagesRegistered: 20, finalManagedAssets: allAssets.length, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
   await writeFile(join(runPath,'result.json'),JSON.stringify(result,null,2)); console.log(JSON.stringify(result,null,2));
 } catch (error) {
   if (app && page) { try { await capture('failure'); } catch { /* Preserve the original error. */ } }

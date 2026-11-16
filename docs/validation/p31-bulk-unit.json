@@ -1,0 +1,66 @@
+{
+  "outcome": "PASS",
+  "appVersion": "0.4.2",
+  "schemaVersion": 5,
+  "testFiles": 11,
+  "passed": 357,
+  "failed": 0,
+  "sourceReport": "artifacts/bulk-tests-final.json",
+  "files": [
+    {
+      "name": "App.test.tsx",
+      "passed": 8,
+      "failed": 0
+    },
+    {
+      "name": "assets.test.ts",
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "name": "bulk.test.ts",
+      "passed": 16,
+      "failed": 0
+    },
+    {
+      "name": "classes.test.ts",
+      "passed": 258,
+      "failed": 0
+    },
+    {
+      "name": "library.test.ts",
+      "passed": 15,
+      "failed": 0
+    },
+    {
+      "name": "p11.test.tsx",
+      "passed": 5,
+      "failed": 0
+    },
+    {
+      "name": "resources.test.ts",
+      "passed": 19,
+      "failed": 0
+    },
+    {
+      "name": "security.test.ts",
+      "passed": 4,
+      "failed": 0
+    },
+    {
+      "name": "store.test.ts",
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "name": "use-rules.test.ts",
+      "passed": 8,
+      "failed": 0
+    },
+    {
+      "name": "UseRulesUI.test.tsx",
+      "passed": 7,
+      "failed": 0
+    }
+  ]
+}

@@ -316,3 +316,15 @@ summary { cursor: pointer; font-size: 12px; color: #c3c8d2; }
 .basic-use-rules .rule-kind { margin:20px 0 12px; }
 .rule-save-summary { font-size:12px; line-height:1.8; margin-top:18px; padding-top:12px; border-top:1px solid var(--border); color:#d3c09d; }
 .rule-save-summary strong { margin-right:6px; }
+
+/* Bulk controls remain outside the artwork and appear only in selection mode. */
+.card-item { min-width:0; }
+.card-item > .card-button { width:100%; }
+.hand .card-item { flex:0 0 196px; }
+.card-batch-check { display:flex; align-items:center; gap:8px; padding:8px 4px 16px; font-size:.85rem; }
+.batch-tools { padding:12px; margin-bottom:12px; background:#1e222b; border:1px solid var(--border); border-radius:8px; position:sticky; top:0; z-index:3; }
+.batch-tools p { margin:0 0 10px; }
+.batch-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0; }
+.batch-tag { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:8px 0; }
+.batch-select { display:flex; align-items:center; gap:8px; margin:8px 0; }
+@media (min-width:1700px) { .hand .card-item { flex-basis:220px; } }

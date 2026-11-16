@@ -1,6 +1,22 @@
 import type { CardDefinition, CastOption } from './contracts';
 import type { ResourceSnapshot, ResourceView } from './resources';
 
+// Only independent one-slot alternatives have an unambiguous automatic conversion.
+export function proposeSlotConversion(card:CardDefinition,snapshot:ResourceSnapshot):{castOptions:CastOption[];bindings:{costKey:string;resourceInstanceId:string}[]}|undefined {
+  if(card.kind!=='spell'||!card.spellLevel||card.castOptions.length<2)return;
+  const costs=card.castOptions.map(option=>option.costs.length===1&&!option.casting?option.costs[0]:undefined);
+  if(costs.some(cost=>cost?.type!=='fixed'||cost.amount!==1||cost.slotLevel===undefined||cost.slotLevel<card.spellLevel!))return;
+  const levels=costs.map(cost=>cost?.type==='fixed'?cost.slotLevel:undefined);
+  if(new Set(levels).size!==levels.length)return;
+  const resourceIds=costs.map(cost=>snapshot.bindings.find(binding=>binding.cardId===card.id&&binding.costKey===cost!.costKey)?.resourceInstanceId);
+  if(resourceIds.some(id=>!id)||new Set(resourceIds).size!==1)return;
+  const resource=snapshot.resources.find(r=>r.id===resourceIds[0]);const family=resource?.template.slotKind;
+  if(!resource||resource.kind!=='slot_track'||family!=='standard'&&family!=='pact')return;
+  if(levels.some(level=>!resource.capacityByLevel?.[String(level)]))return;
+  const first=card.castOptions[0];const costKey=first.costs[0].costKey;
+  return {castOptions:[{id:first.id,label:'주문 시전',costs:[{type:'slot',costKey,slotSelection:family,autoBind:false}],casting:{mode:family,allowUpcast:true,allowBelowBase:false}}],bindings:[{costKey,resourceInstanceId:resource.id}]};
+}
+
 export type BasicRuleKind='none'|'slots'|'uses'|'points';
 export interface BasicRuleDraft {
   kind:BasicRuleKind; resourceId:string; amount:number; variable:boolean; min:number; max:number; step:number;

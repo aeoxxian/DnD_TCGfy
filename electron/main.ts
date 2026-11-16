@@ -1,3 +1,4 @@
+import { EditStore } from './edit-store';
 import { app, BrowserWindow, dialog, ipcMain, protocol, session } from 'electron';
 import { readFile } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
@@ -32,6 +33,7 @@ else {
     const library = new LibraryStore(store);
     const assets = new AssetService(app.getPath('userData'), library);
     const resources = new ResourceStore(store);
+    const edits = new EditStore(store);
     // Read settings now: corrupted persisted settings stop startup without resetting data.
     store.getSettings();
     const ses = session.defaultSession;
@@ -79,6 +81,9 @@ else {
     safeHandler(IPC.createDeck, input => library.createDeck(input));
     safeHandler(IPC.selectDeck, input => library.selectDeck(input));
     safeHandler(IPC.setDeckCards, input => library.setDeckCards(input));
+    safeHandler(IPC.previewEdit, input => edits.preview(input));
+    safeHandler(IPC.applyEdit, input => edits.apply(input));
+    safeHandler(IPC.getEditHistory, input => edits.history(input));
     safeHandler(IPC.previewClass, input => resources.previewClass(input));
     safeHandler(IPC.getResources, input => resources.snapshot(input));
     safeHandler(IPC.previewResource, input => resources.preview(input));
