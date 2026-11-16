@@ -1,0 +1,45 @@
+import type { DatabaseSync } from 'node:sqlite';
+
+export const SCHEMA_VERSION = 1;
+export const migrations = [{
+  version: 1,
+  sql: `
+    CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+    CREATE TABLE assets(id TEXT PRIMARY KEY, relative_path TEXT NOT NULL UNIQUE, sha256 TEXT NOT NULL, mime_type TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL);
+    CREATE TABLE card_definitions(id TEXT PRIMARY KEY, name TEXT NOT NULL, image_asset_id TEXT REFERENCES assets(id) ON DELETE RESTRICT, kind TEXT NOT NULL CHECK(kind IN ('spell','feature','attack','item','feat','other')), spell_level INTEGER CHECK(spell_level BETWEEN 0 AND 9), attributes_json TEXT NOT NULL CHECK(json_valid(attributes_json)), created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE resource_templates(id TEXT PRIMARY KEY, key TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('counter','slot_track')), definition_json TEXT NOT NULL CHECK(json_valid(definition_json)), source TEXT NOT NULL CHECK(source IN ('class_2014','user')), version INTEGER NOT NULL CHECK(version >= 1));
+    CREATE TABLE character_profiles(id TEXT PRIMARY KEY, name TEXT NOT NULL, ruleset TEXT NOT NULL CHECK(ruleset IN ('dnd5e_2014','homebrew')), class_id TEXT, level INTEGER NOT NULL CHECK(level BETWEEN 1 AND 20), ability_scores_json TEXT CHECK(ability_scores_json IS NULL OR json_valid(ability_scores_json)), active_deck_id TEXT REFERENCES decks(id) ON DELETE SET NULL);
+    CREATE TABLE resource_instances(id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES character_profiles(id) ON DELETE RESTRICT, template_id TEXT NOT NULL REFERENCES resource_templates(id) ON DELETE RESTRICT, overrides_json TEXT NOT NULL CHECK(json_valid(overrides_json)), current_state_json TEXT NOT NULL CHECK(json_valid(current_state_json)), UNIQUE(id, character_id));
+    CREATE TABLE decks(id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES character_profiles(id) ON DELETE RESTRICT, name TEXT NOT NULL);
+    CREATE TABLE deck_cards(deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE, card_id TEXT NOT NULL REFERENCES card_definitions(id) ON DELETE RESTRICT, position INTEGER NOT NULL CHECK(position >= 0), PRIMARY KEY(deck_id, card_id), UNIQUE(deck_id, position));
+    CREATE TABLE card_bindings(id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES character_profiles(id) ON DELETE RESTRICT, card_id TEXT NOT NULL REFERENCES card_definitions(id) ON DELETE RESTRICT, cost_key TEXT NOT NULL, resource_instance_id TEXT NOT NULL, FOREIGN KEY(resource_instance_id, character_id) REFERENCES resource_instances(id, character_id) ON DELETE RESTRICT, UNIQUE(character_id, card_id, cost_key));
+    CREATE TABLE play_events(id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES character_profiles(id) ON DELETE RESTRICT, event_type TEXT NOT NULL CHECK(event_type IN ('card_used','manual_adjustment','recovery','undo','profile_changed')), payload_json TEXT NOT NULL CHECK(json_valid(payload_json)), occurred_at TEXT NOT NULL);
+    CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL CHECK(json_valid(value_json)));
+    CREATE INDEX idx_decks_character ON decks(character_id);
+    CREATE INDEX idx_instances_character ON resource_instances(character_id);
+    CREATE INDEX idx_events_character_time ON play_events(character_id, occurred_at);
+    CREATE INDEX idx_cards_name ON card_definitions(name);
+  `,
+}];
+
+export function transaction<T>(db: DatabaseSync, action: () => T): T {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = action();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+export function migrate(db: DatabaseSync, fromVersion: number): void {
+  transaction(db, () => {
+    for (const migration of migrations.filter(m => m.version > fromVersion)) {
+      db.exec(migration.sql);
+      db.prepare('INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)').run(migration.version, new Date().toISOString());
+      db.exec(`PRAGMA user_version = ${migration.version}`);
+    }
+  });
+}
