@@ -8,3 +8,15 @@ export async function expandResource(page,name,level){
   if(!await group.evaluate(el=>el.open))await group.locator(':scope > summary').click();
   if(await row.getAttribute('aria-expanded')!=='true')await row.click();
 }
+// v1.1: the extra filters are a native popover (top layer, light dismiss).
+export async function openExtraFilters(page){
+  const panel=page.locator('#extra-filters-panel');
+  if(!await panel.evaluate(el=>el.matches(':popover-open')))await page.locator('.extra-filters-toggle').click();
+  await panel.waitFor({state:'visible'});
+  return panel;
+}
+export async function closeExtraFilters(page){
+  const panel=page.locator('#extra-filters-panel');
+  // The close button, not Escape: Escape in a focused search field clears the field instead.
+  if(await panel.evaluate(el=>el.matches(':popover-open'))){await panel.locator('.extra-filters-close').click();await panel.waitFor({state:'hidden'});}
+}

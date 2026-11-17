@@ -1,4 +1,4 @@
-import { openManagement, expandResource } from './navigation-helpers.mjs';
+import { openManagement, expandResource, openExtraFilters, closeExtraFilters } from './navigation-helpers.mjs';
 import { runTrash } from './trash-scenarios.mjs';
 import { runBulk } from './bulk-scenarios.mjs';
 import { openAdvancedRules } from './use-rule-helpers.mjs';
@@ -185,14 +185,14 @@ try {
 
   const roles = page.getByRole('group', { name: '역할 필터' });
   await roles.getByRole('button', { name: '공격', exact: true }).click(); await roles.getByRole('button', { name: '치유', exact: true }).click();
-  await page.locator('.extra-filters summary').click();
+  await openExtraFilters(page);
   await page.getByRole('group', { name: '행동 경제 필터' }).getByRole('button', { name: '보너스 행동', exact: true }).click();
   await page.getByRole('group', { name: '카드 유형 필터' }).getByRole('button', { name: '주문', exact: true }).click();
   await page.getByRole('group', { name: '사거리 필터' }).getByRole('button', { name: '원거리', exact: true }).click();
   await page.getByRole('group', { name: '태그 필터' }).getByRole('button', { name: '공유 태그 수정', exact: true }).click(); await countVisible(19);
   await page.getByRole('searchbox', { name: '카드 이름 검색' }).fill('치유'); await countVisible(1);
   await page.getByRole('status').filter({ hasText: '필터 저장됨' }).waitFor();
-  const persisted = await state(); await capture('p1-filters');
+  const persisted = await state(); await capture('p1-filters'); await closeExtraFilters(page);
   await app.close(); app = undefined; await launch();
   data = await state(); assert.deepEqual(data.libraryState, persisted.libraryState); assert.deepEqual(data.cards, persisted.cards); assert.equal(data.settings.viewMode, 'grid'); await countVisible(1);
   recordCheck('OR roles + AND action/type/range/tag/title filtering; cards, tag labels, filters and P0 view settings restored after full restart');
@@ -243,7 +243,7 @@ try {
   recordCheck('Missing managed image shows a safe fallback while metadata and editing remain available');
 
   const independentTag = (await state()).tags.find(tag => tag.name === '독립 태그');
-  await page.locator('.extra-filters summary').click(); await page.getByRole('group', { name: '태그 필터' }).getByRole('button', { name: '독립 태그', exact: true }).click(); await countVisible(1);
+  await openExtraFilters(page); await page.getByRole('group', { name: '태그 필터' }).getByRole('button', { name: '독립 태그', exact: true }).click(); await countVisible(1); await closeExtraFilters(page);
   await openManagement(page,'라이브러리 관리');await page.getByRole('button', { name: '태그 관리', exact: true }).click(); dialog = page.getByRole('dialog', { name: '공통 태그 관리' });
   await dialog.getByRole('button', { name: '독립 태그 태그 삭제', exact: true }).click(); await dialog.getByRole('button', { name: '태그 삭제 확인' }).click();
   await dialog.getByLabel('독립 태그 태그 이름', { exact: true }).waitFor({ state: 'hidden' }); await dialog.getByRole('button', { name: '공통 태그 관리 닫기' }).click();
@@ -304,8 +304,8 @@ try {
   recordCheck('P1.1 new cards auto-link to the captured active deck atomically; character switch, edits and no-deck registration stay isolated');
   await page.getByRole('group', { name: '역할 필터' }).getByRole('button', { name: '공격', exact: true }).click(); await countVisible(19);
   await page.getByRole('button', { name: '필터 초기화' }).click();
-  if (!await page.locator('.extra-filters').evaluate(element => element.open)) await page.locator('.extra-filters summary').click();
-  await page.getByRole('group', { name: '카드 유형 필터' }).getByRole('button', { name: '공격', exact: true }).click(); await countVisible(2);
+  await openExtraFilters(page);
+  await page.getByRole('group', { name: '카드 유형 필터' }).getByRole('button', { name: '공격', exact: true }).click(); await countVisible(2); await closeExtraFilters(page);
   await page.getByRole('group', { name: '역할 필터' }).getByRole('button', { name: '공격', exact: true }).click(); await countVisible(1);
   assert.equal(await page.getByRole('button', { name: 'P11 B 신규 카드 선택', exact: true }).count(), 1);
   await page.getByRole('button', { name: '필터 초기화' }).click(); await countVisible(24);

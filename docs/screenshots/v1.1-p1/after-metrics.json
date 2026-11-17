@@ -1,0 +1,74 @@
+{
+  "default": {
+    ".board-top": {
+      "top": 112,
+      "height": 38
+    },
+    ".detail-panel": {
+      "top": 164,
+      "height": 307
+    },
+    ".hand-row": {
+      "top": 481,
+      "height": 223
+    },
+    ".cards-area": {
+      "top": 511,
+      "height": 193
+    }
+  },
+  "extraOpen": {
+    ".board-top": {
+      "top": 112,
+      "height": 38
+    },
+    ".detail-panel": {
+      "top": 164,
+      "height": 307
+    },
+    ".hand-row": {
+      "top": 481,
+      "height": 223
+    },
+    ".cards-area": {
+      "top": 511,
+      "height": 193
+    }
+  },
+  "extraSelected": {
+    ".board-top": {
+      "top": 112,
+      "height": 38
+    },
+    ".detail-panel": {
+      "top": 164,
+      "height": 307
+    },
+    ".hand-row": {
+      "top": 481,
+      "height": 223
+    },
+    ".cards-area": {
+      "top": 511,
+      "height": 193
+    }
+  },
+  "rolesAndKinds": {
+    ".board-top": {
+      "top": 112,
+      "height": 38
+    },
+    ".detail-panel": {
+      "top": 164,
+      "height": 307
+    },
+    ".hand-row": {
+      "top": 481,
+      "height": 223
+    },
+    ".cards-area": {
+      "top": 511,
+      "height": 193
+    }
+  }
+}

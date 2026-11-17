@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { createServer } from 'vite';
 import sharp from 'sharp';
 import { DatabaseSync } from 'node:sqlite';
-import { expandResource } from './navigation-helpers.mjs';
+import { expandResource, openExtraFilters, closeExtraFilters } from './navigation-helpers.mjs';
 
 const root=resolve('artifacts');await mkdir(root,{recursive:true});const runPath=await mkdtemp(join(root,'p4-a-'));const userData=join(runPath,'user-data');const baseline=process.argv.includes('--baseline');const dev=process.argv.includes('--dev');const binary=process.env.DND_TCG_EXECUTABLE;assert(!(dev&&binary));
 const env={...process.env,DND_TCG_TEST_USER_DATA:userData};delete env.ELECTRON_RUN_AS_NODE;delete env.DND_TCG_DEV_URL;if(dev)env.DND_TCG_DEV_URL='http://127.0.0.1:5173';
@@ -53,7 +53,7 @@ try{
         assert(Math.abs(metric.devicePixelRatio-scale)<.02);assert(metric.documentHeight<=metric.viewport.height+1);assert(metric.documentWidth<=metric.viewport.width+1);assert(metric.use.top>=0&&metric.use.bottom<=metric.viewport.height&&metric.hit);assert(metric.panel.scrollHeight<=metric.panel.height+1);assert(metric.description.height>=20&&metric.description.scrollHeight>metric.description.height);assert.equal(metric.imageFit,'contain');
         const fixedUse=await page.locator('.use-button').boundingBox();await page.locator('.description-content').evaluate(el=>{el.scrollTop=el.scrollHeight;});assert.deepEqual(await page.locator('.use-button').boundingBox(),fixedUse);
         await capture(`after-${width}x${height}-${scale}`);matrix.push({physicalTarget:{width,height},forcedScale:scale,...metric});
-        const extra=page.locator('.extra-filters');if(!await extra.evaluate(el=>el.open))await extra.locator('summary').click();await select('P4-A 무소모');await select('P4-A 긴 설명 주문');await extra.locator('summary').click();
+        await openExtraFilters(page);await closeExtraFilters(page);await select('P4-A 무소모');await select('P4-A 긴 설명 주문');
         assert((await page.locator('.cards-area').boundingBox()).height>=80);await select('P4-A 복합 비용');await page.waitForFunction(()=>!document.querySelector('.use-button')?.disabled);const complexBox=await page.locator('.use-button').boundingBox();assert(complexBox.y>=0&&complexBox.y+complexBox.height<=metric.viewport.height);await page.locator('.use-options-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});assert.deepEqual(await page.locator('.use-button').boundingBox(),complexBox);await select('P4-A 긴 설명 주문');
 
       }
