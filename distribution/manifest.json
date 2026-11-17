@@ -1,0 +1,607 @@
+{
+  "version": "0.5.2",
+  "zip": "DnD-TCGfy-0.5.2-win-x64.zip",
+  "sha256": "300df157848c9600308b308b579f6016db6780bf3120bee602fbe8a88846d05f",
+  "files": [
+    {
+      "path": "chrome_100_percent.pak",
+      "bytes": 568479,
+      "sha256": "d3bd0c80348ef27db06e1166f3bc2da9a3ceb18eb43ec1ea4a23bfc0fc613ab5"
+    },
+    {
+      "path": "chrome_200_percent.pak",
+      "bytes": 927818,
+      "sha256": "0627475518ecb15650c05a0c438ce27e84568739657f76ad6faf867b5d95ac4f"
+    },
+    {
+      "path": "d3dcompiler_47.dll",
+      "bytes": 4753864,
+      "sha256": "f5c95e919b4ffa1ac71049cd45b9f986d2965e6888395ca2806337985334fa56"
+    },
+    {
+      "path": "DnD TCG-fy.exe",
+      "bytes": 250093056,
+      "sha256": "04fc1608337d9148005aa3ed3995c4c6b960543e2db7236f033035f1f3ef81cf"
+    },
+    {
+      "path": "dxcompiler.dll",
+      "bytes": 25779712,
+      "sha256": "d4dc0f6bd47938e86f0e1b8006236e18393532702ee9e48cffce09c83872692a"
+    },
+    {
+      "path": "electron_wer.dll",
+      "bytes": 425472,
+      "sha256": "c10d3b8906f352e0e364b39661ff0d856f4d7e00e08c3377f09380296997064d"
+    },
+    {
+      "path": "ffmpeg.dll",
+      "bytes": 3097600,
+      "sha256": "b5ab13279290bceb6c6a79a421ef2eb18e7be46ed8f6c4a726a2a4d9b42f69fd"
+    },
+    {
+      "path": "icudtl.dat",
+      "bytes": 10824576,
+      "sha256": "e1ed8f674bb8449731b79cae956042da59f9ecbd37c8d3f86586a22b4836e5b2"
+    },
+    {
+      "path": "LICENSE.electron.txt",
+      "bytes": 1096,
+      "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d"
+    },
+    {
+      "path": "LICENSES.chromium.html",
+      "bytes": 5705935,
+      "sha256": "7dac8267ac6da8d959cfe88f5f055b18a397f10230380b5329125e167bf5639b"
+    },
+    {
+      "path": "locales/af.pak",
+      "bytes": 641339,
+      "sha256": "10121e47f8fe41355dd8f4475907be7adea7f5b25459aa53c9f3ef07dafef05c"
+    },
+    {
+      "path": "locales/am.pak",
+      "bytes": 1037302,
+      "sha256": "5150bc6cfc63844816e305b9645cb8e15587ff826a2be1d8639f2087bfb0a5da"
+    },
+    {
+      "path": "locales/ar.pak",
+      "bytes": 1143037,
+      "sha256": "a4e733aa6122086f34fc2c3eb5be71b020e2204e3073885a182ac82eeb891474"
+    },
+    {
+      "path": "locales/bg.pak",
+      "bytes": 1189898,
+      "sha256": "3f9d18988748118895dc026e4f56a442f078d3a5d564000d177a52ce934346b7"
+    },
+    {
+      "path": "locales/bn.pak",
+      "bytes": 1526566,
+      "sha256": "e2d4d1c81b0218849880b01c896d1d92c2a28347860cb4d5f37d4c777e4aa7cb"
+    },
+    {
+      "path": "locales/ca.pak",
+      "bytes": 724870,
+      "sha256": "d8919779075e3c13a2690e46a039878e5dd5031d4076596590ce2400a06ce95b"
+    },
+    {
+      "path": "locales/cs.pak",
+      "bytes": 753878,
+      "sha256": "cdd8eb041d9e2231e737c5cacae51034d3e3935e2c33d31d216caa17e5d941ff"
+    },
+    {
+      "path": "locales/da.pak",
+      "bytes": 674463,
+      "sha256": "cdf0ea6c9f400af2374c88e50e0cd0a33d9a1ee58db797ad15f7b1ad99890a96"
+    },
+    {
+      "path": "locales/de.pak",
+      "bytes": 728061,
+      "sha256": "f2f8c9fdd2e4f964d639b9e1e981d0a2757cec382176f93b4fca451c4265cf93"
+    },
+    {
+      "path": "locales/el.pak",
+      "bytes": 1309811,
+      "sha256": "f8e4cc68aed45935d7311bd98627fce5934ffcc151d109093de689696c890ec0"
+    },
+    {
+      "path": "locales/en-GB.pak",
+      "bytes": 585046,
+      "sha256": "e2cf3bd4d2ec7f900c710346362b03bdedf0a46285fd32d9cf6b8fab373b2f20"
+    },
+    {
+      "path": "locales/en-US.pak",
+      "bytes": 592299,
+      "sha256": "de43db43fe0072543ab225f6d762cce3656a1639bf9e25f371fe0e80d9eabba7"
+    },
+    {
+      "path": "locales/es-419.pak",
+      "bytes": 714500,
+      "sha256": "21849404ab973bf6c51ca3a876974056140916fa3c32e07e62363fece70c4b4d"
+    },
+    {
+      "path": "locales/es.pak",
+      "bytes": 710820,
+      "sha256": "76afec5b52d120fc66b54cadf3efff4f6614f5139df6672599b2471263813709"
+    },
+    {
+      "path": "locales/et.pak",
+      "bytes": 649743,
+      "sha256": "6eea9c88d02f19bc90d2971eb515c3f6fca76c2cae4e3096ae131e9e5b2de644"
+    },
+    {
+      "path": "locales/fa.pak",
+      "bytes": 1078247,
+      "sha256": "4d70f9508c9afda53f7640a297380e3c9ea5f9826f7a07d5275b972f200660b7"
+    },
+    {
+      "path": "locales/fi.pak",
+      "bytes": 663455,
+      "sha256": "a3e8bcb525568ba1e1908e8cc57b9e05b3ee3d9245cd74894d0fb485eb79a9a7"
+    },
+    {
+      "path": "locales/fil.pak",
+      "bytes": 748590,
+      "sha256": "808d6f4620a9c4fee771dfcf39f382db42e83f1e66fe206f93797b86c22dea24"
+    },
+    {
+      "path": "locales/fr.pak",
+      "bytes": 774089,
+      "sha256": "a69c3908223e2f6d1cb4e1e7166a82af58ddf498f49a1522417cc4bbac72fbc1"
+    },
+    {
+      "path": "locales/gu.pak",
+      "bytes": 1508809,
+      "sha256": "71d29958f321c014b0d36625c9e7d5af7e42e5ab2d753ecd6bceaf02b64d652d"
+    },
+    {
+      "path": "locales/he.pak",
+      "bytes": 940972,
+      "sha256": "d4dd83d2381d0decd74250c4f849eb69f08049f67e39a246cddeabe44d06f433"
+    },
+    {
+      "path": "locales/hi.pak",
+      "bytes": 1601863,
+      "sha256": "e55d2c94104b5e4329c5f254cf670caa6414ca1137af260e86adeff986f4292f"
+    },
+    {
+      "path": "locales/hr.pak",
+      "bytes": 724777,
+      "sha256": "96506f22e560e838ae740bfd72e07ad7a484d4af2d52816a64b9b35742dbf5b3"
+    },
+    {
+      "path": "locales/hu.pak",
+      "bytes": 775366,
+      "sha256": "0d44b7669e37805786b3fe637f2291654c2698b8ec8b57ddec17c1cf4bea5857"
+    },
+    {
+      "path": "locales/id.pak",
+      "bytes": 642959,
+      "sha256": "7111a5623ece2362e16be5a785030a9a628937ab680db34c9dbab6ae7926d0e6"
+    },
+    {
+      "path": "locales/it.pak",
+      "bytes": 700983,
+      "sha256": "b78bca99c590f45b660ce446a0a094e3d7a101c987965ac4e697f79685c230c9"
+    },
+    {
+      "path": "locales/ja.pak",
+      "bytes": 853529,
+      "sha256": "489cdbde7e1ce5fab60086547e4cd6de5316ecee9520ca1ee71dd4911cba0fe0"
+    },
+    {
+      "path": "locales/kn.pak",
+      "bytes": 1738870,
+      "sha256": "cc9903cb7a98ac81c08b33d3f88e88f35b290eaf0f5eaa8fab67395b330d88f0"
+    },
+    {
+      "path": "locales/ko.pak",
+      "bytes": 730396,
+      "sha256": "d3d22df64bab98e36e5a5635e98b33323af0a4b7f1a649bc049e1a753cd70ccb"
+    },
+    {
+      "path": "locales/lt.pak",
+      "bytes": 785117,
+      "sha256": "2fe1400fc3e0010f30955171124c9c8bf0fbab6aaddfce967b997bdc31fa2977"
+    },
+    {
+      "path": "locales/lv.pak",
+      "bytes": 782864,
+      "sha256": "3ed091a6dbba7b8a5a4beff7191918f84ee0a7de23004d76f57826104094f02b"
+    },
+    {
+      "path": "locales/ml.pak",
+      "bytes": 1785503,
+      "sha256": "6e3480887885349cd3198c2f608da25bc7722dbad7c1fba695f95e0e6d564b36"
+    },
+    {
+      "path": "locales/mr.pak",
+      "bytes": 1481173,
+      "sha256": "7bb875ecd2f725eb037758e261dea1d53c2c6668ccbc6b10fedbb427d0947b8d"
+    },
+    {
+      "path": "locales/ms.pak",
+      "bytes": 677751,
+      "sha256": "e0a46e0f40cf0c197c2a1fcb2adca421a93d2ade3d1333b99489f8b7d4a335d3"
+    },
+    {
+      "path": "locales/nb.pak",
+      "bytes": 643919,
+      "sha256": "754820b5f3ec2a19f5a0177026541654bba2a9394a665cd3006e049edd71881d"
+    },
+    {
+      "path": "locales/nl.pak",
+      "bytes": 671742,
+      "sha256": "122fc0b9596008b8556822555f8831628c6e10a1f337f03ad81aa1f85f633f02"
+    },
+    {
+      "path": "locales/pl.pak",
+      "bytes": 751664,
+      "sha256": "364ac77a3f7f3aed3f42016b12a4c140dc7e89b0ff197cddfa968269a414cb62"
+    },
+    {
+      "path": "locales/pt-BR.pak",
+      "bytes": 705460,
+      "sha256": "d6a3e591d5622059e75336f106ba2bed60745752cfd650d21c3e94ab8005771c"
+    },
+    {
+      "path": "locales/pt-PT.pak",
+      "bytes": 708345,
+      "sha256": "3221980cfcc761036ab340c903d17630379e2b592736abe4e2d2513c5cbdcd1d"
+    },
+    {
+      "path": "locales/ro.pak",
+      "bytes": 733934,
+      "sha256": "c8bac592c3f94d10da90e072ef6940108916d18c3fd6782a182635707435393b"
+    },
+    {
+      "path": "locales/ru.pak",
+      "bytes": 1212171,
+      "sha256": "30e72ac33700097dbc4b6766792acdcc92b5803e1d6fc06dd4e037147c28a419"
+    },
+    {
+      "path": "locales/sk.pak",
+      "bytes": 766398,
+      "sha256": "97ff061baeac4437c53a5d0c332f381dfd1abb212886c785ee92fa8444f6fb3f"
+    },
+    {
+      "path": "locales/sl.pak",
+      "bytes": 729966,
+      "sha256": "4e9d2aa291c653c0b3a92c973e1d5d1ecd1b6c1cc64b569c0ae37a28b6d46bcd"
+    },
+    {
+      "path": "locales/sr.pak",
+      "bytes": 1124214,
+      "sha256": "847f575be1bb00072c1d8dad3365117b51de7ffa7ea70b09f3a76de44e804467"
+    },
+    {
+      "path": "locales/sv.pak",
+      "bytes": 654571,
+      "sha256": "9b7ada21987ccced94e15c5b0495f564ecbbaef3afd5746ed20b08fa3625578b"
+    },
+    {
+      "path": "locales/sw.pak",
+      "bytes": 692178,
+      "sha256": "580c759a4004ae1b15145ef6310a31965e4a99ed599572b00d7dcb077b11bc59"
+    },
+    {
+      "path": "locales/ta.pak",
+      "bytes": 1773876,
+      "sha256": "6ef6497441c04f7dcc18caa552d961c5f22e8b369c97a6632bca6b57d6bd7876"
+    },
+    {
+      "path": "locales/te.pak",
+      "bytes": 1648207,
+      "sha256": "301a6b26e82540bc6079c1e210f575950b1dbd8c03437a7817d8446c06c755e7"
+    },
+    {
+      "path": "locales/th.pak",
+      "bytes": 1377527,
+      "sha256": "acf2778d5abda266d91a534d8ceb14cfe2fe34bc41a157c4b7a2058ba778ccbb"
+    },
+    {
+      "path": "locales/tr.pak",
+      "bytes": 706608,
+      "sha256": "75f5b1647fb6e98a0ef9851918bd4bd47ba1cb95489304c6c3f6bcf569f8f24c"
+    },
+    {
+      "path": "locales/uk.pak",
+      "bytes": 1225347,
+      "sha256": "e9d26214e799ec895304952223dd3a5d13d3041e3984378c710fef5626d4d880"
+    },
+    {
+      "path": "locales/ur.pak",
+      "bytes": 1060438,
+      "sha256": "f4d5f15daf9f3dd422f52421b93f0b5f6791a9928facb0e1b6dfd894a3814281"
+    },
+    {
+      "path": "locales/vi.pak",
+      "bytes": 839399,
+      "sha256": "afa8c0da7f0ec483cc62fac9a60164603a9da911a22d211c0ca8aa00a67800d6"
+    },
+    {
+      "path": "locales/zh-CN.pak",
+      "bytes": 600098,
+      "sha256": "ec56f40036a2deb4cf98071c58a271c27c7faf5d07c8a8ad14b50ed14a44980d"
+    },
+    {
+      "path": "locales/zh-TW.pak",
+      "bytes": 592026,
+      "sha256": "f80658c660bf7765a802a881cc475f9c18e468299b417ceea7f5ee935450f384"
+    },
+    {
+      "path": "resources/app.asar",
+      "bytes": 15920669,
+      "sha256": "26c1cbd78a627e0f6124004c1461c7a3b14fd36ba0ccb48b6aacb6c1e1e0fd5e"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/colour/color.cjs",
+      "bytes": 45136,
+      "sha256": "f7c3efcf482624007f2019fffee3e1dec56b8cb893faa9a420b2832805888dce"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/colour/index.cjs",
+      "bytes": 49,
+      "sha256": "e6e93e7fb209420a20fdf2ec676e9c67413be8d5ace99eec64f9468480f0368d"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/colour/LICENSE.md",
+      "bytes": 4433,
+      "sha256": "e2eaa4603c14cb26f301e88648c12a853fa3f0f5da6d4b0972958c666e7f2ab8"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/colour/package.json",
+      "bytes": 1050,
+      "sha256": "d8de837c60986566ef156246162f79d5ebc90d9dfe515f3207406759962b4b14"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/index.cjs",
+      "bytes": 62,
+      "sha256": "6ecbd583f45e914233410fe83a614e4f5ff1a6875a7eb828b03b7258e8ba6944"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/lib/libvips-42.dll",
+      "bytes": 19018240,
+      "sha256": "06dab07cc386748513337a31672b1d5269fbc770a14ff403080575665bf0813f"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/lib/libvips-cpp-8.18.7.dll",
+      "bytes": 333312,
+      "sha256": "25001dbd05305a0a29119ab49933622c70b4a20ea12ef1d5d20ca40181db53bf"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/lib/sharp-win32-x64-0.35.5.node",
+      "bytes": 443904,
+      "sha256": "971048779f9c8598df14641dfc03c625885c93f473a788e65ca2deb50d0b083e"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/LICENSE",
+      "bytes": 10464,
+      "sha256": "dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/package.json",
+      "bytes": 888,
+      "sha256": "697b3d89590e3b988b51764bd22dfd6f4a1b35cd4eb12c664eca7987e8ee6115"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/versions.json",
+      "bytes": 596,
+      "sha256": "e2611d5d854815a8b33c8a3d2ec649511a9596ccf16844e8eae7cf81e79881c4"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/channel.cjs",
+      "bytes": 5383,
+      "sha256": "7445567e8001f4be3126374e4c17e282777ed14c718acca875c91bec69a2d7a1"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/channel.mjs",
+      "bytes": 5376,
+      "sha256": "6067b0ba5ebcc9682a01d0b450a12b54849a95c8ed017f8485bddb5fd0b9db91"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/colour.cjs",
+      "bytes": 5622,
+      "sha256": "da760186e75d4fd8b6da0a617ecf122deec2fa6d95fdcc194bbee0cb1c5e4605"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/colour.mjs",
+      "bytes": 5610,
+      "sha256": "760e7fa8161432a9cc97f0a3d9f3e0b757e66089c967e6b36f3131c9fdafa1b5"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/composite.cjs",
+      "bytes": 9332,
+      "sha256": "6e0837309d25c2b642d42b557f3e1292c2b057af09746647a3a6d54de772a157"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/composite.mjs",
+      "bytes": 9325,
+      "sha256": "16eadc26ba57417e90e4bb73aff1116b56ad26766088793ab0b7c4bbdd2bc9fc"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/constructor.cjs",
+      "bytes": 20364,
+      "sha256": "6b8978e0f1614d83a219cbbd455e3eed7922bc4212a5b3b99c5d37c3af3b3226"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/constructor.mjs",
+      "bytes": 20340,
+      "sha256": "8be8da679d2a028d0f53b02ce52f07f295134a297caf3068944cd8d0b57ab3d1"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/index.cjs",
+      "bytes": 620,
+      "sha256": "d69f275bc49fcd2a6188b26b35c986d4db32a1b008653fef88adb4598688232a"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/index.d.cts",
+      "bytes": 92885,
+      "sha256": "24adc1ebbf6b05fc1434083b899b9ffd7edda0aa85ac0123d7ddb4ff860e5884"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/index.d.mts",
+      "bytes": 87987,
+      "sha256": "b837d41bb8d39398690458f45cc445160dad36ec0db5ba0463d114e560d49d85"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/index.mjs",
+      "bytes": 573,
+      "sha256": "0e8f955c68a1b0bccf0ba5343c924dbfa6a46a76a0d491ec27fe6b328311363e"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/input.cjs",
+      "bytes": 33741,
+      "sha256": "e5eb5c891c0893098dbe8bc0358a2f2c7e800581018923a7956732fe1a5ddf8f"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/input.mjs",
+      "bytes": 33729,
+      "sha256": "4b0a51e678f9022cec06a1ffb34e17ea3498cfb707492b54de87541ccac54125"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/is.cjs",
+      "bytes": 3042,
+      "sha256": "46fa32e93964d8a31d6e851dc3bb7f3ec36935f9e8323b59603ff6cd84a7faa7"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/is.mjs",
+      "bytes": 3040,
+      "sha256": "96a3b1b82d389b7b57569332fed93e46cf9b5aa79f2babb82cbb15fe1581a409"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/libvips.cjs",
+      "bytes": 5833,
+      "sha256": "3419f6cb4303feaf4a76abe122ce1caf5dc755f9f17fa013afd5561827b61062"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/libvips.mjs",
+      "bytes": 5828,
+      "sha256": "d9984601b0aafe44c393b29ce4b0712b1c40890c3d740d4fda49842a4ea5873d"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/operation.cjs",
+      "bytes": 32930,
+      "sha256": "11eb4921f37e4e06c0b349f55e186852cdd094203cc3c5651681801eea5d80f8"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/operation.mjs",
+      "bytes": 32923,
+      "sha256": "a3b14c3a13305dbe8fde48a263d13b0a104dcb97afc65fe5f55b8e556d054be1"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/output.cjs",
+      "bytes": 65469,
+      "sha256": "4c2878241a264095b661fb321accf86fa9be033bfe541d5a70ac2f8d80150893"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/output.mjs",
+      "bytes": 65452,
+      "sha256": "d1be82aace2d7f96bfc29e6e76538521fc8dfe6d4e90f7eda71a8f4c2a1597ba"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/resize.cjs",
+      "bytes": 22840,
+      "sha256": "e03dce87aaee233fecf191ec3c713a9f856e13d0d9ccd7b0a7dbf35b65e36538"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/resize.mjs",
+      "bytes": 22833,
+      "sha256": "e3d26f31cf391e28f3f96e708ccb96745cf016e18f8ef4486c837e5efcb3c922"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/sharp.cjs",
+      "bytes": 6262,
+      "sha256": "76120d3971051fcc469c0bfa36e7b23d3c388b6a2f5785bf1491bbdb90ff0176"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/sharp.mjs",
+      "bytes": 6357,
+      "sha256": "d0c3ce3837636a140e8363850823e3b8dc2b000928303664cc9fc1aa2ba326ee"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/utility.cjs",
+      "bytes": 9786,
+      "sha256": "0f7a14858dfa8ebd01b2c6c2272297f7a34c4af3d84f0c0b926146c49a2655b1"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/dist/utility.mjs",
+      "bytes": 9862,
+      "sha256": "761566e165bc1fc90bc6dd67a3b560c1a63e6cfe98009b726d35288606d629b9"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/install/build.js",
+      "bytes": 860,
+      "sha256": "fea92e0d55cce8692413c479021173aa1512304e1b849039949cbee9d6ceb1de"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/LICENSE",
+      "bytes": 10273,
+      "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/package.json",
+      "bytes": 2936,
+      "sha256": "0cc09c779da7380aac6a45a51eb50d4cbd7f0da207cac166067b6db0968d3609"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/src/common.h",
+      "bytes": 10988,
+      "sha256": "70a4f13f5e56a956edd8340066240865e39d3039157bd511930de2bf5aa17ba9"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/src/metadata.h",
+      "bytes": 1878,
+      "sha256": "5e02c25ec821a525b0caf31161b1e8675ff32cfd098c17cda0b888440362b057"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/src/operations.h",
+      "bytes": 3625,
+      "sha256": "6f41d329634471dff8e093d12e38ff356293079e2aeecc5b922fc23ba99799e6"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/src/pipeline.h",
+      "bytes": 10131,
+      "sha256": "e09c3dbd873071a373e6d95679b470a6fe1be5fc2ef781b00fd87958b5ab5e98"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/src/stats.h",
+      "bytes": 1267,
+      "sha256": "db854f0c3c4a0db1751021ed676413c6d5ca00becc08bdc13258b29047450b8c"
+    },
+    {
+      "path": "resources/app.asar.unpacked/node_modules/sharp/src/utilities.h",
+      "bytes": 741,
+      "sha256": "0b126ab63cf1aedf8e71e6cb8179899d3ef02c46419100e847b2ca4284b8901b"
+    },
+    {
+      "path": "resources.pak",
+      "bytes": 13372221,
+      "sha256": "fad3e2667f8ea9f24a8dfe9a84d78ff48a2e67f167dfb1774c81ffa17c98eec2"
+    },
+    {
+      "path": "snapshot_blob.bin",
+      "bytes": 374568,
+      "sha256": "d4eba99ae13a00a254491e7b13fa1abf7500013c604fe57936556c9a56485d29"
+    },
+    {
+      "path": "v8_context_snapshot.bin",
+      "bytes": 753600,
+      "sha256": "8afc49b4203277e1d2ec92f36582ace05aaecf867fdaecfa658d7c9d935f8ed1"
+    },
+    {
+      "path": "vk_swiftshader.dll",
+      "bytes": 5453312,
+      "sha256": "83979cbba2c4eb1b3fad618bf5497f04a04c1a0db6a9fafaa0f7d8bd2355808d"
+    },
+    {
+      "path": "vk_swiftshader_icd.json",
+      "bytes": 106,
+      "sha256": "32d83ff113fef532a9f97e0d2831f8656628ab1c99e9060f0332b1532839afd9"
+    },
+    {
+      "path": "vulkan-1.dll",
+      "bytes": 957440,
+      "sha256": "f8b2913970e91783c2a112ad7815729651379d15dd2822302c7b686cacb2ce6a"
+    }
+  ]
+}

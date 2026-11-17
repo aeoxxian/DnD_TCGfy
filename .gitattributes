@@ -1,0 +1,7 @@
+project-archive/*.zip filter=lfs diff=lfs merge=lfs -text
+distribution/*.zip filter=lfs diff=lfs merge=lfs -text
+*.sqlite3 -text
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.webp -text

@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 6,
+  "sqliteIntegrity": "ok",
+  "foreignKeyViolations": 0,
+  "counts": {
+    "card_definitions": 17,
+    "character_profiles": 5,
+    "decks": 5,
+    "resource_templates": 14,
+    "resource_instances": 15,
+    "card_bindings": 6,
+    "play_events": 102
+  },
+  "files": [
+    {
+      "path": "assets/01defabb-0514-412d-9ce6-4eab1650b09a.png",
+      "bytes": 2581407,
+      "sha256": "ccc6b00005df9e82baaa26518eb7fbd394b0074b1d9458b02484517dfbc09b87"
+    },
+    {
+      "path": "assets/26e09ee7-4a30-486d-9b28-6b4333814d2e.png",
+      "bytes": 2744115,
+      "sha256": "7e0f772e8e5f882396c4aa8cc26cdb2253c9ead2f44fe35c1c0d009d8d71125c"
+    },
+    {
+      "path": "assets/3680255a-80c9-4053-9c6c-f0d24bac600b.png",
+      "bytes": 2974102,
+      "sha256": "4090d0e1cf42272902276faa203fd51f1d8a069a8ab04d434733d078b694cf6b"
+    },
+    {
+      "path": "assets/429685bf-529e-4db7-8b5e-0a21431946e6.png",
+      "bytes": 3009498,
+      "sha256": "4d4bb2fee88417c4cc7121081f5a91108713b2a65ca69e3aafd7c128f9ca91c0"
+    },
+    {
+      "path": "assets/44375404-0802-41c6-8857-e2de1094ecd6.png",
+      "bytes": 3009836,
+      "sha256": "9d242fe30e91649109b7c6746d53c91595f4676598eb01b355970106dfb6f896"
+    },
+    {
+      "path": "assets/4628b268-9f82-45d5-80c3-386bf8e5dc9a.png",
+      "bytes": 2945038,
+      "sha256": "ef7127bc82042c2b6ad4c78dede1b01cd649abde74d75da118912419581bb55f"
+    },
+    {
+      "path": "assets/63d46fca-4911-479c-b88d-45f0e2992bd9.png",
+      "bytes": 2690040,
+      "sha256": "9d23309f8665757a750af8d215207a69723659ec7b92bca8ee0c0022a689a42e"
+    },
+    {
+      "path": "assets/7fc22672-67e1-472e-a05a-fe75bc654dec.png",
+      "bytes": 2444671,
+      "sha256": "dce49b97a901c62fbaa75c35d5378f99a56d124adae954b3266cf979bd791896"
+    },
+    {
+      "path": "assets/826d37ba-d3e2-47f8-92cf-892f904cbdfe.png",
+      "bytes": 2527300,
+      "sha256": "52d629dec439ba96ae2763ebd9c30878f0d187e146f8efba358c5b9aa0cdca3e"
+    },
+    {
+      "path": "assets/8339c676-2aa7-41ee-be87-bbe06aa94cf4.png",
+      "bytes": 3108738,
+      "sha256": "6f15ffef22de9b232040579d37b806e86d57688aafb21ab9c88b5a56fb9de6c2"
+    },
+    {
+      "path": "assets/8c828e86-2d74-49d9-bc90-8658de00326e.png",
+      "bytes": 2312784,
+      "sha256": "edd459c264f18c039f4f36b7e638d65ea79b84f4f11550e7be615b8fcd319ac8"
+    },
+    {
+      "path": "assets/9541ffa9-80d5-4276-ab70-4fcac8a34207.png",
+      "bytes": 2883933,
+      "sha256": "4ae53c905f8d4e1ded3606023d7dff1679208781f66595f9395da4f644fb7231"
+    },
+    {
+      "path": "assets/9b88f21d-323f-479c-8588-5d31aca71677.png",
+      "bytes": 2707722,
+      "sha256": "c8976e02da34b05cb0150cda9d3b2f7a3a7e50fd87c0cdcdfd9bd4b632736ce2"
+    },
+    {
+      "path": "assets/a5f6dd6b-b24f-4f21-9ee7-30f2c6d71b92.png",
+      "bytes": 3099992,
+      "sha256": "d4269ff1afa60098eafd44995f330ba1d1963922820eda35ac6a75c0f017ae90"
+    },
+    {
+      "path": "assets/bde59b41-3d31-434b-a1dd-883aadf539cc.png",
+      "bytes": 2940020,
+      "sha256": "8257168986db4854750ecf4fe621ee046982ea242c552cb772b02633d7dd608e"
+    },
+    {
+      "path": "assets/c318befa-d297-496c-9102-48a9541cdc05.png",
+      "bytes": 2375184,
+      "sha256": "f96bf6c23b13e4d683820f8508f6e4a8e566e6ef7ec80cf617d7d00556bb5fc2"
+    },
+    {
+      "path": "assets/dd389793-d31d-45f4-ab6e-8eb639e6f479.png",
+      "bytes": 3009498,
+      "sha256": "4d4bb2fee88417c4cc7121081f5a91108713b2a65ca69e3aafd7c128f9ca91c0"
+    },
+    {
+      "path": "backups/before-v1-to-v2-550d1b48-6fef-49a4-a8ef-f2da010b0f5c.sqlite3",
+      "bytes": 131072,
+      "sha256": "3db296f50bb9d0372a145646a811a137bd487894c5c6a6a829841e2d85f767ca"
+    },
+    {
+      "path": "backups/before-v2-to-v3-845eea93-a727-4190-9227-50fa3a22d245.sqlite3",
+      "bytes": 163840,
+      "sha256": "acff2559d79cdd6cbb2abf7ef245f88f5c7319c3f1eeaed86761237b885ffe52"
+    },
+    {
+      "path": "backups/before-v3-to-v4-3612b634-c1ba-4858-9686-e75b15d4ab91.sqlite3",
+      "bytes": 196608,
+      "sha256": "18af0e72a2df8ed692cadd3c82ddcfb5e1aab12ce6a09b49113297bd81c9c4d2"
+    },
+    {
+      "path": "backups/before-v4-to-v5-c7e59922-379c-4a78-b514-626b2e951262.sqlite3",
+      "bytes": 286720,
+      "sha256": "a8a067f32ffa12ba3b8b993b494d5a101a70ba6d129ea8e1b7f62b5e261341a2"
+    },
+    {
+      "path": "backups/before-v5-to-v6-655ce863-47f7-4c34-a055-b130968984e7.sqlite3",
+      "bytes": 307200,
+      "sha256": "758ffe700e61a7922d946442c0323605e3bcfd1b6591eb9b51674944f8f9abea"
+    },
+    {
+      "path": "cache/thumbnails/01789625e3494aeeb0a38b1ae86809e84f563c76c203f60d65da92439259f45c.webp",
+      "bytes": 85714,
+      "sha256": "8693331644d023355a97c09e2a11c039b3ff7ed8be85042d790877ec529c6815"
+    },
+    {
+      "path": "cache/thumbnails/1015467a30cf6715a037a726b9c97d843b3b65d02bca72a58eb6435b491e4164.webp",
+      "bytes": 106868,
+      "sha256": "e5ac898570efb30edf51f626e27085a1b81abe86e0882a81a46a9e1cdc566692"
+    },
+    {
+      "path": "cache/thumbnails/1bc4816bfbd23d8e8e5566de3650b847d36fbeed590b4665b94b7c5139f5b0a7.webp",
+      "bytes": 76916,
+      "sha256": "073fe29f1aeb2665024fa04e1f1d993f73a5636a2609440fe046db92ce70c5fb"
+    },
+    {
+      "path": "cache/thumbnails/2741c7215011573482f2af6b6541f1cbaf746eeebfedb7de414c151bd5fe11b0.webp",
+      "bytes": 86112,
+      "sha256": "bb0650b122c7ddb95f87025a430b6de77384703866a38ff90bd11274ccfecd7c"
+    },
+    {
+      "path": "cache/thumbnails/380cd870977bdc14221f6a2f96614a4bcf976da97b887070a1a0e4579c0cca34.webp",
+      "bytes": 88060,
+      "sha256": "cbe6fa98d60bff39e94bd78274b25bf5273ae8f74107b6573d5af2b8f811efde"
+    },
+    {
+      "path": "cache/thumbnails/3827bd533d4384cfedd37d0364ee58fdde3efce028a18964fd62fa23862dd26c.webp",
+      "bytes": 76300,
+      "sha256": "0ef856f8aff64da93c35cc9a6afe995fae92857b6c5470fcb486ac0dc5962bd0"
+    },
+    {
+      "path": "cache/thumbnails/531d63fab01f461f7a25193baf1dce569a7fc31b09ed145d7a42542debfc10a7.webp",
+      "bytes": 58978,
+      "sha256": "df4c4f4e699f1589ab296510067118ebade8d5766d76b3739f43fce9cd1a2c34"
+    },
+    {
+      "path": "cache/thumbnails/5934ed01af67c76b6a5457c0800f8140c9d5310815e3c10b20b1818651580282.webp",
+      "bytes": 69622,
+      "sha256": "82efc6eac01111034e5be7619a59a4cb0152373858fff24162f3cc74e4ff43ee"
+    },
+    {
+      "path": "cache/thumbnails/8a8ff803a8498737468351f06891a51733c7f1eddef6b45bb4e1b0044a8f6462.webp",
+      "bytes": 111732,
+      "sha256": "d788decec7c40e92361669f314a5d2b523f6e65bd1180a0d117dfffb90dd72ae"
+    },
+    {
+      "path": "cache/thumbnails/99ed113f883f4c44ca04e71bf399a124776a982940af8cb068d90836e5343688.webp",
+      "bytes": 98414,
+      "sha256": "72875347a544d0c175782886ff688a8e62aed17ad4a1f340271b79fd10af989e"
+    },
+    {
+      "path": "cache/thumbnails/bc7aaa061c1743fb200dc60accc6238ea3146fd4a9f5b6f6d8c8f48d302efdbc.webp",
+      "bytes": 64252,
+      "sha256": "d8ba8a2a82809ad5a5e674b9c83a06ea3740a49f7a4aa32e74eedf5dc27a0ad6"
+    },
+    {
+      "path": "cache/thumbnails/d33b028b624dc7f799e48ca29b9f7980c0d839d1de87110817647bf29660da0b.webp",
+      "bytes": 107810,
+      "sha256": "301c1f5b139b7a6de364322033d7da5dd0d65bdefda7930e0a2cf420af4d631d"
+    },
+    {
+      "path": "cache/thumbnails/d3a4d74df7aa91ee083b3f4ee67dec4eab2826f9b013fc2a8c169a8ff1d919af.webp",
+      "bytes": 103186,
+      "sha256": "ef3857946621d1c00c193cbf3bad7377e5473bbed42cb40b72682d6658a6fca7"
+    },
+    {
+      "path": "cache/thumbnails/deb32b8cecee8c14d2007a7cb0f042c46f09214f7794ea614ee69b0e34d03fd1.webp",
+      "bytes": 115566,
+      "sha256": "e0d2835ce270e532b937ad8fe4e8340a4c5aff75e5f35f013cd178cd0e326ba4"
+    },
+    {
+      "path": "cache/thumbnails/e22509dd36bdd55b45a780f830cf3635ddd6ae3260753332fcdbd545c6a5ed8c.webp",
+      "bytes": 97362,
+      "sha256": "0ccc128c26d26f855ea713fc10efce96081990d1a701db030d968db50ca561db"
+    },
+    {
+      "path": "cache/thumbnails/ebf2b1a8048656a34d3f553ebf192e04eb35ec0e8ccd665c431fcf4e6b1c6433.webp",
+      "bytes": 106868,
+      "sha256": "e5ac898570efb30edf51f626e27085a1b81abe86e0882a81a46a9e1cdc566692"
+    },
+    {
+      "path": "cache/thumbnails/f8524c11c07a0694b3e68c76ee9a3a9beae95e4a11474ea03f2165514cab9239.webp",
+      "bytes": 75916,
+      "sha256": "9eea072886f8e329d09b792ba8dc9c2306cab17dd42a012e0328c265dc186496"
+    },
+    {
+      "path": "data/app.sqlite3",
+      "bytes": 405504,
+      "sha256": "ddfbb61a1151bc9596609957d654ecce8bc93575fb7db990d63341b1256fd5cf"
+    }
+  ],
+  "alreadyMissingInSource": [],
+  "sourcePolicy": "Source DB/WAL and assets only read; standalone DB generated from isolated copies; browser sessions excluded."
+}
