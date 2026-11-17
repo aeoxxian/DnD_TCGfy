@@ -1,0 +1,54 @@
+{
+  "outcome": "PASS",
+  "baseline": true,
+  "runtime": {
+    "packaged": true,
+    "version": "0.4.3",
+    "electron": "45.3.3",
+    "node": "24.22.3",
+    "hostDisplays": [
+      {
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "scaleFactor": 1
+      }
+    ]
+  },
+  "checks": [],
+  "matrix": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "useButton": {
+        "x": 1586,
+        "y": 4373.078125,
+        "width": 299,
+        "height": 39
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "useButton": {
+        "x": 1082,
+        "y": 6006.421875,
+        "width": 249,
+        "height": 39
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    }
+  ],
+  "sourceHash": "e35787a9dff316c5c4216f6ea5a9652b932706a84ebea177e584673a39f5d241",
+  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p4-a-MV2iL4"
+}

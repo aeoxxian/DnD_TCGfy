@@ -99,7 +99,7 @@ else {
     safeHandler(IPC.previewResource, input => resources.preview(input));
     safeHandler(IPC.changeResource, input => resources.change(input));
     mainWindow = new BrowserWindow({
-      title: 'DnD TCG-fy', width: 1440, height: 900, minWidth: 960, minHeight: 600, backgroundColor: '#14161b',
+      title: 'DnD TCG-fy', width: 1440, height: 900, minWidth: 860, minHeight: 440, backgroundColor: '#14161b',
       show: false, autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, webviewTag: false, spellcheck: false },
     });

@@ -30,8 +30,11 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('bulk selection scope',()=>{
+  it('moves card management off the play board and keeps selection/search after closing it',async()=>{
+    render(<App/>);await screen.findByRole('button',{name:'상처 치료 카드 선택'});fireEvent.change(screen.getByRole('searchbox',{name:'카드 이름 검색'}),{target:{value:'치료'}});const card=screen.getByRole('button',{name:'상처 치료 카드 선택'});fireEvent.click(card);expect(screen.queryByRole('button',{name:'카드 등록'})).toBeNull();expect(screen.queryByRole('button',{name:'정보 수정'})).toBeNull();expect(screen.queryByRole('button',{name:'카드 사용 규칙'})).toBeNull();fireEvent.click(screen.getByRole('button',{name:'관리'}));expect(screen.getByRole('button',{name:'카드 등록'})).toBeDefined();expect(screen.getByRole('button',{name:'정보 수정'})).toBeDefined();expect(screen.getByRole('button',{name:'선택 관리'})).toBeDefined();fireEvent.click(screen.getByRole('button',{name:'관리 메뉴 닫기'}));expect(card.getAttribute('aria-pressed')).toBe('true');expect((screen.getByRole('searchbox',{name:'카드 이름 검색'}) as HTMLInputElement).value).toBe('치료');expect(window.desktop.changeResource).not.toHaveBeenCalled();
+  });
   it('only shows checks in selection mode and clears selections on every filter change',async()=>{
-    render(<App/>);await screen.findByRole('button',{name:'선택 관리'});
+    render(<App/>);await screen.findByRole('button',{name:'관리'});fireEvent.click(screen.getByRole('button',{name:'관리'}));
     expect(screen.queryByRole('checkbox',{name:'상처 치료 일괄 선택'})).toBeNull();
     fireEvent.click(screen.getByRole('button',{name:'선택 관리'}));
     fireEvent.click(screen.getByRole('button',{name:'표시 카드 전체 선택'}));
@@ -96,7 +99,7 @@ describe('P0 card board', () => {
   it('preserves card identity and sends only editable metadata from the editor', async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '상처 치료 카드 선택' }));
-    fireEvent.click(screen.getByRole('button', { name: '정보 수정' }));
+    fireEvent.click(screen.getByRole('button',{name:'관리'}));fireEvent.click(screen.getByRole('button', { name: '정보 수정' }));
     fireEvent.change(screen.getByRole('textbox', { name: '카드 이름' }), { target: { value: '바뀐 이름' } });
     fireEvent.click(screen.getByRole('button', { name: '수정 저장' }));
     await waitFor(() => expect(window.desktop.saveCards).toHaveBeenCalled());
@@ -112,6 +115,6 @@ describe('P0 card board', () => {
     const images = screen.getAllByRole('img', { name: '상처 치료 카드 이미지' });
     for (const image of images) fireEvent.error(image);
     expect(screen.getAllByText('이미지 파일을 읽을 수 없습니다.')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: '정보 수정' })).toBeDefined();
+    expect(screen.queryByRole('button',{name:'정보 수정'})).toBeNull();fireEvent.click(screen.getByRole('button',{name:'관리'}));expect(screen.getByRole('button',{name:'정보 수정'})).toBeDefined();
   });
 });

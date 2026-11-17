@@ -1,0 +1,21 @@
+{
+  "version": "0.5.0",
+  "schemaVersion": 6,
+  "packCommand": ".\\scripts\\bootstrap-npm.ps1 run pack:win",
+  "packExitCode": 0,
+  "files": {
+    "release/win-unpacked/DnD TCG-fy.exe": {
+      "bytes": 250093056,
+      "sha256": "44508279e95e3fca43c1177d7ea94f3e9131bcc26f79109f0aa08f968a128539"
+    },
+    "release/win-unpacked/resources/app.asar": {
+      "bytes": 15889025,
+      "sha256": "3e13f0c6a6cb3a7452ba27a1ea9480bd4487bf11624bda9a428b873ddd12cdb7"
+    }
+  },
+  "notes": [
+    "Unsigned Windows x64 unpacked folder; EXE actually launched and tested.",
+    "No schema or engine changes in P4-A.",
+    "Native Windows per-app device scale 1/1.25/1.5; global Windows display settings not changed."
+  ]
+}
