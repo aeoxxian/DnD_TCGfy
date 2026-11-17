@@ -17,8 +17,8 @@ export function CardCostEditor(props:Props){
 function BasicRules({card,controller,onSaved,onClose,scope,setScope,onAdvanced}:Props&{scope:'shared'|'character';setScope:(scope:'shared'|'character')=>void;onAdvanced:()=>void}){
   const snapshot=controller.snapshot!;const [revision]=useState(snapshot.revision);const radioName=useId();
   const original=useMemo(()=>scope==='shared'?card:effectiveCard(card,snapshot),[card,scope,snapshot]);
-  const [inferred]=useState(()=>inferBasicRule(original,snapshot));const legacy=!inferred;
-  const [draft,setDraft]=useState<BasicRuleDraft>(()=>inferred??emptyBasicRule(card));const [chosen,setChosen]=useState(!legacy);
+  const [inferred]=useState(()=>inferBasicRule(original,snapshot));const legacy=!inferred;const unconfigured=original.costStatus==='unconfigured';
+  const [draft,setDraft]=useState<BasicRuleDraft>(()=>inferred??emptyBasicRule(card));const [chosen,setChosen]=useState(!legacy&&!unconfigured);
   const [ids]=useState(()=>({optionId:original.castOptions[0].id,costKey:original.castOptions.length===1&&original.castOptions[0].costs.length===1?original.castOptions[0].costs[0].costKey:crypto.randomUUID()}));
   const [review,setReview]=useState(false);const [conversionConfirmed,setConversionConfirmed]=useState(false);const [sharedConfirmed,setSharedConfirmed]=useState(false);const [localError,setLocalError]=useState('');
   const [restore,setRestore]=useState(false);
@@ -30,7 +30,7 @@ function BasicRules({card,controller,onSaved,onClose,scope,setScope,onAdvanced}:
   try{if(chosen)proposal=buildBasicRule(original,draft,ids);}catch(error){invalid=(error as Error).message;}
   const affected=snapshot.sharedCostUsers?.[card.id]??0;
   const baseChanged=proposal?.spellLevel!==undefined&&proposal.spellLevel!==card.spellLevel;
-  const sharedChange=!!proposal&&(baseChanged||scope==='shared'&&JSON.stringify(proposal.castOptions)!==JSON.stringify(card.castOptions));
+  const sharedChange=!!proposal&&(baseChanged||scope==='shared'&&(card.costStatus==='unconfigured'||JSON.stringify(proposal.castOptions)!==JSON.stringify(card.castOptions)));
   const needsShared=affected>0&&sharedChange;
   const before=describeUseRules(original.castOptions,snapshot.bindings.filter(value=>value.cardId===card.id),snapshot.resources);
   const after=proposal?describeUseRules(proposal.castOptions,proposal.bindings,snapshot.resources):[];
@@ -42,6 +42,7 @@ function BasicRules({card,controller,onSaved,onClose,scope,setScope,onAdvanced}:
     if(await controller.perform({type:'save_costs',scope,confirmShared:sharedConfirmed,expectedCardVersion:card.updatedAt,cardId:card.id,...proposal},revision)){await onSaved();onClose();}
   }
   return <form className="basic-use-rules" onSubmit={event=>{event.preventDefault();void save().catch(()=>setLocalError('저장 결과를 확인하지 못했습니다. 다시 불러온 규칙을 확인해 주세요.'));}}>
+    {unconfigured&&<p className="registration-note">비용 미설정 카드입니다. 아래에서 무소모 또는 사용할 자원을 명시적으로 선택해 주세요.</p>}
     <p className="manager-help">이 카드가 사용하는 자원과 한 번에 쓰는 양을 정하세요. 설정만으로 자원이 차감되지는 않습니다.</p>
     <label className="form-field">적용 대상<select aria-label="적용 대상" disabled={controller.busy} value={scope} onChange={event=>setScope(event.target.value as 'shared'|'character')}><option value="shared">이 카드를 쓰는 모든 캐릭터</option><option value="character">이 캐릭터만</option></select></label>
     {legacy&&<section className="legacy-use-rules" aria-label="기존 고급 설정"><h3>기존 고급 설정을 유지하고 있습니다</h3><ul>{before.map((text,i)=><li key={i}>{text}</li>)}</ul><p>아래에서 새 규칙을 고르면 저장 전에 바뀌는 내용을 확인할 수 있습니다.</p><button type="button" onClick={onAdvanced}>기존 고급 설정 편집</button></section>}

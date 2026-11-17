@@ -3,7 +3,7 @@ import type { CardBinding, ResourceSnapshot, ResourceView } from './resources';
 
 export function effectiveCard(card:CardDefinition,snapshot?:ResourceSnapshot):CardDefinition {
   const override=snapshot?.costOverrides?.find(value=>value.cardId===card.id);
-  return override?{...card,castOptions:override.castOptions}:card;
+  return override?{...card,costStatus:'configured',castOptions:override.castOptions}:card;
 }
 export function castingLevels(card:CardDefinition,option:CastOption):number[] {
   if(card.kind!=='spell'||card.spellLevel===undefined)throw new Error('주문 카드에 기본 주문 레벨을 지정해 주세요.');

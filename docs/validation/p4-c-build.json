@@ -1,0 +1,16 @@
+{
+  "version": "0.5.2",
+  "schemaVersion": 6,
+  "command": ".\\scripts\\bootstrap-npm.ps1 run pack:win",
+  "exitCode": 0,
+  "files": {
+    "release/win-unpacked/DnD TCG-fy.exe": {
+      "bytes": 250093056,
+      "sha256": "04fc1608337d9148005aa3ed3995c4c6b960543e2db7236f033035f1f3ef81cf"
+    },
+    "release/win-unpacked/resources/app.asar": {
+      "bytes": 15920669,
+      "sha256": "26c1cbd78a627e0f6124004c1461c7a3b14fd36ba0ccb48b6aacb6c1e1e0fd5e"
+    }
+  }
+}

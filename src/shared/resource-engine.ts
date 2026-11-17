@@ -33,6 +33,7 @@ export function stateAt(resource: ResourceView, slotLevel?: number): { current: 
   return { current: resource.remainingByLevel![String(slotLevel)], maximum: resource.capacityByLevel![String(slotLevel)] };
 }
 export function planUse(card: CardDefinition, optionId: string, resources: ResourceView[], bindings: CardBinding[], choices: Record<string,number>, castingLevel?:number): ResourcePlan {
+  if (card.costStatus === 'unconfigured') throw new ResourceError('비용 미설정 카드입니다. 카드 사용 규칙을 먼저 지정해 주세요.');
   const option = card.castOptions.find(option => option.id === optionId);
   if (!option) throw new ResourceError('사용 방식을 찾을 수 없습니다.');
   let selectedCastingLevel:number|undefined;

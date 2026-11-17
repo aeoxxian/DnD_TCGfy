@@ -1,0 +1,15 @@
+{
+  "outcome": "PASS",
+  "baseline": true,
+  "runtime": {
+    "packaged": true,
+    "version": "0.5.1",
+    "electron": "45.3.3",
+    "node": "24.22.3"
+  },
+  "mode": "packaged-windows-exe",
+  "sourceHash": "7e0f772e8e5f882396c4aa8cc26cdb2253c9ead2f44fe35c1c0d009d8d71125c",
+  "checks": [],
+  "matrix": [],
+  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p4-c-glGxae"
+}

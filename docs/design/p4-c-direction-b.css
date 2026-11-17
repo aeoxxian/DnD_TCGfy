@@ -1,0 +1,19 @@
+/* PROPOSAL ONLY. Not imported by the application. QA screenshot injection only. */
+.app { --border:#343d49; --muted:#b7c3cf; --accent:#c2b18a; }
+.p4-b .topbar { background:#101720; border-bottom-color:#48505b; box-shadow:none; }
+.p4-b .resource-panel,.p4-b .detail-panel { background:#18212b; }
+.p4-b .board { background:#0e151e; }
+.p4-b .brand-mark { color:#b8aa8d; }
+.p4-b button { border-radius:10px; background:#202a35; border-color:#3b4858; }
+.p4-b button:hover:not(:disabled) { background:#2c3947; border-color:#ad9d7c; }
+.p4-b .resource-status-row { border:0; border-radius:0; background:transparent; border-bottom:1px solid #35414e; }
+.p4-b .resource-track { border:0; background:transparent; }
+.p4-b .resource-group>summary { color:#d9d2c2; }
+.p4-b .panel-title h2 { color:#e4e8ec; font-size:14px; font-weight:600; }
+.p4-b .selected-card-heading h2 { color:#f0e6cf; }
+.p4-b .extra-filters { background:transparent; border-color:#3b4858; }
+.p4-b .card-use { border-top-color:#897b61; }
+.p4-b .use-button { background:#536274; border-color:#c0b18f; }
+.p4-b .card-face,.p4-b .card-item.is-selected .card-face { box-shadow:none; }
+
+.app .modal { background:#18212b; border-color:#56616d; border-radius:12px; }

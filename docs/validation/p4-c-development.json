@@ -1,0 +1,130 @@
+{
+  "outcome": "PASS",
+  "baseline": false,
+  "runtime": {
+    "packaged": false,
+    "version": "0.5.2",
+    "electron": "45.3.3",
+    "node": "24.22.3"
+  },
+  "mode": "development",
+  "sourceHash": "7e0f772e8e5f882396c4aa8cc26cdb2253c9ead2f44fe35c1c0d009d8d71125c",
+  "checks": [
+    "One registration saves a single automatic slot rule and active deck; actual use spends only selected 4/5/6 tier",
+    "Unconfigured is blocked; explicit free, fixed count, variable points, homebrew downcast, multiple costs and multiple use options registered in the same dialog",
+    "Character-private rules leave other character unconfigured; injected binding write failure rolls back card/deck/cost/history/revision and retry saves exactly one card",
+    "Hand/grid double click and keyboard preview open image-only dialog; image click stays, outside/ESC close, focus/selection restored, drag double-click blocked, resource snapshot unchanged",
+    "Restart preserves IDs/images/rules/private bindings/history/Undo; six viewport/device-scale combinations fit uncropped original; proposal CSS injected only into QA window and removed"
+  ],
+  "matrix": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "dpr": 1,
+      "image": {
+        "x": 610.671875,
+        "y": 16,
+        "width": 698.65625,
+        "height": 1048
+      },
+      "ratio": 0.6666666666666666,
+      "docHeight": 1080
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scale": 1,
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "dpr": 1,
+      "image": {
+        "x": 437.671875,
+        "y": 16,
+        "width": 490.65625,
+        "height": 736
+      },
+      "ratio": 0.6666666666666666,
+      "docHeight": 768
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1.25,
+      "viewport": {
+        "width": 1536,
+        "height": 864
+      },
+      "dpr": 1.25,
+      "image": {
+        "x": 490.6625061035156,
+        "y": 16,
+        "width": 554.6625366210938,
+        "height": 832
+      },
+      "ratio": 0.6666666666666666,
+      "docHeight": 864
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scale": 1.25,
+      "viewport": {
+        "width": 1094,
+        "height": 616
+      },
+      "dpr": 1.25,
+      "image": {
+        "x": 352.13751220703125,
+        "y": 16,
+        "width": 389.32501220703125,
+        "height": 584
+      },
+      "ratio": 0.6666666666666666,
+      "docHeight": 616
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "dpr": 1.5,
+      "image": {
+        "x": 410.66668701171875,
+        "y": 16,
+        "width": 458.66668701171875,
+        "height": 688
+      },
+      "ratio": 0.6666666666666666,
+      "docHeight": 720
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scale": 1.5,
+      "viewport": {
+        "width": 912,
+        "height": 512
+      },
+      "dpr": 1.5,
+      "image": {
+        "x": 290.66668701171875,
+        "y": 8,
+        "width": 330.66668701171875,
+        "height": 496
+      },
+      "ratio": 0.6666666666666666,
+      "docHeight": 512
+    }
+  ],
+  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p4-c-ulXot9"
+}

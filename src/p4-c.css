@@ -1,0 +1,18 @@
+/* P4-C functional surfaces only. Proposed palettes live in docs, not here. */
+.image-lightbox { position:fixed; inset:0; width:100vw; height:100dvh; max-width:none; max-height:none; margin:0; padding:16px; border:0; border-radius:0; background:rgba(4,6,10,.92); color:#e8e9ec; overflow:hidden; box-shadow:none; }
+.image-lightbox[open] { display:grid; place-items:center; }
+.image-lightbox::backdrop { background:transparent; }
+.image-lightbox:focus { outline:none; }
+.image-lightbox>img { display:block; width:auto; height:auto; min-width:0; min-height:0; max-width:calc(100vw - 32px); max-height:calc(100dvh - 32px); object-fit:contain; user-select:none; }
+.registration-rules { border-top:1px solid var(--border); margin-top:18px; padding-top:16px; }
+.registration-rules h3 { margin-bottom:10px; font-size:16px; }
+.registration-rule-types { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 14px; border:0; padding:0; }
+.registration-rule-types label { padding:9px 12px; border:1px solid var(--border); border-radius:6px; cursor:pointer; }
+.registration-rule-types label:has(input:checked) { border-color:var(--accent); color:#f4d7a8; background:#393329; }
+.registration-rule-types input { margin-right:6px; }
+.registration-rules .form-columns { gap:12px; }
+.registration-rules .rule-help { padding:10px 12px; }
+.registration-summary { border-left:2px solid var(--accent); padding:10px 12px; margin-top:12px; background:#1a1e26; font-size:12px; }
+@media(max-height:600px) { .image-lightbox { padding:8px; } .image-lightbox>img { max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); } }
+
+.registration-rules-shell { border:0; padding:0; margin:0; min-width:0; }

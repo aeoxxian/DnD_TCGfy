@@ -104,7 +104,7 @@ try {
     const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
     return { packaged: app.isPackaged, appVersion: app.getVersion(), electron: process.versions.electron, node: process.versions.node, userData: app.getPath('userData'), sandbox: prefs.sandbox, nodeIntegration: prefs.nodeIntegration, contextIsolation: prefs.contextIsolation, webSecurity: prefs.webSecurity };
   });
-  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.5.1');
+  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.5.2');
   assert.equal(runtime.sandbox, true); assert.equal(runtime.nodeIntegration, false); assert.equal(runtime.contextIsolation, true); assert.equal(runtime.webSecurity, true);
   let data = await state(); assert.equal(data.schemaVersion, 6); assert.deepEqual(data.settings, initialSettings);
   assert.deepEqual(data.cards[0].castOptions, legacyCard.castOptions); assert.equal(data.cards[0].id, 'p0-card');
@@ -122,7 +122,7 @@ try {
   assert.equal(await dialog.getByText(/not-an-image.png:/).count(), 1);
   await dialog.getByLabel('카드 유형', { exact: true }).selectOption('spell');
   await checksTo(dialog, '카드 역할', ['공격', '유틸']); await checksTo(dialog, '카드 행동 경제', ['보너스 행동']);
-  await dialog.locator('summary').click(); await dialog.getByLabel('사거리', { exact: true }).selectOption('ranged');
+  await dialog.locator('.editor-advanced > summary').click(); await dialog.getByLabel('사거리', { exact: true }).selectOption('ranged');
   await dialog.getByLabel('거리 (ft, 선택)').fill('60'); await dialog.getByLabel('주문 레벨 (선택)').selectOption('1');
   await dialog.getByLabel('새 태그', { exact: true }).fill('검수 공통'); await dialog.getByRole('button', { name: '태그 추가', exact: true }).click();
   await dialog.getByRole('checkbox', { name: '검수 공통', exact: true }).waitFor();
@@ -148,7 +148,7 @@ try {
   await edit('TEST-02', async dialog => {
     await dialog.getByLabel('카드 이름', { exact: true }).fill('반응의 카드'); await dialog.getByLabel('카드 유형', { exact: true }).selectOption('feature');
     await checksTo(dialog, '카드 역할', ['유틸']); await checksTo(dialog, '카드 행동 경제', ['반응 행동']);
-    await dialog.locator('summary').click(); await dialog.getByLabel('사거리', { exact: true }).selectOption('self');
+    await dialog.locator('.editor-advanced > summary').click(); await dialog.getByLabel('사거리', { exact: true }).selectOption('self');
     await dialog.getByRole('checkbox', { name: '검수 공통', exact: true }).uncheck();
     await dialog.getByLabel('새 태그', { exact: true }).fill('독립 태그'); await dialog.getByRole('button', { name: '태그 추가', exact: true }).click();
     await dialog.getByRole('checkbox', { name: '독립 태그', exact: true }).waitFor();
@@ -176,13 +176,12 @@ try {
   await selectCard('치유의 카드'); await page.getByRole('button',{name:'치유의 카드 미리보기 확대',exact:true}).click();
   const original = page.getByRole('img', { name: '치유의 카드 원본 확대' });
   await original.evaluate(img => img.decode()); assert.equal(await original.evaluate(img => getComputedStyle(img).objectFit), 'contain');
-  await capture('p1-original'); await page.getByRole('button', { name: '원본 크기', exact: true }).click();
-  assert.equal(await original.evaluate(img => getComputedStyle(img).maxWidth), 'none'); await page.keyboard.press('Escape');
+  await capture('p1-original'); const imageBounds=await original.boundingBox(),viewport=await page.evaluate(()=>({width:innerWidth,height:innerHeight})); assert(imageBounds.x>=0&&imageBounds.y>=0&&imageBounds.x+imageBounds.width<=viewport.width&&imageBounds.y+imageBounds.height<=viewport.height);assert.equal(await page.locator('.image-lightbox button').count(),0);await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('button', { name: '정보 수정' }).count(), 0); await page.keyboard.press('Escape');
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1920, 1080));
   await page.evaluate(() => window.scrollTo(0, 0)); await capture('p1-hand');
   await page.getByRole('button', { name: '격자', exact: true }).click(); await page.getByRole('status').filter({ hasText: '환경 설정 저장됨' }).waitFor();
-  await capture('p1-grid'); recordCheck('Original contain display, fit/natural-size enlargement, ESC return, hand/grid and lazy thumbnail rendering');
+  await capture('p1-grid'); recordCheck('Original contain display, image-only viewport-fit enlargement, ESC return, hand/grid and lazy thumbnail rendering');
 
   const roles = page.getByRole('group', { name: '역할 필터' });
   await roles.getByRole('button', { name: '공격', exact: true }).click(); await roles.getByRole('button', { name: '치유', exact: true }).click();
@@ -314,7 +313,7 @@ try {
   await selectCard('치유의 카드'); await page.getByRole('button', { name: '치유의 카드 미리보기 확대', exact: true }).click();
   await page.getByRole('img', { name: '치유의 카드 원본 확대' }).evaluate(img => img.decode()); await capture('p11-preview-click'); await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '치유의 카드 미리보기 확대', exact: true }).focus(); await page.keyboard.press('Enter');
-  await page.getByRole('dialog', { name: '치유의 카드 원본 보기' }).waitFor(); await page.getByRole('button', { name: '치유의 카드 원본 보기 닫기' }).click(); await page.keyboard.press('Escape');
+  await page.getByRole('dialog', { name: '치유의 카드 원본 보기' }).waitFor(); await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   const hand = page.getByLabel('카드 목록', { exact: true }); await hand.evaluate(element => { element.scrollLeft = 0; });
   await hand.scrollIntoViewIfNeeded(); const bounds = await hand.boundingBox();
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 70); const wheelStarted = Date.now(); await page.mouse.wheel(0, 220);

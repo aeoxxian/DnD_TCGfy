@@ -1,3 +1,4 @@
+import { RegistrationStore } from './registration-store';
 import { TrashStore } from './trash-store';
 import { AssetCleanup } from './asset-cleanup';
 import { EditStore } from './edit-store';
@@ -35,6 +36,7 @@ else {
     const library = new LibraryStore(store);
     const assets = new AssetService(app.getPath('userData'), library);
     const resources = new ResourceStore(store);
+    const registration = new RegistrationStore(store, library, resources);
     const edits = new EditStore(store);
     const trash = new TrashStore(store);
     const cleanup = new AssetCleanup(store,assets);
@@ -78,7 +80,7 @@ else {
     safeHandler(IPC.saveSettings, input => store!.saveSettings(settingsSchema.parse(input)));
     safeHandler(IPC.saveLibraryState, input => library.saveState(input));
     safeHandler(IPC.importImages, input => assets.importPaths(input));
-    safeHandler(IPC.saveCards, input => library.saveCards(input));
+    safeHandler(IPC.saveCards, input => registration.save(input));
     safeHandler(IPC.archiveCard, input => library.archiveCard(input));
     safeHandler(IPC.saveTag, input => library.saveTag(input));
     safeHandler(IPC.deleteTag, input => library.deleteTag(input));

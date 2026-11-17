@@ -68,11 +68,12 @@ export class LibraryStore {
     } satisfies Deck));
     return { cards, tags, profiles, decks, libraryState: this.getState(), warnings };
   }
-  saveCards(input: unknown): Library {
-    const { cards: drafts, registrationTarget } = saveCardsSchema.parse(input);
+  saveCards(input: unknown, withinTransaction = false): Library {
+    const { cards: drafts, registrationTarget, initialRules } = saveCardsSchema.parse(input);
+    if (initialRules) throw new UserInputError('초기 사용 규칙은 통합 등록 경로에서 저장해 주세요.');
     const ids = drafts.flatMap(card => card.id ? [card.id] : []);
     if (new Set(ids).size !== ids.length) throw new UserInputError('같은 카드를 한 번에 두 번 수정할 수 없습니다.');
-    transaction(this.db, () => {
+    const execute = () => {
       const state = this.getState();
       const profile = state.activeCharacterId ? this.db.prepare('SELECT id,active_deck_id FROM character_profiles WHERE id=?').get(state.activeCharacterId) as { id: string; active_deck_id: string | null } | undefined : undefined;
       const currentTarget = profile?.active_deck_id ? { characterId: profile.id, deckId: profile.active_deck_id } : null;
@@ -88,6 +89,7 @@ export class LibraryStore {
         const card = cardSchema.parse({
           ...draft, id: existing?.id ?? randomUUID(), imageAssetId,
           roles: [...new Set(draft.roles)], actions: [...new Set(draft.actions)], tags: [...new Set(draft.tags)],
+          costStatus: existing?.costStatus,
           castOptions: existing?.castOptions ?? [{ id: randomUUID(), label: '일반 사용', costs: [] }],
           createdAt: existing?.createdAt ?? now, updatedAt: now,
         });
@@ -101,7 +103,8 @@ export class LibraryStore {
         for (const tagId of card.tags) insertTag.run(id, tagId);
         if (!existing && target) this.db.prepare('INSERT INTO deck_cards(deck_id,card_id,position) VALUES (?,?,(SELECT COALESCE(MAX(position),-1)+1 FROM deck_cards WHERE deck_id=?))').run(target.deckId, id, target.deckId);
       }
-    });
+    };
+    if (withinTransaction) execute(); else transaction(this.db, execute);
     return this.getLibrary();
   }
   archiveCard(input: unknown): Library {

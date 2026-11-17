@@ -1,0 +1,210 @@
+{
+  "outcome": "PASS",
+  "baseline": false,
+  "runtime": {
+    "packaged": true,
+    "version": "0.5.2",
+    "electron": "45.3.3",
+    "node": "24.22.3",
+    "hostDisplays": [
+      {
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "scaleFactor": 1
+      }
+    ]
+  },
+  "checks": [
+    "1920x1080 / 1366x768 at per-app device scale 1/1.25/1.5: no document scroll, long description scrolls independently, confirm button stays inside panel and hit-testable",
+    "Only explicit use/adjust/rest changes resources; upcast selected tier, free/fixed/variable/homebrew use, eight cost inputs, row expand/collapse, manual entry, four rests and Undo remain functional",
+    "Management access retains card selection/search/resources; pact fixed tier stays independent, full restart preserves IDs/tags/images/rules/state/history/Undo, SQLite v6 unchanged and FK/integrity/hash checks pass"
+  ],
+  "matrix": [
+    {
+      "physicalTarget": {
+        "width": 1920,
+        "height": 1080
+      },
+      "forcedScale": 1,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "devicePixelRatio": 1,
+      "documentHeight": 1080,
+      "documentWidth": 1920,
+      "use": {
+        "top": 1029,
+        "bottom": 1068,
+        "left": 1533,
+        "right": 1908
+      },
+      "hit": true,
+      "description": {
+        "height": 477,
+        "scrollHeight": 3528
+      },
+      "panel": {
+        "height": 1013,
+        "scrollHeight": 1013
+      },
+      "imageFit": "contain"
+    },
+    {
+      "physicalTarget": {
+        "width": 1366,
+        "height": 768
+      },
+      "forcedScale": 1,
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "devicePixelRatio": 1,
+      "documentHeight": 768,
+      "documentWidth": 1366,
+      "use": {
+        "top": 717,
+        "bottom": 756,
+        "left": 996.53125,
+        "right": 1354
+      },
+      "hit": true,
+      "description": {
+        "height": 194,
+        "scrollHeight": 3528
+      },
+      "panel": {
+        "height": 701,
+        "scrollHeight": 701
+      },
+      "imageFit": "contain"
+    },
+    {
+      "physicalTarget": {
+        "width": 1920,
+        "height": 1080
+      },
+      "forcedScale": 1.25,
+      "viewport": {
+        "width": 1536,
+        "height": 864
+      },
+      "devicePixelRatio": 1.25,
+      "documentHeight": 864,
+      "documentWidth": 1536,
+      "use": {
+        "top": 812.7999877929688,
+        "bottom": 851.9999885559082,
+        "left": 1148.800048828125,
+        "right": 1524.0000610351562
+      },
+      "hit": true,
+      "description": {
+        "height": 265,
+        "scrollHeight": 3529
+      },
+      "panel": {
+        "height": 797,
+        "scrollHeight": 797
+      },
+      "imageFit": "contain"
+    },
+    {
+      "physicalTarget": {
+        "width": 1366,
+        "height": 768
+      },
+      "forcedScale": 1.25,
+      "viewport": {
+        "width": 1094,
+        "height": 616
+      },
+      "devicePixelRatio": 1.25,
+      "documentHeight": 616,
+      "documentWidth": 1094,
+      "use": {
+        "top": 568.7999877929688,
+        "bottom": 607.9999885559082,
+        "left": 812.4000244140625,
+        "right": 1085.6000366210938
+      },
+      "hit": true,
+      "description": {
+        "height": 215,
+        "scrollHeight": 5257
+      },
+      "panel": {
+        "height": 568,
+        "scrollHeight": 568
+      },
+      "imageFit": "contain"
+    },
+    {
+      "physicalTarget": {
+        "width": 1920,
+        "height": 1080
+      },
+      "forcedScale": 1.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "devicePixelRatio": 1.5,
+      "documentHeight": 720,
+      "documentWidth": 1280,
+      "use": {
+        "top": 669.3333740234375,
+        "bottom": 708.0000419616699,
+        "left": 934.2708740234375,
+        "right": 1268.0000610351562
+      },
+      "hit": true,
+      "description": {
+        "height": 161,
+        "scrollHeight": 3528
+      },
+      "panel": {
+        "height": 654,
+        "scrollHeight": 654
+      },
+      "imageFit": "contain"
+    },
+    {
+      "physicalTarget": {
+        "width": 1366,
+        "height": 768
+      },
+      "forcedScale": 1.5,
+      "viewport": {
+        "width": 912,
+        "height": 512
+      },
+      "devicePixelRatio": 1.5,
+      "documentHeight": 512,
+      "documentWidth": 912,
+      "use": {
+        "top": 465.3333435058594,
+        "bottom": 504.0000114440918,
+        "left": 630.6666870117188,
+        "right": 904.0000305175781
+      },
+      "hit": true,
+      "description": {
+        "height": 111,
+        "scrollHeight": 5256
+      },
+      "panel": {
+        "height": 464,
+        "scrollHeight": 464
+      },
+      "imageFit": "contain"
+    }
+  ],
+  "sourceHash": "e35787a9dff316c5c4216f6ea5a9652b932706a84ebea177e584673a39f5d241",
+  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p4-a-KPCrzw"
+}

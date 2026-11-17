@@ -94,7 +94,7 @@ export class ResourceStore {
     const card = this.library.getLibrary().cards.find(card => card.id === id);
     if (!card) throw new UserInputError('등록된 카드를 찾을 수 없습니다.');
     const row=characterId?this.db.prepare('SELECT cast_options_json FROM character_cost_overrides WHERE character_id=? AND card_id=?').get(characterId,id) as {cast_options_json:string}|undefined:undefined;
-    return row?{...card,castOptions:cardSchema.shape.castOptions.parse(JSON.parse(row.cast_options_json))}:card;
+    return row?{...card,costStatus:'configured' as const,castOptions:cardSchema.shape.castOptions.parse(JSON.parse(row.cast_options_json))}:card;
   }
   private checkScope(overrides: ResourceOverrides): void {
     if (overrides.scope === 'character') { if (overrides.ownerCardId) throw new UserInputError('캐릭터 공유 자원에는 소유 카드를 지정하지 않습니다.'); return; }
@@ -148,8 +148,9 @@ export class ResourceStore {
       this.db.prepare('UPDATE resource_instances SET current_state_json=? WHERE id=? AND character_id=? AND archived_at IS NULL').run(JSON.stringify(state), id, characterId);
     }
   }
-  change(input: unknown, withinTransaction = false): ResourceResult {
+  change(input: unknown, withinTransaction = false, newCardRegistration = false): ResourceResult {
     const request = resourceRequestSchema.parse(input); const { characterId, action } = request; const fingerprint = digest(request);
+    if (newCardRegistration && (!withinTransaction || action.type !== 'save_costs')) throw new UserInputError('잘못된 초기 규칙 저장 요청입니다.');
     try {
       const execute = () => {
         const prior = this.db.prepare('SELECT fingerprint,event_id FROM resource_requests WHERE request_id=?').get(request.requestId) as { fingerprint: string; event_id: string | null } | undefined;
@@ -189,6 +190,7 @@ export class ResourceStore {
           const resource = snapshot.resources.find(resource => resource.id === action.resourceId); if (!resource) throw new UserInputError('현재 캐릭터의 자원이 아닙니다.');
           this.db.prepare('UPDATE resource_instances SET archived_at=? WHERE id=? AND character_id=?').run(new Date().toISOString(),resource.id,characterId); label = `${resource.name} 연결 해제`;
         } else if (action.type === 'save_costs') {
+          barrier = !newCardRegistration;
           const card = this.getCard(action.cardId,snapshot.characterId); const options = cardSchema.shape.castOptions.max(12).parse(action.castOptions);
           if (new Set(options.map(option => option.id)).size !== options.length) throw new UserInputError('사용 방식 ID가 중복됩니다.');
           const keys = new Set(options.flatMap(option => option.costs.map(cost => cost.costKey)));
@@ -204,11 +206,12 @@ export class ResourceStore {
           if(action.expectedCardVersion!==undefined&&action.expectedCardVersion!==shared.updatedAt)throw new UserInputError('공통 카드가 변경됐습니다. 비용 설정을 다시 열어 주세요.');
           const baseChanged=action.spellLevel!==undefined&&action.spellLevel!==shared.spellLevel;
           if(action.spellLevel!==undefined&&shared.kind!=='spell')throw new UserInputError('주문 카드에만 기본 주문 레벨을 지정할 수 있습니다.');
-          if((baseChanged||action.scope==='shared'&&JSON.stringify(shared.castOptions)!==JSON.stringify(options))&&(snapshot.sharedCostUsers?.[card.id]??0)>0&&!action.confirmShared)throw new UserInputError('다른 캐릭터에 영향을 주는 공통 비용/기본 주문 레벨 수정에 동의해 주세요.');
+          if((baseChanged||action.scope==='shared'&&(shared.costStatus==='unconfigured'||JSON.stringify(shared.castOptions)!==JSON.stringify(options)))&&(snapshot.sharedCostUsers?.[card.id]??0)>0&&!action.confirmShared)throw new UserInputError('다른 캐릭터에 영향을 주는 공통 비용/기본 주문 레벨 수정에 동의해 주세요.');
           configuration={cardId:card.id,scope:action.scope,before:{spellLevel:shared.spellLevel,castOptions:action.scope==='shared'?shared.castOptions:card.castOptions,bindings:snapshot.bindings.filter(binding=>binding.cardId===card.id)},after:{spellLevel:action.spellLevel??shared.spellLevel,castOptions:options,bindings:action.bindings}};
           if(baseChanged)this.db.prepare('UPDATE card_definitions SET spell_level=?,updated_at=? WHERE id=?').run(action.spellLevel!,new Date().toISOString(),card.id);
           if(action.scope==='shared'){
-            this.db.prepare("UPDATE card_definitions SET attributes_json=json_set(attributes_json,'$.castOptions',json(?)),updated_at=? WHERE id=?").run(JSON.stringify(options),new Date().toISOString(),card.id);
+            const attributes=shared.costStatus===undefined?"json_set(attributes_json,'$.castOptions',json(?))":"json_set(attributes_json,'$.castOptions',json(?),'$.costStatus','configured')";
+            this.db.prepare(`UPDATE card_definitions SET attributes_json=${attributes},updated_at=? WHERE id=?`).run(JSON.stringify(options),new Date().toISOString(),card.id);
           }else this.db.prepare('INSERT INTO character_cost_overrides VALUES (?,?,?,?) ON CONFLICT(character_id,card_id) DO UPDATE SET cast_options_json=excluded.cast_options_json,updated_at=excluded.updated_at').run(characterId,card.id,JSON.stringify(options),new Date().toISOString());
           this.db.prepare('DELETE FROM card_bindings WHERE character_id=? AND card_id=?').run(characterId,card.id);
           for (const binding of action.bindings) this.db.prepare('INSERT INTO card_bindings(id,character_id,card_id,cost_key,resource_instance_id) VALUES (?,?,?,?,?)').run(randomUUID(),characterId,card.id,binding.costKey,binding.resourceInstanceId);

@@ -42,6 +42,7 @@ export const cardSchema = z.strictObject({
   range: z.strictObject({ kind: z.enum(['self', 'touch', 'melee', 'ranged', 'special']), feet: z.number().nonnegative().optional() }),
   tags: z.array(z.string().min(1)), description: z.string().optional(), spellLevel: z.number().int().min(0).max(9).optional(),
   castOptions: z.array(z.strictObject({ id: z.string().min(1), label: z.string().min(1), costs: z.array(costSchema), casting: castingSchema.optional() })).min(1),
+  costStatus: z.enum(['unconfigured', 'configured']).optional(),
   createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
 }).refine(v => v.spellLevel === undefined || v.kind === 'spell');
 export type CardDefinition = z.infer<typeof cardSchema>;
@@ -61,7 +62,14 @@ export const cardDraftSchema = z.strictObject({
 export type CardDraft = z.infer<typeof cardDraftSchema>;
 export const registrationTargetSchema = z.strictObject({ characterId: idSchema, deckId: idSchema });
 export type RegistrationTarget = z.infer<typeof registrationTargetSchema>;
-export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional() });
+export const initialRulesSchema = z.strictObject({
+  requestId: z.uuid(), configured: z.boolean(), scope: z.enum(['shared', 'character']),
+  characterId: idSchema.optional(), expectedRevision: z.number().int().nonnegative().optional(),
+  castOptions: cardSchema.shape.castOptions.max(12).refine(options => options.reduce((n, option) => n + option.costs.length, 0) <= 100),
+  bindings: z.array(z.strictObject({ costKey: z.string().min(1).max(128), resourceInstanceId: idSchema })).max(100),
+});
+export type InitialRules = z.infer<typeof initialRulesSchema>;
+export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional(), initialRules: initialRulesSchema.optional() });
 export const libraryStateSchema = z.strictObject({
   query: z.string().max(200), roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
   kinds: z.array(kindSchema).max(6), ranges: z.array(rangeSchema).max(5), tagIds: z.array(idSchema).max(100),

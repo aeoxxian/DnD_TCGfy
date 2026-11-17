@@ -1,0 +1,16 @@
+/* PROPOSAL ONLY. Not imported by the application. QA screenshot injection only. */
+.app { --border:#414047; --muted:#babac2; --accent:#d1b780; }
+.p4-b .topbar { background:#111318; border-bottom:1px solid #83704b; box-shadow:none; }
+.p4-b .resource-panel,.p4-b .detail-panel { background:#1b1d24; }
+.p4-b .board { background:#101319; }
+.p4-b button { border-radius:4px; background:#23252d; border-color:#42414a; }
+.p4-b button:hover:not(:disabled) { background:#2c2b30; border-color:#c9af79; }
+.p4-b .view-switch button[aria-pressed=true],.p4-b .chips button[aria-pressed=true] { background:#3c3529; border-color:#c9af79; }
+.p4-b .panel-title { border-bottom:1px solid #766342; padding-bottom:8px; }
+.p4-b .panel-title h2 { color:#e3ce9d; font-size:13px; font-weight:600; letter-spacing:.04em; }
+.p4-b .card-use { border-top-color:#a68a56; }
+.p4-b .use-button { background:#6c5936; border-color:#d0b17a; }
+.p4-b .card-face { box-shadow:0 4px 10px #0005; }
+.p4-b .card-item.is-selected .card-face { box-shadow:0 4px 10px #0005; }
+
+.app .modal { background:#1b1d24; border-color:#83704b; border-radius:6px; }
