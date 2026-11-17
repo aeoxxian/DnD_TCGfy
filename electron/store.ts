@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from '../src/shared/contracts';
 import { migrate, SCHEMA_VERSION, transaction } from './migrations';
+import { UserInputError } from './errors';
 
 function versionOf(db: DatabaseSync): number {
   return (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
@@ -54,16 +55,20 @@ export class AppStore {
     const row = this.db.prepare("SELECT value_json FROM settings WHERE key = 'preferences'").get() as { value_json: string } | undefined;
     // Invalid persisted values must surface as an error, never silently reset.
     const display = this.db.prepare("SELECT value_json FROM settings WHERE key = 'resource_display'").get() as { value_json: string } | undefined;
-    return settingsSchema.parse({ ...(row ? JSON.parse(row.value_json) : DEFAULT_SETTINGS), ...(display ? { resourceViews: JSON.parse(display.value_json) } : {}) });
+    const appearance = this.db.prepare("SELECT value_json FROM settings WHERE key = 'appearance'").get() as { value_json: string } | undefined;
+    return settingsSchema.parse({ ...(row ? JSON.parse(row.value_json) : DEFAULT_SETTINGS), ...(display ? { resourceViews: JSON.parse(display.value_json) } : {}), ...(appearance ? { appearance: JSON.parse(appearance.value_json) } : {}) });
   }
   saveSettings(input: unknown): Settings {
     const settings = settingsSchema.parse(input);
     transaction(this.db, () => {
-      // Keep the original preferences object readable by P0–P4-A. UI display state
-      // has its own key and never participates in resource revisions or Undo.
-      const { resourceViews, ...preferences } = settings;
+      // Keep the original preferences object readable by P0–P4-A. UI display state and the
+      // play-mat appearance have their own keys and never participate in resource revisions or Undo.
+      const { resourceViews, appearance, ...preferences } = settings;
+      if (appearance) for (const back of appearance.customBacks)
+        if (!this.db.prepare('SELECT 1 FROM assets WHERE id = ?').get(back.assetId)) throw new UserInputError('카드 뒷면 이미지를 찾을 수 없습니다. 이미지를 다시 선택해 주세요.');
       this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('preferences', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(preferences));
       if (resourceViews !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('resource_display', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(resourceViews));
+      if (appearance !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('appearance', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(appearance));
     });
     return this.getSettings();
   }

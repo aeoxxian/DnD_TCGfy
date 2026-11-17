@@ -4,7 +4,11 @@ import type { TrashResult } from './shared/trash';
 import { CardBatchTools } from './components/CardBatchTools';
 import { EditHistory } from './components/BatchEdits';
 import { useEffect, useRef, useState, useMemo, useCallback, type DragEvent } from 'react';
-import type { Bootstrap, Library, LibraryState, Settings, AssetPreview, Result } from './shared/contracts';
+import { DEFAULT_APPEARANCE, type Appearance, type Bootstrap, type Library, type LibraryState, type Settings, type AssetPreview, type Result } from './shared/contracts';
+import { cardBackFor } from './shared/appearance';
+import { CLASS_NAMES } from './shared/class-contracts';
+import { CardBackDialog, DeckPile, Icon, ThemeMenu, UsedPile, cardBackSource } from './components/Appearance';
+import { UseHistory } from './components/UseHistory';
 import { filterCards } from './shared/library';
 import { ImageLightbox } from './components/ImageLightbox';
 import { CardEditor } from './components/CardEditor';
@@ -17,6 +21,7 @@ import { CardCostEditor, cardResourceNote } from './components/CardResources';
 import { CharacterSettings } from './components/CharacterSettings';
 import { TagManager, ProfileManager } from './components/Managers';
 
+function popoverOpen(): boolean { try { return !!document.querySelector(':popover-open'); } catch { return false; } }
 type Panel = 'new' | 'edit' | 'tags' | 'profiles' | 'preview' | 'archive' | 'resources' | 'costs' | 'class' | 'history' | 'libraryMenu' | 'trash' | 'management';
 export function App() {
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
@@ -31,6 +36,8 @@ export function App() {
   const [selectedCards,setSelectedCards]=useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [backsOpen, setBacksOpen] = useState(false);
+  const [usedOpen, setUsedOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>();
   const [imported, setImported] = useState<AssetPreview[]>([]);
   const filterRef = useRef<LibraryState | undefined>(undefined);
@@ -50,7 +57,7 @@ export function App() {
   useEffect(() => { void load(); }, []);
   useEffect(() => {
     function keydown(event: KeyboardEvent) {
-      if (document.querySelector('dialog[open]')) return;
+      if (document.querySelector('dialog[open]') || popoverOpen()) return;
       const editing = event.target instanceof HTMLElement && (event.target.isContentEditable || !!event.target.closest('input,textarea,select'));
       if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey && !editing) { event.preventDefault(); document.getElementById('card-name-search')?.focus(); return; }
       if (event.key !== 'Escape' || editing) return;
@@ -142,27 +149,43 @@ export function App() {
   const { settings, cards, tags, libraryState } = bootstrap;
   const closeSelection = () => { setSelectedId(undefined); if (selectedButton.current?.isConnected) selectedButton.current.focus(); };
   const openNew = () => { setImported([]); setPanel('new'); };
-  return <div className={`app p4-a p4-b ${settings.reducedMotion ? 'reduced-motion' : ''} ${settings.resourcePanelCollapsed ? 'resources-collapsed' : ''}`}>
+  const appearance: Appearance = settings.appearance ?? DEFAULT_APPEARANCE;
+  const classLine = resourceController.snapshot?.profile ? `${CLASS_NAMES[resourceController.snapshot.profile.classId as keyof typeof CLASS_NAMES] ?? '홈브루'} · ${resourceController.snapshot.profile.level}레벨` : '';
+  const deckCount = activeDeck ? activeDeck.cardIds.filter(id => cards.some(card => card.id === id)).length : cards.length;
+  return <div className={`app p4-a p4-b playmat ${settings.reducedMotion ? 'reduced-motion' : ''} ${settings.resourcePanelCollapsed ? 'resources-collapsed' : ''}`} data-theme={appearance.theme}>
     <header className="topbar">
-      <div className="brand"><span className="brand-mark" aria-hidden="true">◇</span><div><h1>DnD <span>TCG-fy</span></h1><p>나의 선택을 손패 위에</p></div></div>
-      <div className="profile-summary"><label><span className="sr-only">활성 캐릭터</span><select aria-label="활성 캐릭터" value={activeProfile?.id ?? ''} onChange={event => updateFilters({ activeCharacterId: event.target.value || undefined, viewScope: event.target.value ? libraryState.viewScope : 'library' })}><option value="">전체 라이브러리</option>{bootstrap.profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label>{activeProfile && <select aria-label="활성 덱" value={activeDeck?.id ?? ''} disabled={busy} onChange={event => void mutate(() => window.desktop.selectDeck({ characterId: activeProfile.id, deckId: event.target.value }))}>{bootstrap.decks.filter(deck => deck.characterId === activeProfile.id).map(deck => <option key={deck.id} value={deck.id}>{deck.name}</option>)}</select>}</div>
-      <div className="top-actions"><button aria-haspopup="dialog" onClick={()=>setPanel('management')}>관리</button><button aria-haspopup="dialog" onClick={()=>setSettingsOpen(true)}>환경 설정</button></div>
+      <div className="brand"><span className="brand-logo" aria-hidden="true"/><div><h1>DnD <span>TCG-fy</span></h1><p className="brand-tagline">THE ADVENTURER&apos;S TABLE</p></div></div>
+      <div className="profile-summary nameplate">
+        <span className="portrait" aria-hidden="true">{activeProfile?.name.slice(0, 1) ?? '◇'}</span>
+        <div className="nameplate-character"><label><span className="sr-only">활성 캐릭터</span><select aria-label="활성 캐릭터" value={activeProfile?.id ?? ''} onChange={event => updateFilters({ activeCharacterId: event.target.value || undefined, viewScope: event.target.value ? libraryState.viewScope : 'library' })}><option value="">전체 라이브러리</option>{bootstrap.profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label>{classLine && <span className="class-ribbon">{classLine}</span>}</div>
+        {activeProfile && <label className="nameplate-deck"><span className="nameplate-kicker" aria-hidden="true">DECK</span><select aria-label="활성 덱" value={activeDeck?.id ?? ''} disabled={busy} onChange={event => void mutate(() => window.desktop.selectDeck({ characterId: activeProfile.id, deckId: event.target.value }))}>{bootstrap.decks.filter(deck => deck.characterId === activeProfile.id).map(deck => <option key={deck.id} value={deck.id}>{deck.name}</option>)}</select></label>}
+      </div>
+      <div className="top-actions"><ThemeMenu value={appearance.theme} disabled={saving} onChange={theme => void updateSettings({ appearance: { ...appearance, theme } })}/><button aria-haspopup="dialog" onClick={()=>setPanel('management')}><Icon name="manage"/>관리</button><button aria-haspopup="dialog" onClick={()=>setSettingsOpen(true)}><Icon name="settings"/>환경 설정</button></div>
     </header>
     {settingsOpen&&<Modal title="환경 설정" onClose={()=>setSettingsOpen(false)}><p>이 기기에 저장되며 다시 실행해도 유지됩니다.</p><label className="checkbox-line"><input type="checkbox" checked={settings.reducedMotion} disabled={saving} onChange={e=>void updateSettings({reducedMotion:e.target.checked})}/>모션 줄이기</label></Modal>}
+    {backsOpen&&<CardBackDialog appearance={appearance} deck={activeDeck ? { id: activeDeck.id, name: activeDeck.name } : undefined} busy={saving} onClose={()=>setBacksOpen(false)} onSave={next=>{setBacksOpen(false);void updateSettings({ appearance: next });}}/>}
+    {usedOpen&&activeProfile&&<UseHistory characterId={activeProfile.id} onClose={()=>setUsedOpen(false)}/>}
     <div className="workspace">
-      <aside className="resource-panel" aria-label="자원 패널"><div className="panel-title"><h2>{settings.resourcePanelCollapsed ? '자원' : '나의 자원'}</h2><button className="collapse-button" aria-label={settings.resourcePanelCollapsed ? '자원 패널 펼치기' : '자원 패널 접기'} disabled={saving} onClick={() => void updateSettings({ resourcePanelCollapsed: !settings.resourcePanelCollapsed })}>{settings.resourcePanelCollapsed ? '›' : '‹'}</button></div>{!settings.resourcePanelCollapsed && <ResourcePanel key={activeProfile?.id} controller={resourceController} display={settings.resourceViews?.[activeProfile?.id ?? '']} displayBusy={saving} onDisplayChange={display => { if (activeProfile) void updateSettings({ resourceViews: { ...settings.resourceViews, [activeProfile.id]: display } }); }}/>}</aside>
+      <aside className="resource-panel" aria-label="자원 패널"><div className="panel-title"><h2>{settings.resourcePanelCollapsed ? '자원' : '자원 장부'}</h2><button className="collapse-button" aria-label={settings.resourcePanelCollapsed ? '자원 패널 펼치기' : '자원 패널 접기'} disabled={saving} onClick={() => void updateSettings({ resourcePanelCollapsed: !settings.resourcePanelCollapsed })}>{settings.resourcePanelCollapsed ? '›' : '‹'}</button></div>{!settings.resourcePanelCollapsed && <ResourcePanel key={activeProfile?.id} controller={resourceController} display={settings.resourceViews?.[activeProfile?.id ?? '']} displayBusy={saving} onDisplayChange={display => { if (activeProfile) void updateSettings({ resourceViews: { ...settings.resourceViews, [activeProfile.id]: display } }); }}/>}</aside>
       <main className="board" aria-label="카드 보드" onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }} onDrop={event => void dropFiles(event)}>
-        <div className="board-title"><div><span className="eyebrow">YOUR CARD TABLE</span><h2>손끝에서 고르는 다음 행동</h2><p>나의 카드를 펼쳐 살펴보고, 선택을 준비하세요.</p></div><span className="milestone">P4-C · UX 검수</span></div>
-        <Filters state={libraryState} tags={tags} cards={filterCardsSource} onChange={updateFilters} />
-        <div className="board-toolbar"><div className="deck-label"><span aria-hidden="true">▱</span><strong>{libraryState.viewScope === 'deck' ? activeDeck?.name ?? '덱' : '라이브러리'}</strong><span aria-label="표시 카드 수">{visibleCards.length} / {cards.length}장</span></div><div className="toolbar-switches">{selectionMode&&<button aria-pressed onClick={()=>{setSelectionMode(false);setSelectedCards([]);}}>선택 관리 종료</button>}<div className="view-switch" role="group" aria-label="카드 범위"><button aria-pressed={libraryState.viewScope === 'library'} onClick={() => updateFilters({ viewScope: 'library' })}>전체 카드</button><button disabled={!activeDeck} aria-pressed={libraryState.viewScope === 'deck'} onClick={() => updateFilters({ viewScope: 'deck' })}>활성 덱</button></div><div className="view-switch" role="group" aria-label="카드 보기 방식"><button aria-pressed={settings.viewMode === 'hand'} disabled={saving} onClick={() => void updateSettings({ viewMode: 'hand' })}>손패</button><button aria-pressed={settings.viewMode === 'grid'} disabled={saving} onClick={() => void updateSettings({ viewMode: 'grid' })}>격자</button></div></div></div>
+        <h2 className="sr-only">카드 보드</h2>
+        <div className="board-top">
+          <Filters state={libraryState} tags={tags} cards={filterCardsSource} onChange={updateFilters} />
+        </div>
         {selectionMode&&<CardBatchTools key={`${libraryState.activeCharacterId}-${activeDeck?.id}`} ids={selectedCards.filter(id=>visibleCards.some(card=>card.id===id))} visibleCount={visibleCards.length} tags={tags} decks={bootstrap.decks.map(d=>({...d,name:`${bootstrap.profiles.find(p=>p.id===d.characterId)?.name} · ${d.name}`}))} activeDeck={activeDeck} onAll={()=>setSelectedCards(visibleCards.map(card=>card.id))} onClear={()=>setSelectedCards([])} onTrashed={trashChanged} onSaved={async()=>{setSelectedCards([]);await load();await resourceController.refresh();}}/>}
-        {visibleCards.length ? <CardGallery cards={visibleCards} mode={settings.viewMode} selectedId={selectedId} selectedIds={selectedCards} selectionMode={selectionMode} notes={resourceNotes} onSelect={selectCard} onCheck={checkCard} onPreview={previewCard}/> : <div className="empty-library"><span aria-hidden="true">◇</span><h3>{cards.length ? '조건에 맞는 카드가 없어요' : '첫 손패를 만들어 보세요'}</h3><p>{cards.length ? '필터를 바꾸거나 전체 라이브러리를 살펴보세요.' : '카드 이미지를 여기에 놓거나 카드 등록을 누르세요.'}</p>{!cards.length && <button onClick={()=>setPanel('management')}>관리 메뉴 열기</button>}</div>}
-        <div className="table-note"><span aria-hidden="true">◇</span><p>카드를 선택한 뒤 크게 보기로 원본을 읽을 수 있습니다.<br /><small>선택과 필터 변경은 카드를 사용하지 않습니다.</small></p></div>
-        <footer className="board-status">{lastTrashed.length>0&&<button disabled={busy} onClick={()=>void undoTrash()}>휴지통 이동 실행 취소 · {lastTrashed.length}장</button>}<span role="status" aria-live="polite">{saving ? '설정 저장 중…' : status || '로컬 카드 보드 준비됨'}</span><span className="navigation-hint" title="방향키 이동 · Enter/Space 선택 · Ctrl+F 검색">← → 이동 · Enter 선택 · Ctrl+F 검색</span><span>v{bootstrap.appVersion}</span></footer>
+        <SelectedCardPanel card={selected} tags={tags} controller={resourceController} onPreview={()=>setPanel('preview')} onClose={closeSelection} closeRef={closeButton}/>
+        <div className="hand-row">
+          <DeckPile src={cardBackSource(cardBackFor(appearance, activeDeck?.id))} deckName={activeDeck?.name ?? '전체 라이브러리'} count={deckCount} onOpen={()=>setBacksOpen(true)}/>
+          <div className="hand-zone">
+            <div className="hand-header"><div className="deck-label"><strong>{libraryState.viewScope === 'deck' ? activeDeck?.name ?? '덱' : '라이브러리'}</strong><span aria-label="표시 카드 수">{visibleCards.length} / {cards.length}장</span></div><span className="hand-title" aria-hidden="true">HAND</span><div className="board-toolbar"><div className="toolbar-switches">{selectionMode&&<button aria-pressed onClick={()=>{setSelectionMode(false);setSelectedCards([]);}}>선택 관리 종료</button>}<div className="view-switch" role="group" aria-label="카드 범위"><button aria-pressed={libraryState.viewScope === 'library'} onClick={() => updateFilters({ viewScope: 'library' })}>전체 카드</button><button disabled={!activeDeck} aria-pressed={libraryState.viewScope === 'deck'} onClick={() => updateFilters({ viewScope: 'deck' })}>활성 덱</button></div><div className="view-switch" role="group" aria-label="카드 보기 방식"><button aria-pressed={settings.viewMode === 'hand'} disabled={saving} onClick={() => void updateSettings({ viewMode: 'hand' })}>손패</button><button aria-pressed={settings.viewMode === 'grid'} disabled={saving} onClick={() => void updateSettings({ viewMode: 'grid' })}>격자</button></div></div></div></div>
+            {visibleCards.length ? <CardGallery cards={visibleCards} mode={settings.viewMode} selectedId={selectedId} selectedIds={selectedCards} selectionMode={selectionMode} notes={resourceNotes} onSelect={selectCard} onCheck={checkCard} onPreview={previewCard}/> : <div className="empty-library"><span aria-hidden="true">◇</span><h3>{cards.length ? '조건에 맞는 카드가 없어요' : '첫 손패를 만들어 보세요'}</h3><p>{cards.length ? '필터를 바꾸거나 전체 라이브러리를 살펴보세요.' : '카드 이미지를 여기에 놓거나 카드 등록을 누르세요.'}</p>{!cards.length && <button onClick={()=>setPanel('management')}>관리 메뉴 열기</button>}</div>}
+          </div>
+          <UsedPile events={resourceController.snapshot?.events ?? []} cards={cards} disabled={!activeProfile || !resourceController.snapshot} onOpen={()=>setUsedOpen(true)}/>
+        </div>
         {error && <p className="error-banner" role="alert">{error}</p>}{bootstrap.warnings.map((warning, i) => <p className="error-banner" role="alert" key={i}>{warning}</p>)}
       </main>
-      <SelectedCardPanel card={selected} tags={tags} controller={resourceController} onPreview={()=>setPanel('preview')} onClose={closeSelection} closeRef={closeButton}/>
     </div>
+    <footer className="board-status">{lastTrashed.length>0&&<button disabled={busy} onClick={()=>void undoTrash()}>휴지통 이동 실행 취소 · {lastTrashed.length}장</button>}<span role="status" aria-live="polite">{saving ? '설정 저장 중…' : status || '로컬 카드 보드 준비됨'}</span><span className="navigation-hint" title="방향키 이동 · Enter/Space 선택 · Ctrl+F 검색">← → 이동 · Enter 선택 · Ctrl+F 검색</span><span>v{bootstrap.appVersion}</span></footer>
     {(panel === 'new' || panel === 'edit') && <CardEditor key={panel === 'edit' ? selected?.id : 'new'} card={panel === 'edit' ? selected : undefined} initialAssets={panel === 'new' ? imported : undefined} registrationTarget={activeProfile && activeDeck ? { characterId: activeProfile.id, deckId: activeDeck.id } : null} targetLabel={activeProfile && activeDeck ? `${activeProfile.name} · ${activeDeck.name}` : undefined} tags={tags} onLibrary={library=>{applyLibrary(library);void resourceController.refresh();}} controller={resourceController} characterId={activeProfile?.id} onClose={() => setPanel(undefined)} />}
     {panel==='class'&&(resourceController.snapshot?<CharacterSettings key={resourceController.snapshot.characterId} controller={resourceController} onSaved={load} onClose={()=>setPanel(undefined)}/>:<Modal title="클래스·레벨 설정" onClose={()=>setPanel(undefined)}><p>{resourceController.error||'캐릭터와 자원 설정을 불러오는 중…'}</p></Modal>)}
     {panel === 'history'&&<EditHistory onClose={()=>setPanel(undefined)} onSaved={async()=>{await load();await resourceController.refresh();}}/>}

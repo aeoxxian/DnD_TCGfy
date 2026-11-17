@@ -9,16 +9,40 @@ export const resourceDisplaySchema = z.strictObject({
 });
 export type ResourceDisplay = z.infer<typeof resourceDisplaySchema>;
 
+export const idSchema = z.string().min(1).max(128);
+
+// Play-mat appearance: purely visual, stored under its own settings key.
+export const THEME_IDS = ['oxblood', 'ebony', 'verdant', 'abyss'] as const;
+export type ThemeId = typeof THEME_IDS[number];
+export const BUILTIN_CARD_BACKS = ['dragon', 'crest', 'stars'] as const;
+export type BuiltinCardBack = typeof BUILTIN_CARD_BACKS[number];
+export const cardBackRefSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('builtin'), id: z.enum(BUILTIN_CARD_BACKS) }),
+  z.strictObject({ type: z.literal('custom'), assetId: idSchema }),
+]);
+export type CardBackRef = z.infer<typeof cardBackRefSchema>;
+export const appearanceSchema = z.strictObject({
+  theme: z.enum(THEME_IDS),
+  cardBack: z.strictObject({
+    default: cardBackRefSchema,
+    decks: z.record(idSchema, cardBackRefSchema).refine(value => Object.keys(value).length <= 500),
+  }),
+  customBacks: z.array(z.strictObject({ assetId: idSchema, name: z.string().trim().min(1).max(60) })).max(24)
+    .refine(list => new Set(list.map(item => item.assetId)).size === list.length, '같은 카드 뒷면 이미지가 중복되었습니다.'),
+}).refine(value => [value.cardBack.default, ...Object.values(value.cardBack.decks)]
+  .every(ref => ref.type === 'builtin' || value.customBacks.some(item => item.assetId === ref.assetId)), '목록에 없는 카드 뒷면 이미지를 선택했습니다.');
+export type Appearance = z.infer<typeof appearanceSchema>;
+export const DEFAULT_APPEARANCE: Appearance = { theme: 'oxblood', cardBack: { default: { type: 'builtin', id: 'dragon' }, decks: {} }, customBacks: [] };
+
 export const settingsSchema = z.strictObject({
   viewMode: z.enum(['hand', 'grid']),
   reducedMotion: z.boolean(),
   resourcePanelCollapsed: z.boolean(),
   resourceViews: z.record(z.string().min(1).max(128), resourceDisplaySchema).refine(value => Object.keys(value).length <= 200).optional(),
+  appearance: appearanceSchema.optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };
-
-export const idSchema = z.string().min(1).max(128);
 export const roleSchema = z.enum(['damage', 'heal', 'protect', 'buff', 'debuff', 'utility', 'revive', 'other']);
 export const actionSchema = z.enum(['action', 'bonus_action', 'reaction', 'no_action', 'passive', 'special']);
 export const kindSchema = z.enum(['spell', 'attack', 'feature', 'feat', 'item', 'other']);
