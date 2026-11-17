@@ -6,11 +6,11 @@
   "files": {
     "release/win-unpacked/DnD TCG-fy.exe": {
       "bytes": 250093056,
-      "sha256": "c7fcef4268721f36acb97f600e544819d17828cc6c15de751697b7cddb443c8e"
+      "sha256": "4f2f1210b5a07e236077c28610cfc773bcc63a932e931c86cbab36d611785a07"
     },
     "release/win-unpacked/resources/app.asar": {
-      "bytes": 15898602,
-      "sha256": "cefc29265930595096cdf17a3e236fcd0b0c8207fd9429d470efd84cb632bf1f"
+      "bytes": 15898670,
+      "sha256": "05e3593d9e6c81103678d90babb17e0dc311ca92f7ba1da951a23c7580ed30f4"
     }
   }
 }

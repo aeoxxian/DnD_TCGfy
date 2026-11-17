@@ -94,6 +94,8 @@ try{
       const m=await page.evaluate(()=>{const use=document.querySelector('.use-button').getBoundingClientRect(),image=document.querySelector('.detail-card img').getBoundingClientRect();return{viewport:{width:innerWidth,height:innerHeight},dpr:devicePixelRatio,scroll:{width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight},use:{top:use.top,bottom:use.bottom},preview:{width:image.width,height:image.height},imageFit:getComputedStyle(document.querySelector('.detail-card img')).objectFit};});
       if(!baseline){assert(m.use.bottom<=m.viewport.height+1);assert(m.scroll.width<=m.viewport.width+1&&m.scroll.height<=m.viewport.height+1);assert.equal(m.imageFit,'contain');}
       matrix.push({width,height,scale,...m});await capture(`${baseline?'before':'after'}-${width}x${height}-${scale}`);
+      if(!baseline){const extra=page.locator('.extra-filters');await extra.locator('summary').click();const overlap=await page.locator('.card-item').evaluateAll(items=>{const a=items[0].getBoundingClientRect(),b=items[1].getBoundingClientRect();return(a.right-b.left)/a.width;});assert(overlap>=0&&overlap<=.081);await extra.locator('summary').click();}
+
     }
   }
   assert.deepEqual(await resourceState(fixture.profile),initial);assert.deepEqual(errors,[]);await app.close();app=undefined;

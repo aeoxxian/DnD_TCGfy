@@ -40,162 +40,104 @@
   "benchmarks": [
     {
       "count": 20,
-      "coldLaunchMs": 730,
+      "coldLaunchMs": 606,
       "roleFilterMs": [
         31.700000047683716,
-        31.5,
-        29.699999809265137,
-        9.400000095367432,
-        30.799999952316284,
-        32
+        32,
+        31.09999990463257,
+        31.600000143051147,
+        32,
+        30.90000009536743
       ],
-      "firstVisibleImagesWaitMs": 34,
+      "firstVisibleImagesWaitMs": 26,
       "filterMs": [
-        17,
-        15.100000143051147,
-        23.600000143051147,
-        28.800000190734863,
+        24.700000047683716,
+        28.700000047683716,
         31.299999952316284,
-        30.800000190734863,
-        31.200000047683716
+        31.399999856948853,
+        31.5,
+        31.5,
+        31.299999952316284
       ],
-      "filterMedianMs": 28.800000190734863,
-      "filterMaxMs": 31.299999952316284,
+      "filterMedianMs": 31.299999952316284,
+      "filterMaxMs": 31.5,
       "wheelMs": [
-        10.100000143051147,
-        10.599999904632568,
-        10.599999904632568,
-        10.599999904632568,
-        10.599999904632568,
-        10.800000190734863,
-        11,
-        11.099999904632568,
-        10.5,
-        10.799999952316284
+        9.299999952316284,
+        9.200000047683716,
+        9.800000190734863,
+        9.799999952316284,
+        10.299999952316284,
+        9.5,
+        9.599999904632568,
+        9.799999952316284,
+        10,
+        8.799999952316284
       ],
-      "dragGestureMs": 218,
-      "dragFrameMedianMs": 16.600000000000136,
+      "dragGestureMs": 212,
+      "dragFrameMedianMs": 16.700000000000045,
       "dragFrameMaxMs": 16.799999999999955,
       "workingSet": [
         {
           "type": "Browser",
-          "workingSetKiB": 168524
+          "workingSetKiB": 168336
         },
         {
           "type": "GPU",
-          "workingSetKiB": 113816
+          "workingSetKiB": 113984
         },
         {
           "type": "Utility",
-          "workingSetKiB": 56636
+          "workingSetKiB": 56792
         },
         {
           "type": "Tab",
-          "workingSetKiB": 164932
+          "workingSetKiB": 171540
         }
       ],
-      "rendererHeapBytes": 20515809
+      "rendererHeapBytes": 22046381
     },
     {
       "count": 50,
-      "coldLaunchMs": 1209,
+      "coldLaunchMs": 629,
       "roleFilterMs": [
-        27.90000009536743,
-        31.699999809265137,
-        31.600000143051147,
-        31.90000009536743,
-        31.699999809265137,
-        31.700000047683716
+        32,
+        31.5,
+        32,
+        31.59999990463257,
+        31.59999990463257,
+        31.200000047683716
       ],
-      "firstVisibleImagesWaitMs": 27,
+      "firstVisibleImagesWaitMs": 28,
       "filterMs": [
-        23.5,
-        30.90000009536743,
-        27.90000009536743,
-        26.5,
-        30.200000047683716,
-        29.40000009536743,
-        30.09999990463257
+        23.800000190734863,
+        33.40000009536743,
+        25.600000143051147,
+        27.699999809265137,
+        29,
+        29.90000009536743,
+        30
       ],
-      "filterMedianMs": 29.40000009536743,
-      "filterMaxMs": 30.90000009536743,
+      "filterMedianMs": 29,
+      "filterMaxMs": 33.40000009536743,
       "wheelMs": [
-        9.900000095367432,
-        10.599999904632568,
+        9.200000047683716,
         10.200000047683716,
-        9.899999856948853,
-        9.900000095367432,
-        11,
-        10.5,
-        11,
-        10.900000095367432,
-        11.099999904632568
+        8.5,
+        9.300000190734863,
+        8.5,
+        9.600000143051147,
+        7.599999904632568,
+        10.400000095367432,
+        9.699999809265137,
+        10.900000095367432
       ],
-      "dragGestureMs": 208,
-      "dragFrameMedianMs": 16.600000000000136,
-      "dragFrameMaxMs": 16.799999999999955,
-      "workingSet": [
-        {
-          "type": "Browser",
-          "workingSetKiB": 172296
-        },
-        {
-          "type": "GPU",
-          "workingSetKiB": 110064
-        },
-        {
-          "type": "Utility",
-          "workingSetKiB": 56608
-        },
-        {
-          "type": "Tab",
-          "workingSetKiB": 179660
-        }
-      ],
-      "rendererHeapBytes": 15211101
-    },
-    {
-      "count": 200,
-      "coldLaunchMs": 813,
-      "roleFilterMs": [
-        31.600000143051147,
-        33.200000047683716,
-        29.899999856948853,
-        62.59999990463257,
-        26.700000047683716,
-        59.40000009536743
-      ],
-      "firstVisibleImagesWaitMs": 30,
-      "filterMs": [
-        22.700000047683716,
-        34,
-        27.100000143051147,
-        25,
-        24.5,
-        26.600000143051147,
-        31.600000143051147
-      ],
-      "filterMedianMs": 26.600000143051147,
-      "filterMaxMs": 34,
-      "wheelMs": [
-        2.799999952316284,
-        11,
-        11,
-        11.199999809265137,
-        11.099999904632568,
-        11.300000190734863,
-        10.799999952316284,
-        10.900000095367432,
-        10.5,
-        11
-      ],
-      "dragGestureMs": 246,
+      "dragGestureMs": 211,
       "dragFrameMedianMs": 16.699999999999818,
       "dragFrameMaxMs": 16.799999999999955,
       "workingSet": [
         {
           "type": "Browser",
-          "workingSetKiB": 131264
+          "workingSetKiB": 169732
         },
         {
           "type": "GPU",
@@ -203,14 +145,72 @@
         },
         {
           "type": "Utility",
-          "workingSetKiB": 56620
+          "workingSetKiB": 56560
         },
         {
           "type": "Tab",
-          "workingSetKiB": 249336
+          "workingSetKiB": 192644
         }
       ],
-      "rendererHeapBytes": 26494325
+      "rendererHeapBytes": 21796303
+    },
+    {
+      "count": 200,
+      "coldLaunchMs": 759,
+      "roleFilterMs": [
+        27.800000190734863,
+        31.799999952316284,
+        28.799999952316284,
+        32.299999952316284,
+        31.399999856948853,
+        62.09999990463257
+      ],
+      "firstVisibleImagesWaitMs": 32,
+      "filterMs": [
+        23.200000047683716,
+        32.80000019073486,
+        24,
+        29.799999952316284,
+        31.600000143051147,
+        32,
+        32.200000047683716
+      ],
+      "filterMedianMs": 31.600000143051147,
+      "filterMaxMs": 32.80000019073486,
+      "wheelMs": [
+        0.9000000953674316,
+        10,
+        10.399999856948853,
+        5,
+        7.8999998569488525,
+        10.200000047683716,
+        10.700000047683716,
+        10.299999952316284,
+        9.899999856948853,
+        10.399999856948853
+      ],
+      "dragGestureMs": 258,
+      "dragFrameMedianMs": 16.700000000000045,
+      "dragFrameMaxMs": 16.799999999999955,
+      "workingSet": [
+        {
+          "type": "Browser",
+          "workingSetKiB": 130916
+        },
+        {
+          "type": "GPU",
+          "workingSetKiB": 112104
+        },
+        {
+          "type": "Utility",
+          "workingSetKiB": 56712
+        },
+        {
+          "type": "Tab",
+          "workingSetKiB": 248856
+        }
+      ],
+      "rendererHeapBytes": 18614381
     }
   ],
   "matrix": [
@@ -358,5 +358,5 @@
     "Roving Tab / arrows / Home / End / Space; selected card unchanged on focus navigation, no resource consumption; Ctrl+F and text input isolation; original enlargement and Escape; priority/group state restart"
   ],
   "errors": [],
-  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p4-b-mfC0Bt"
+  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p4-b-7o07GA"
 }

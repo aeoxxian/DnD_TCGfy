@@ -44,7 +44,7 @@
     "appVersion": "0.5.1",
     "electron": "45.3.3",
     "node": "24.22.3",
-    "userData": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p1-e2e-oygHNL\\user-data",
+    "userData": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p1-e2e-peW0Mc\\user-data",
     "sandbox": true,
     "nodeIntegration": false,
     "contextIsolation": true,
@@ -72,7 +72,7 @@
     "All managed/source SHA-256 values match; old replacement/archive assets retained; P0 resources/events/bindings untouched",
     "P1.1 new cards auto-link to the captured active deck atomically; character switch, edits and no-deck registration stay isolated",
     "P1.1 attack role, attack kind and their AND intersection select independent, persisted metadata",
-    "P1.1 wheel/drag on 24 cards, no accidental selection, normal click and outside wheel preserved; wheel response 35 ms",
+    "P1.1 wheel/drag on 24 cards, no accidental selection, normal click and outside wheel preserved; wheel response 34 ms",
     "P1.1 restart preserves new card metadata and automatic deck links",
     "P2 multi-resource confirmation, double-click suppression, atomic insufficiency, multi-resource Undo and explicit no-spend exception",
     "P2 shared pool across cards, four explicit recovery events, manual set/plus and persistent sequential Undo",
@@ -99,5 +99,5 @@
   ],
   "pageErrors": [],
   "securityWarnings": [],
-  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p1-e2e-oygHNL"
+  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p1-e2e-peW0Mc"
 }
