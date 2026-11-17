@@ -9,6 +9,7 @@ import { cardBackFor } from './shared/appearance';
 import { CLASS_NAMES } from './shared/class-contracts';
 import { CardBackDialog, DeckPile, Icon, ThemeMenu, UsedPile, cardBackSource } from './components/Appearance';
 import { UseHistory } from './components/UseHistory';
+import { BackupManager } from './components/BackupManager';
 import { filterCards } from './shared/library';
 import { ImageLightbox } from './components/ImageLightbox';
 import { CardEditor } from './components/CardEditor';
@@ -22,7 +23,7 @@ import { CharacterSettings } from './components/CharacterSettings';
 import { TagManager, ProfileManager } from './components/Managers';
 
 function popoverOpen(): boolean { try { return !!document.querySelector(':popover-open'); } catch { return false; } }
-type Panel = 'new' | 'edit' | 'tags' | 'profiles' | 'preview' | 'archive' | 'resources' | 'costs' | 'class' | 'history' | 'libraryMenu' | 'trash' | 'management';
+type Panel = 'backup' | 'new' | 'edit' | 'tags' | 'profiles' | 'preview' | 'archive' | 'resources' | 'costs' | 'class' | 'history' | 'libraryMenu' | 'trash' | 'management';
 export function App() {
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,7 @@ export function App() {
     setLoading(true); setError('');
     try {
       const result = await window.desktop.getBootstrap();
-      if (result.ok) { filterRef.current = result.value.libraryState; setBootstrap(result.value); }
+      if (result.ok) { filterRef.current = result.value.libraryState; setBootstrap(result.value); if (result.value.notices?.length) setStatus(result.value.notices.join(' ')); }
       else setError(result.error);
     } catch { setError('데스크톱 연결을 확인할 수 없습니다. 앱을 다시 실행해 주세요.'); }
     finally { setLoading(false); }
@@ -194,8 +195,9 @@ export function App() {
     {panel === 'tags' && <TagManager library={bootstrap} onLibrary={applyLibrary} onClose={() => setPanel(undefined)} />}
     {panel === 'profiles' && <ProfileManager onClass={()=>setPanel('class')} library={bootstrap} onLibrary={applyLibrary} onClose={() => setPanel(undefined)} />}
     {panel === 'preview' && selected && <ImageLightbox card={selected} onClose={()=>setPanel(undefined)}/>}
-    {panel==='management'&&<Modal title="관리 메뉴" wide onClose={()=>setPanel(undefined)}><p className="manager-help">관리창을 닫으면 선택한 카드와 검색 조건을 유지한 채 플레이로 돌아갑니다.</p><div className="management-sections"><section><h3>카드·라이브러리</h3><button disabled={busy} onClick={openNew}>카드 등록</button><button onClick={()=>setPanel('libraryMenu')}>라이브러리 관리</button><button onClick={()=>{setSelectionMode(true);setSelectedCards([]);setPanel(undefined);}}>선택 관리</button></section><section><h3>캐릭터·자원</h3><button onClick={()=>setPanel('profiles')}>캐릭터·덱</button><button onClick={()=>setPanel('resources')}>자원 관리</button><button onClick={()=>setPanel('history')}>일괄 편집 복원</button></section><section><h3>선택 카드{selected?` · ${selected.name}`:''}</h3><button disabled={!selected} onClick={()=>setPanel('edit')}>정보 수정</button><button disabled={!selected||!resourceController.snapshot} onClick={()=>setPanel('costs')}>카드 사용 규칙</button>{activeDeck&&selected&&<button disabled={busy} onClick={async()=>{if(await mutate(()=>window.desktop.setDeckCards({deckId:activeDeck.id,cardIds:activeDeck.cardIds.includes(selected.id)?activeDeck.cardIds.filter(id=>id!==selected.id):[...activeDeck.cardIds,selected.id]})))setPanel(undefined);}}>{activeDeck.cardIds.includes(selected.id)?'활성 덱에서 빼기':'활성 덱에 추가'}</button>}<button className="trash-move" disabled={!selected} onClick={()=>setPanel('archive')}>휴지통으로 이동</button></section></div></Modal>}
+    {panel==='management'&&<Modal title="관리 메뉴" wide onClose={()=>setPanel(undefined)}><p className="manager-help">관리창을 닫으면 선택한 카드와 검색 조건을 유지한 채 플레이로 돌아갑니다.</p><div className="management-sections"><section><h3>카드·라이브러리</h3><button disabled={busy} onClick={openNew}>카드 등록</button><button onClick={()=>setPanel('libraryMenu')}>라이브러리 관리</button><button onClick={()=>setPanel('backup')}>백업·복원</button><button onClick={()=>{setSelectionMode(true);setSelectedCards([]);setPanel(undefined);}}>선택 관리</button></section><section><h3>캐릭터·자원</h3><button onClick={()=>setPanel('profiles')}>캐릭터·덱</button><button onClick={()=>setPanel('resources')}>자원 관리</button><button onClick={()=>setPanel('history')}>일괄 편집 복원</button></section><section><h3>선택 카드{selected?` · ${selected.name}`:''}</h3><button disabled={!selected} onClick={()=>setPanel('edit')}>정보 수정</button><button disabled={!selected||!resourceController.snapshot} onClick={()=>setPanel('costs')}>카드 사용 규칙</button>{activeDeck&&selected&&<button disabled={busy} onClick={async()=>{if(await mutate(()=>window.desktop.setDeckCards({deckId:activeDeck.id,cardIds:activeDeck.cardIds.includes(selected.id)?activeDeck.cardIds.filter(id=>id!==selected.id):[...activeDeck.cardIds,selected.id]})))setPanel(undefined);}}>{activeDeck.cardIds.includes(selected.id)?'활성 덱에서 빼기':'활성 덱에 추가'}</button>}<button className="trash-move" disabled={!selected} onClick={()=>setPanel('archive')}>휴지통으로 이동</button></section></div></Modal>}
     {panel==='libraryMenu'&&<Modal title="라이브러리 관리" onClose={()=>setPanel(undefined)}><p>공통 태그와 삭제된 카드를 관리합니다.</p><div className="batch-actions"><button onClick={()=>setPanel('tags')}>태그 관리</button><button onClick={()=>setPanel('trash')}>휴지통</button></div></Modal>}
+    {panel==='backup'&&<BackupManager onClose={()=>setPanel(undefined)} onLibrary={library=>{applyLibrary(library);void resourceController.refresh();}}/>}
     {panel==='trash'&&<TrashManager onChanged={trashChanged} onClose={()=>setPanel(undefined)}/>}
     {panel==='archive'&&selected&&<TrashReview action={{type:'move',cardIds:[selected.id]}} onDone={trashChanged} onClose={()=>setPanel(undefined)}/>}
 

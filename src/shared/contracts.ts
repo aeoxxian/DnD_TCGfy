@@ -1,4 +1,5 @@
 import type { TrashBridge } from './trash';
+import type { BackupBridge } from './backup';
 import type { EditBridge } from './bulk';
 import { z } from 'zod';
 import type { ResourceBridge } from './resources';
@@ -123,9 +124,11 @@ export interface Bootstrap extends Library {
   cards: CardDefinition[];
   appVersion: string;
   schemaVersion: number;
+  /** One-off start-up messages (restore finished, auto backup made). */
+  notices?: string[];
 }
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge {
+export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge, BackupBridge {
   getBootstrap(): Promise<Result<Bootstrap>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   saveLibraryState(state: LibraryState): Promise<Result<LibraryState>>;
@@ -146,4 +149,5 @@ export const IPC = {
   importImages: 'assets:import', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
   createProfile: 'profiles:create', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
   previewClass: 'classes:preview', getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
+  exportBackup: 'backup:export', inspectBackup: 'backup:inspect', applyBackup: 'backup:apply', discardBackup: 'backup:discard', getBackupStatus: 'backup:status',
 } as const;

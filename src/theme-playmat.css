@@ -451,3 +451,26 @@ html, body { background: #0b0807; }
 }
 @media (prefers-reduced-motion: reduce) { .app.playmat.p4-b .use-button { transform: none !important; } }
 .app.playmat.reduced-motion .use-button { transform: none !important; }
+
+/* Backup and restore (P5). */
+.app.playmat .backup-manager { display: flex; flex-direction: column; gap: 16px; }
+.app.playmat .backup-section { padding-bottom: 14px; border-bottom: 1px solid var(--ink-line); }
+.app.playmat .backup-section h3 { margin-bottom: 6px; font: 700 15px var(--kserif); }
+.app.playmat .backup-section .batch-actions { margin: 10px 0 4px; }
+.app.playmat .backup-result { margin-top: 8px; font-size: 12px; line-height: 1.7; color: var(--ink); overflow-wrap: anywhere; }
+.app.playmat .backup-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; margin: 8px 0 0; }
+.app.playmat .backup-facts dt { font: 700 11px var(--kserif); color: var(--ink-mute); }
+.app.playmat .backup-facts dd { margin: 2px 0 0; font-size: 12px; color: var(--ink-strong); }
+.app.playmat .backup-path { overflow-wrap: anywhere; font-size: 11px; }
+.app.playmat .restore-preview { margin-top: 12px; padding: 12px 14px; border-radius: 6px; background: rgba(255, 252, 244, .45); box-shadow: inset 0 0 0 1px #b9a684; font-size: 12px; }
+.app.playmat .backup-compare { width: 100%; max-width: 420px; margin: 10px 0; border-collapse: collapse; }
+.app.playmat .backup-compare :is(th, td) { padding: 3px 8px; border-bottom: 1px solid var(--ink-line); text-align: right; font-variant-numeric: tabular-nums; }
+.app.playmat .backup-compare :is(th[scope=row], thead th:first-child) { text-align: left; font: 700 12px var(--kserif); }
+.app.playmat .restore-checks, .app.playmat .restore-warnings { margin: 6px 0; padding-left: 18px; line-height: 1.7; }
+.app.playmat .restore-warnings { color: var(--wax); }
+.app.playmat .restore-mode { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; padding: 0; border: 0; }
+.app.playmat .restore-mode legend { margin-bottom: 6px; font: 700 13px var(--kserif); }
+.app.playmat .restore-mode label { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 5px; box-shadow: inset 0 0 0 1px #b9a684; cursor: pointer; }
+.app.playmat .restore-mode label:has(input:checked) { background: rgba(255, 252, 244, .75); box-shadow: inset 0 0 0 1px var(--ribbon); }
+.app.playmat .restore-mode label > span { display: flex; flex-direction: column; gap: 3px; }
+.app.playmat .restore-mode small { color: var(--ink-mute); line-height: 1.6; }

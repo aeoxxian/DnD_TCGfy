@@ -1,7 +1,7 @@
 {
   "name": "dnd-tcg-fy",
   "productName": "DnD TCG-fy",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "private": true,
   "description": "오프라인 TCG 스타일 D&D 카드 보드",
   "author": "DnD TCG-fy",
@@ -27,6 +27,8 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "sharp": "0.35.5",
+    "yauzl": "3.4.0",
+    "yazl": "3.3.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -36,6 +38,8 @@
     "@types/node": "24.10.1",
     "@types/react": "19.2.5",
     "@types/react-dom": "19.2.3",
+    "@types/yauzl": "3.4.0",
+    "@types/yazl": "3.3.1",
     "@vitejs/plugin-react": "5.1.1",
     "electron": "45.3.3",
     "electron-builder": "26.18.0",

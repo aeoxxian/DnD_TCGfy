@@ -25,6 +25,7 @@ beforeEach(() => {
     selectDeck: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     setDeckCards: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     previewClass:vi.fn(), getResources: vi.fn(), previewResource: vi.fn(), changeResource: vi.fn(),
+    exportBackup: vi.fn(), inspectBackup: vi.fn(), applyBackup: vi.fn(), discardBackup: vi.fn(), getBackupStatus: vi.fn(),
   };
 });
 afterEach(cleanup);

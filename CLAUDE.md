@@ -42,6 +42,17 @@ There are three layers, and the renderer never touches the filesystem or the dat
 
 Layout: the selected card (`SelectedCardPanel`, still `.detail-panel`) is rendered *inside* the board as the IN PLAY slot plus a parchment page. The hand row is `DeckPile | hand | UsedPile` (`src/components/Appearance.tsx`). E2E scripts depend on the class names `.use-button`, `.card-use`, `.cards-area`, `.description-content` and `.deck-label`, and on the accessible names of buttons and meters, so keep them stable.
 
+Backup and restore (`electron/backup.ts`, UI `src/components/BackupManager.tsx`, contract `src/shared/backup.ts`):
+- **ZIP format:** `manifest.json` (per-file bytes and SHA-256), `data/app.sqlite3` (a `VACUUM INTO` snapshot) and `assets/*`.
+- **Inspection:** `inspect()` validates the whole archive (allow-listed paths, size and ratio limits, hashes, DB integrity and schema) and stages it under `restore/staging/<token>`.
+- **Replace restore:** writes `restore/pending.json` and relaunches the app. `applyPendingRestore()` runs in `main.ts` *before* `AppStore` opens the DB; it moves the current `data`, `assets` and thumbnails to `backups/replaced-*` (never deletes them) and rolls back on failure.
+- **Copy restore:** `importCopies()` adds only the backup's active cards, images and tags, with new IDs.
+- **Auto snapshots:** `autoSnapshot()` runs at start-up into `backups/auto` and prunes only its own `app-YYYYMMDD-HHMMSS.sqlite3` files (keeps 14).
+- **Paths:** file paths come only from main-process dialogs, never from the renderer.
+- **Testing:** E2E sets `DND_TCG_TEST_NO_RELAUNCH=1` so a replace restore exits instead of relaunching.
+
+P5 checks: `node scripts/p5-e2e.mjs` covers offline play, a hard kill, export, restore into a new profile and copy import; it also runs against a packaged exe via `DND_TCG_EXECUTABLE`. `node scripts/p5-installer-check.mjs <older-setup> <new-setup>` does a silent install, upgrade and uninstall, and refuses to run if the app is already installed.
+
 Appearance (theme and card backs) is `Settings.appearance`, validated by `appearanceSchema`. `AppStore` stores it under its own `appearance` settings key and checks that custom card-back asset ids exist. Pure helpers are in `src/shared/appearance.ts`.
 
 Adding an IPC operation touches four places: `IPC` and the types in `contracts.ts`, the bridge in `preload.ts`, a `safeHandler` that validates input with zod in `main.ts`, and the store method.

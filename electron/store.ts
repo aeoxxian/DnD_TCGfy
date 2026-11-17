@@ -9,7 +9,7 @@ import { UserInputError } from './errors';
 function versionOf(db: DatabaseSync): number {
   return (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
 }
-function inspect(db: DatabaseSync): number {
+export function inspectDatabase(db: DatabaseSync): number {
   const version = versionOf(db);
   if (version > SCHEMA_VERSION) throw new Error('더 새로운 버전의 데이터입니다. 최신 앱으로 열어 주세요.');
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
@@ -32,7 +32,7 @@ export class AppStore {
     // Inspect unsupported files without modifying the database, journal or settings.
     if (existed) {
       const reader = new DatabaseSync(dbPath, { readOnly: true });
-      try { version = inspect(reader); } finally { reader.close(); }
+      try { version = inspectDatabase(reader); } finally { reader.close(); }
     }
     for (const directory of ['data', 'assets', 'backups']) mkdirSync(join(userData, directory), { recursive: true });
     this.db = new DatabaseSync(dbPath);

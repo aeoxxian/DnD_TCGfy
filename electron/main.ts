@@ -15,6 +15,8 @@ import { LibraryStore } from './library-store';
 import { AssetService } from './assets';
 import { UserInputError } from './errors';
 import { ResourceStore } from './resource-store';
+import { BackupService, applyPendingRestore } from './backup';
+import { applyRestoreSchema, restoreTokenSchema } from '../src/shared/backup';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const development = !app.isPackaged && process.env.DND_TCG_DEV_URL === DEV_URL;
@@ -32,7 +34,16 @@ if (!singleInstance) app.quit();
 else {
   app.on('second-instance', () => { if (mainWindow?.isMinimized()) mainWindow.restore(); mainWindow?.focus(); });
   app.whenReady().then(async () => {
+    // A replacement restore is swapped in before the database is opened (never while it is in use).
+    const restored = applyPendingRestore(app.getPath('userData'));
     store = new AppStore(app.getPath('userData'));
+    const backup = new BackupService(store, app.getVersion());
+    const startupNotices: string[] = []; const startupWarnings: string[] = [];
+    if (restored.notice) startupNotices.push(restored.notice);
+    if (restored.warning) startupWarnings.push(restored.warning);
+    backup.cleanupStale();
+    try { if (backup.autoSnapshot()) startupNotices.push('오늘의 자동 백업(데이터베이스 스냅샷)을 만들었습니다.'); }
+    catch (error) { console.error('[auto-backup]', error); startupWarnings.push('자동 백업을 만들지 못했습니다. 저장 공간을 확인해 주세요. 데이터는 그대로입니다.'); }
     const library = new LibraryStore(store);
     const assets = new AssetService(app.getPath('userData'), library);
     const resources = new ResourceStore(store);
@@ -75,7 +86,31 @@ else {
     };
     safeHandler(IPC.getBootstrap, input => {
       z.undefined().parse(input);
-      return { settings: store!.getSettings(), ...library.getLibrary(), appVersion: app.getVersion(), schemaVersion: SCHEMA_VERSION };
+      const current = library.getLibrary();
+      return { settings: store!.getSettings(), ...current, warnings: [...startupWarnings, ...current.warnings], notices: startupNotices, appVersion: app.getVersion(), schemaVersion: SCHEMA_VERSION };
+    });
+    const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    safeHandler(IPC.getBackupStatus, input => { z.undefined().parse(input); return backup.status(); });
+    safeHandler(IPC.exportBackup, async input => {
+      z.undefined().parse(input);
+      const choice = await dialog.showSaveDialog(mainWindow!, { title: '백업 내보내기', defaultPath: join(app.getPath('documents'), `DnD-TCG-fy-backup-${stamp()}.zip`), filters: [{ name: 'DnD TCG-fy 백업', extensions: ['zip'] }] });
+      if (choice.canceled || !choice.filePath) return { canceled: true };
+      return backup.exportTo(choice.filePath.toLowerCase().endsWith('.zip') ? choice.filePath : `${choice.filePath}.zip`);
+    });
+    safeHandler(IPC.inspectBackup, async input => {
+      z.undefined().parse(input);
+      const choice = await dialog.showOpenDialog(mainWindow!, { title: '백업에서 복원', properties: ['openFile'], filters: [{ name: 'DnD TCG-fy 백업', extensions: ['zip'] }] });
+      if (choice.canceled || !choice.filePaths[0]) return { canceled: true };
+      return backup.inspect(choice.filePaths[0]);
+    });
+    safeHandler(IPC.discardBackup, input => backup.discard(restoreTokenSchema.parse(input).token));
+    safeHandler(IPC.applyBackup, async input => {
+      const request = applyRestoreSchema.parse(input);
+      if (request.mode === 'copy') return { mode: 'copy', ...(await backup.importCopies(request.token)), library: library.getLibrary() };
+      const preservedIn = await backup.scheduleReplace(request.token);
+      // Restart so the swap happens before any store opens the database. Tests opt out of relaunching.
+      setTimeout(() => { store?.close(); store = undefined; if (process.env.DND_TCG_TEST_NO_RELAUNCH !== '1') app.relaunch(); app.exit(0); }, 400);
+      return { mode: 'replace', restarting: true, preservedIn };
     });
     safeHandler(IPC.saveSettings, input => store!.saveSettings(settingsSchema.parse(input)));
     safeHandler(IPC.saveLibraryState, input => library.saveState(input));
