@@ -1,7 +1,8 @@
 import { BatchReview } from './BatchEdits';
 import type { EditAction } from '../shared/bulk';
 import { useState, type FormEvent } from 'react';
-import type { CardDefinition } from '../shared/contracts';
+import type { CardDefinition, SlotColorSet } from '../shared/contracts';
+import { SlotColorEditor } from './SlotColorEditor';
 import { templateDraftSchema, type ResourceOverrides, type ResourceTemplate, type ResourceView, type RecoveryTrigger, type TemplateDraft } from '../shared/resources';
 import type { ResourceController } from './ResourcePanel';
 import { Modal } from './Modal';
@@ -65,13 +66,14 @@ function ResourceForm({ selection, cards, controller, onClose }: { selection: Fo
   </form></Modal>;
 }
 
-export function ResourceManager({ cards, controller, onClose }: { cards: CardDefinition[]; controller: ResourceController; onClose: () => void }) {
+export function ResourceManager({ cards, controller, onClose, characterName, slotColors, slotColorsBusy = false, onSlotColors }: { cards: CardDefinition[]; controller: ResourceController; onClose: () => void; characterName?: string; slotColors?: SlotColorSet; slotColorsBusy?: boolean; onSlotColors?: (next?: SlotColorSet) => void }) {
   const [selection,setSelection] = useState<FormSelection>();
   const [deletion,setDeletion] = useState<{id:string;name:string;template:boolean}>();
   const [manage,setManage]=useState(false);const [resourceIds,setResourceIds]=useState<string[]>([]);const [templateIds,setTemplateIds]=useState<string[]>([]);const [batch,setBatch]=useState<EditAction>();
   const snapshot=controller.snapshot;
   if(selection&&snapshot)return <ResourceForm key={`${selection.mode}-${selection.template?.id??selection.resource?.id??'new'}`} selection={selection} cards={cards} controller={controller} onClose={()=>{setSelection(undefined);setResourceIds([]);setTemplateIds([]);}}/>;
   return <Modal title="자원 관리" wide onClose={onClose}>{!snapshot?<p>상단에서 캐릭터를 선택해 주세요.</p>:<>
+    {onSlotColors&&<SlotColorEditor snapshot={snapshot} characterName={characterName} value={slotColors} busy={slotColorsBusy} onChange={onSlotColors}/>}
     <p className="manager-help">장착 자원의 현재량과 템플릿은 별도입니다. 사용 중인 템플릿은 복제해서 편집합니다. 아래 설정 변경은 이전 자원 변경 기록의 실행 취소 경계가 됩니다.</p>
     <button className="primary" disabled={controller.busy} onClick={()=>setSelection({mode:'new'})}>새 자원 만들기</button>
     <button disabled={controller.busy} aria-pressed={manage} onClick={()=>{setManage(!manage);setResourceIds([]);setTemplateIds([]);}}>{manage?'자원 선택 관리 종료':'자원 선택 관리'}</button>

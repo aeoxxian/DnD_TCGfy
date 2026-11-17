@@ -33,6 +33,23 @@ SQLite 버전은 **v6 유지**. DDL·마이그레이션은 없다. 자원 엔진
 - 런타임 계약은 `settingsSchema.effects`(선택, `strictObject`). `preferences`에 넣지 않으므로 0.6.0도 DB를 읽는다.
 - 자원·사용 기록·카드 데이터와 무관하며 Undo 대상이 아니다.
 
+## `settings` 키 `slot_colors` (Phase 4)
+
+캐릭터별 주문 슬롯 보석 색. 사용자가 관리 → 자원 관리 → “주문 슬롯 색상”에서 바꿀 때만 생긴다.
+
+```json
+{
+  "character-uuid": {
+    "standard": { "base": "#a3283a" },
+    "pact": { "base": "#2f7d4f", "levels": { "5": "#7547a3" } }
+  }
+}
+```
+
+- 색은 소문자 `#rrggbb`. `levels`의 키는 `"1"`~`"9"`이며 일부만 있어도 된다. 표시 색은 레벨 색 → 종류 색(`base`) → 기본 사파이어(`#4d62ad`) 순으로 정한다.
+- 런타임 계약은 `settingsSchema.slotColors`(선택, 캐릭터 200개 이하, 모두 `strictObject`). “기본 색상으로 복원”은 해당 캐릭터 항목을 지우고, 비어 있는 종류·레벨 맵은 저장하지 않는다. 현재 캐릭터 목록에 없는 ID는 저장할 때 정리한다.
+- 표시 전용이다. 슬롯 수·사용·회복 계산, revision, 사용 기록, Undo와 무관하다.
+
 ## 지켜지는 것
 
 - `play_events`는 추가만 되며(Undo도 새 기록) 이 기능은 이벤트를 지우거나 고치지 않는다.

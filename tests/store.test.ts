@@ -76,6 +76,22 @@ describe('SQLite persistence and compatibility', () => {
     expect(raw('effects', second)).toEqual({ cardTilt: false });
     second.close();
   });
+  it('v1.1: keeps spell slot colours per character in their own slot_colors key', () => {
+    const path = fixture();
+    const first = new AppStore(path);
+    const colors = { 'char-a': { pact: { base: '#a3283a', levels: { '5': '#2f7d4f' } } }, 'char-b': { standard: { base: '#7547a3' } } };
+    first.saveSettings({ ...DEFAULT_SETTINGS, slotColors: colors });
+    const raw = (key: string, store = first) => JSON.parse((store.db.prepare('SELECT value_json FROM settings WHERE key=?').get(key) as { value_json: string }).value_json);
+    expect(raw('preferences')).toEqual(DEFAULT_SETTINGS);
+    expect(raw('slot_colors')).toEqual(colors);
+    first.close();
+    const second = new AppStore(path);
+    expect(second.getSettings().slotColors).toEqual(colors);
+    for (const bad of [{ a: { pact: { base: 'red' } } }, { a: { pact: { base: '#A3283A' } } }, { a: { pact: { levels: { '10': '#a3283a' } } } }, { a: { arcane: { base: '#a3283a' } } }])
+      expect(() => second.saveSettings({ ...DEFAULT_SETTINGS, slotColors: bad })).toThrow();
+    expect(raw('slot_colors', second)).toEqual(colors);
+    second.close();
+  });
   it('rejects invalid inputs and preserves last saved settings', () => {
     const store = new AppStore(fixture());
     store.saveSettings(DEFAULT_SETTINGS);

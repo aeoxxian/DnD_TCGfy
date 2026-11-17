@@ -18,6 +18,15 @@ export type HistoryView = z.infer<typeof historyViewSchema>;
 /** v1.1: visual effects preferences, kept apart from `preferences` so older versions still read the DB. */
 export const effectsSchema = z.strictObject({ cardTilt: z.boolean() });
 export type Effects = z.infer<typeof effectsSchema>;
+/** v1.1: per-character spell slot gem colours (display only). Levels are "1"–"9". */
+export const hexColorSchema = z.string().regex(/^#[0-9a-f]{6}$/, '색상은 #rrggbb 형식이어야 합니다.');
+export const slotColorSchema = z.strictObject({
+  base: hexColorSchema.optional(),
+  levels: z.partialRecord(z.enum(['1', '2', '3', '4', '5', '6', '7', '8', '9']), hexColorSchema).optional(),
+});
+export const slotColorSetSchema = z.strictObject({ standard: slotColorSchema.optional(), pact: slotColorSchema.optional() });
+export type SlotColor = z.infer<typeof slotColorSchema>;
+export type SlotColorSet = z.infer<typeof slotColorSetSchema>;
 
 export const idSchema = z.string().min(1).max(128);
 
@@ -52,6 +61,7 @@ export const settingsSchema = z.strictObject({
   appearance: appearanceSchema.optional(),
   historyViews: z.record(z.string().min(1).max(128), historyViewSchema).refine(value => Object.keys(value).length <= 200).optional(),
   effects: effectsSchema.optional(),
+  slotColors: z.record(z.string().min(1).max(128), slotColorSetSchema).refine(value => Object.keys(value).length <= 200).optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };
