@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { DEFAULT_SETTINGS, DEFAULT_LIBRARY_STATE, type Bootstrap } from '../src/shared/contracts';
@@ -38,7 +38,27 @@ describe('bulk selection scope',()=>{
     finish({ok:false,error:'설정 저장 실패'});await waitFor(()=>expect(box.checked).toBe(false));expect(box.disabled).toBe(false);expect(window.desktop.changeResource).not.toHaveBeenCalled();
   });
   it('moves card management off the play board and keeps selection/search after closing it',async()=>{
-    render(<App/>);await screen.findByRole('button',{name:'상처 치료 카드 선택'});fireEvent.change(screen.getByRole('searchbox',{name:'카드 이름 검색'}),{target:{value:'치료'}});const card=screen.getByRole('button',{name:'상처 치료 카드 선택'});fireEvent.click(card);expect(screen.queryByRole('button',{name:'카드 등록'})).toBeNull();expect(screen.queryByRole('button',{name:'정보 수정'})).toBeNull();expect(screen.queryByRole('button',{name:'카드 사용 규칙'})).toBeNull();fireEvent.click(screen.getByRole('button',{name:'관리'}));expect(screen.getByRole('button',{name:'카드 등록'})).toBeDefined();expect(screen.getByRole('button',{name:'정보 수정'})).toBeDefined();expect(screen.getByRole('button',{name:'선택 관리'})).toBeDefined();fireEvent.click(screen.getByRole('button',{name:'관리 메뉴 닫기'}));expect(card.getAttribute('aria-pressed')).toBe('true');expect((screen.getByRole('searchbox',{name:'카드 이름 검색'}) as HTMLInputElement).value).toBe('치료');expect(window.desktop.changeResource).not.toHaveBeenCalled();
+    render(<App/>);await screen.findByRole('button',{name:'상처 치료 카드 선택'});fireEvent.change(screen.getByRole('searchbox',{name:'카드 이름 검색'}),{target:{value:'치료'}});const card=screen.getByRole('button',{name:'상처 치료 카드 선택'});fireEvent.click(card);expect(screen.getByRole('button',{name:'카드 등록'}).closest('.top-actions')).not.toBeNull();expect(screen.queryByRole('button',{name:'정보 수정'})).toBeNull();expect(screen.queryByRole('button',{name:'카드 사용 규칙'})).toBeNull();fireEvent.click(screen.getByRole('button',{name:'관리'}));expect(screen.getAllByRole('button',{name:'카드 등록'})).toHaveLength(2);expect(screen.getByRole('button',{name:'정보 수정'})).toBeDefined();expect(screen.getByRole('button',{name:'선택 관리'})).toBeDefined();fireEvent.click(screen.getByRole('button',{name:'관리 메뉴 닫기'}));expect(card.getAttribute('aria-pressed')).toBe('true');expect((screen.getByRole('searchbox',{name:'카드 이름 검색'}) as HTMLInputElement).value).toBe('치료');expect(window.desktop.changeResource).not.toHaveBeenCalled();
+  });
+  it('v1.1: opens the existing registration form from the main screen, and cancelling saves nothing',async()=>{
+    render(<App/>);const register=await screen.findByRole('button',{name:'카드 등록'});
+    expect(register.closest('.top-actions')).not.toBeNull();expect(register.getAttribute('title')).toBe('라이브러리에만 등록(활성 덱 없음)');
+    fireEvent.click(register);const dialog=await screen.findByRole('dialog',{name:'카드 등록'});
+    expect(within(dialog).getByRole('button',{name:'카드 저장'})).toBeDefined();
+    fireEvent.click(within(dialog).getByRole('button',{name:'취소'}));
+    await waitFor(()=>expect(screen.queryByRole('dialog',{name:'카드 등록'})).toBeNull());
+    expect(window.desktop.saveCards).not.toHaveBeenCalled();expect(window.desktop.setDeckCards).not.toHaveBeenCalled();
+  });
+  it('v1.1: ends selection management from the selection bar, clearing checks without touching cards or decks',async()=>{
+    render(<App/>);await screen.findByRole('button',{name:'관리'});fireEvent.click(screen.getByRole('button',{name:'관리'}));fireEvent.click(screen.getByRole('button',{name:'선택 관리'}));
+    const bar=screen.getByRole('region',{name:'카드 선택 관리'});
+    expect(document.querySelector('.toolbar-switches')!.textContent).not.toContain('선택 관리 종료');
+    fireEvent.click(screen.getByRole('checkbox',{name:'상처 치료 일괄 선택'}));expect(bar.textContent).toContain('1장 선택');
+    fireEvent.click(within(bar).getByRole('button',{name:'선택 관리 종료'}));
+    expect(screen.queryByRole('region',{name:'카드 선택 관리'})).toBeNull();expect(screen.queryByRole('checkbox',{name:'상처 치료 일괄 선택'})).toBeNull();
+    fireEvent.click(screen.getByRole('button',{name:'관리'}));fireEvent.click(screen.getByRole('button',{name:'선택 관리'}));
+    expect((screen.getByRole('checkbox',{name:'상처 치료 일괄 선택'}) as HTMLInputElement).checked).toBe(false);
+    for(const call of [window.desktop.saveCards,window.desktop.setDeckCards,window.desktop.archiveCard,window.desktop.applyEdit,window.desktop.changeTrash])expect(call).not.toHaveBeenCalled();
   });
   it('only shows checks in selection mode and clears selections on every filter change',async()=>{
     render(<App/>);await screen.findByRole('button',{name:'관리'});fireEvent.click(screen.getByRole('button',{name:'관리'}));

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 DnD TCG-fy is an offline-first Windows 10/11 x64 Electron app that shows D&D player actions as a TCG-style hand of selectable cards, with a generic resource engine (spell slots, counters, points) that cards spend from. The UI text and most documentation are in Korean.
 
-**Read `AGENTS.md` first.** Its hard constraints are binding: no scope creep into dice, combat, turns or networking. Never alter user card art. Only a confirmed `Use` spends resources. Never reset user data. Record stack or scope changes in `DECISIONS.md` before implementing them. Do not claim Windows/EXE steps were tested unless they actually ran. The product contract is `SPEC.md` and the domain contract is `DATA_SCHEMA.md`, extended by the phase supplements `DATA_SCHEMA_P1…P4C.md` and `DATA_SCHEMA_TRASH.md`. Work followed the phases P0→P5 in `IMPLEMENTATION_PLAN.md` (P5 = 0.6.0 is done). v1.1 usability work follows `V1_1_PLAN.md` one phase at a time: stop after each phase with a report and wait for the user's approval before starting the next one.
+**Read `AGENTS.md` first.** Its hard constraints are binding: no scope creep into dice, combat, turns or networking. Never alter user card art. Only a confirmed `Use` spends resources. Never reset user data. Record stack or scope changes in `DECISIONS.md` before implementing them. Do not claim Windows/EXE steps were tested unless they actually ran. The product contract is `SPEC.md` and the domain contract is `DATA_SCHEMA.md`, extended by the phase supplements `DATA_SCHEMA_P1…P4C.md`, `DATA_SCHEMA_TRASH.md` and `DATA_SCHEMA_V1_1.md`. Work followed the phases P0→P5 in `IMPLEMENTATION_PLAN.md` (P5 = 0.6.0 is done). v1.1 usability work follows `V1_1_PLAN.md` one phase at a time: stop after each phase with a report and wait for the user's approval before starting the next one.
 
 ## Commands
 
@@ -29,7 +29,7 @@ Quality gate before moving on: `lint`, `typecheck` and `test` must all pass.
 E2E scripts drive a real Electron window with Playwright. Each run isolates its data in `artifacts/p1-e2e-*/user-data` through `DND_TCG_TEST_USER_DATA`, which must be an absolute path.
 - `npm run test:e2e` or `node scripts/e2e.mjs --dev [--from-v5]` covers the main scenario. `--from-vN` seeds an older schema to exercise the migrations.
 - To test the packaged EXE, set `$env:DND_TCG_EXECUTABLE` to `release\win-unpacked\DnD TCG-fy.exe` and drop `--dev`.
-- Phase suites are `scripts/p4-a-e2e.mjs`, `p4-b-e2e.mjs` (run `prepare-p4-b-fixtures.mjs` first) and `p4-c-e2e.mjs`. `scripts/v11-p1-e2e.mjs` checks the v1.1 Phase 1 filter bar (`--dev`, built bundle or `DND_TCG_EXECUTABLE`; it covers 3 window sizes × 100/125/150% scaling).
+- Phase suites are `scripts/p4-a-e2e.mjs`, `p4-b-e2e.mjs` (run `prepare-p4-b-fixtures.mjs` first) and `p4-c-e2e.mjs`. `scripts/v11-p1-e2e.mjs` checks the v1.1 Phase 1 filter bar (`--dev`, built bundle or `DND_TCG_EXECUTABLE`; it covers 3 window sizes × 100/125/150% scaling), and `scripts/v11-p2-e2e.mjs` checks Phase 2 (main-screen registration, selection bar, recent-history clearing, including a restart).
 - Dev-mode E2E uses port 5173, so never run two at once.
 
 ## Architecture
@@ -53,7 +53,7 @@ Backup and restore (`electron/backup.ts`, UI `src/components/BackupManager.tsx`,
 
 P5 checks: `node scripts/p5-e2e.mjs` covers offline play, a hard kill, export, restore into a new profile and copy import; it also runs against a packaged exe via `DND_TCG_EXECUTABLE`. `node scripts/p5-installer-check.mjs <older-setup> <new-setup>` does a silent install, upgrade and uninstall, and refuses to run if the app is already installed.
 
-Appearance (theme and card backs) is `Settings.appearance`, validated by `appearanceSchema`. `AppStore` stores it under its own `appearance` settings key and checks that custom card-back asset ids exist. Pure helpers are in `src/shared/appearance.ts`.
+Appearance (theme and card backs) is `Settings.appearance`, validated by `appearanceSchema`. `AppStore` stores it under its own `appearance` settings key and checks that custom card-back asset ids exist. Pure helpers are in `src/shared/appearance.ts`. v1.1 adds `Settings.historyViews` (key `history_view`): a per-character "hidden through" mark for the recent-actions list (`src/shared/history-view.ts`); it never touches play events or Undo.
 
 Adding an IPC operation touches four places: `IPC` and the types in `contracts.ts`, the bridge in `preload.ts`, a `safeHandler` that validates input with zod in `main.ts`, and the store method.
 

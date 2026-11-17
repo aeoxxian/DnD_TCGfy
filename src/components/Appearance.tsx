@@ -29,6 +29,8 @@ const ICONS = {
   manage: 'M3 1.5h9v12l-4.5-2.8L3 13.5z',
   settings: 'M7.5 5.2a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6zM7.5 1v2M7.5 12v2M1 7.5h2M12 7.5h2M2.9 2.9l1.4 1.4M10.7 10.7l1.4 1.4M2.9 12.1l1.4-1.4M10.7 4.3l1.4-1.4',
   check: 'M2.5 6.2l2.3 2.3 4.7-5',
+  // A card with a plus: register a new card.
+  add: 'M3.5 1.5h8v12h-8zM7.5 5v5M5 7.5h5',
 };
 export function Icon({ name, size = 15 }: { name: keyof typeof ICONS; size?: number }) {
   return <svg className="icon" width={size} height={size} viewBox={name === 'check' ? '0 0 12 12' : '0 0 15 15'} aria-hidden="true" focusable="false"><path d={ICONS[name]} fill="none" stroke="currentColor" strokeWidth={name === 'check' ? 1.8 : 1.2} strokeLinecap="round" strokeLinejoin="round"/></svg>;

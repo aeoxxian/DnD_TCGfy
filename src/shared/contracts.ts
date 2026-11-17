@@ -9,6 +9,12 @@ export const resourceDisplaySchema = z.strictObject({
   priorityIds: z.array(z.string().min(1).max(128)).max(1000),
 });
 export type ResourceDisplay = z.infer<typeof resourceDisplaySchema>;
+/** v1.1: per-character "hidden through" mark for the recent-actions list. Play events themselves are never removed. */
+export const historyViewSchema = z.strictObject({
+  clearedEventId: z.string().min(1).max(128),
+  clearedAt: z.iso.datetime(),
+});
+export type HistoryView = z.infer<typeof historyViewSchema>;
 
 export const idSchema = z.string().min(1).max(128);
 
@@ -41,6 +47,7 @@ export const settingsSchema = z.strictObject({
   resourcePanelCollapsed: z.boolean(),
   resourceViews: z.record(z.string().min(1).max(128), resourceDisplaySchema).refine(value => Object.keys(value).length <= 200).optional(),
   appearance: appearanceSchema.optional(),
+  historyViews: z.record(z.string().min(1).max(128), historyViewSchema).refine(value => Object.keys(value).length <= 200).optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };

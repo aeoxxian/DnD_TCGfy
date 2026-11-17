@@ -205,6 +205,10 @@ html, body { background: #0b0807; }
 .app.playmat .resource-history > summary { font: 700 12px var(--kserif); color: #4f3d2c; }
 .app.playmat .resource-history li { border-bottom-color: var(--ink-line); }
 .app.playmat .resource-history :is(span, small) { color: var(--ink-mute); }
+/* v1.1 P2: display-only history controls. */
+.app.playmat .resource-history .history-empty { margin: 8px 0; font-size: 11px; color: var(--ink-mute); }
+.app.playmat .resource-history .history-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.app.playmat .resource-history .history-actions button { padding: 5px 9px; font-size: 11px; }
 .app.playmat .ledger-page .resource-error, .app.playmat .ledger-page .empty-state { color: var(--wax); }
 .app.playmat .live-resources > .empty-state { color: var(--mute-l); }
 .app.playmat .live-resources > .resource-error { color: #e9a99d; }
@@ -269,6 +273,25 @@ html, body { background: #0b0807; }
 .app.playmat .view-switch button[aria-pressed=true] { border-radius: 5px; }
 .app.playmat .board > .batch-tools { color: var(--ink); background: var(--parchment) 0 0 / 420px, #e9e1cf; border: 0; box-shadow: inset 0 0 0 1px #9c866a; }
 .app.playmat .board > .batch-tools > p { background: transparent; }
+/* v1.1 P2: folded, the selection bar is one compact row (status · actions · bulk area); opened, the bulk area takes the full width. */
+.app.playmat .board > .batch-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; }
+.app.playmat .board > .batch-tools > p { flex: 1 1 240px; position: static; margin: 0; padding: 0; }
+.app.playmat .board > .batch-tools > .batch-actions { flex: none; margin: 0; }
+.app.playmat .board > .batch-tools > details { flex: none; }
+.app.playmat .board > .batch-tools > details[open] { flex-basis: 100%; }
+/* Opened: tags | decks | trash side by side when there is room (Chromium puts the children in ::details-content). */
+.app.playmat .board > .batch-tools > details[open]::details-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 12px; align-items: start; margin-top: 6px; }
+.app.playmat .board > .batch-tools > details > :is(fieldset, .batch-actions) { min-width: 0; margin: 0; }
+.app.playmat .board > .batch-tools > details > .batch-actions { align-self: start; }
+/* In selection mode the hand is where the work happens: the IN PLAY page gives up height first. */
+.app.playmat .board:has(> .batch-tools) > .detail-panel { flex-basis: clamp(150px, 24dvh, 240px); }
+.app.playmat .board:has(> .batch-tools > details[open]) > .detail-panel { flex-basis: 150px; }
+/* The move to the trash lives inside the expanded bulk area, set apart in wax red. */
+.app.playmat .batch-tools .batch-trash { margin-top: 10px; padding: 6px 12px 10px; border: 1px solid rgba(122, 47, 35, .55); border-radius: 4px; background: rgba(122, 47, 35, .06); }
+.app.playmat .batch-tools .batch-trash legend { padding: 0 4px; font-weight: 700; color: var(--wax); }
+.app.playmat .batch-tools .batch-trash p { margin: 0 0 6px; }
+.app.playmat .batch-tools .batch-trash .trash-move { margin-bottom: 6px; }
+.app.playmat .batch-tools .batch-trash-scope strong { color: var(--wax); }
 
 /* IN PLAY slot and the parchment card page. */
 .app.playmat .detail-panel { position: relative; flex: 0 1 clamp(214px, 40dvh, 360px); min-height: 150px; display: block; height: auto; padding: 0; margin-top: 4px; border: 0; background: transparent; overflow: visible; }
@@ -361,7 +384,9 @@ html, body { background: #0b0807; }
 .app.playmat .hand-zone > .card-gallery, .app.playmat .hand-zone > .empty-library { flex: 1; min-height: 0; }
 .app.playmat .cards-area { scrollbar-color: #5a4236 transparent; }
 .app.playmat.p4-b .cards-area.hand { align-items: safe center; padding: 22px 10px 6px; overflow-x: auto; overflow-y: hidden; scrollbar-gutter: auto; }
-.app.playmat.p4-b .batch-selection .hand .card-item { --hand-width: clamp(76px, min(14vw, calc((100cqh - 124px) / 1.458)), 230px); }
+/* v1.1 P2: in selection mode the check sits on the card's corner (not a row above it), so cards keep their normal size and stay in view. */
+.app.playmat.p4-b .batch-selection .hand .card-item { --hand-width: clamp(56px, min(15vw, calc((100cqh - 84px) / 1.458)), 250px); }
+.app.playmat .batch-selection .card-item { position: relative; }
 .app.playmat .hand .card-caption > span { display: none; }
 .app.playmat .hand .card-caption strong { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .app.playmat.p4-b .hand .card-item { --hand-width: clamp(84px, min(15vw, calc((100cqh - 84px) / 1.458)), 250px); }
@@ -377,7 +402,12 @@ html, body { background: #0b0807; }
 .app.playmat .empty-library { color: var(--ink-l); }
 .app.playmat .empty-library > span { color: var(--m1); }
 .app.playmat .empty-library p { color: var(--mute-l); }
-.app.playmat .card-batch-check { color: var(--ink-l); }
+.app.playmat .card-batch-check { position: absolute; z-index: 6; top: 6px; left: 6px; gap: 5px; padding: 3px 9px 3px 6px; border-radius: 999px;
+  font: 700 11px var(--sans); color: var(--ink); background: rgba(240, 232, 214, .94); box-shadow: 0 0 0 1px #000, 0 2px 6px rgba(0, 0, 0, .6); cursor: pointer; }
+.app.playmat .card-batch-check:has(input:checked) { color: #fbf6ea; background: #3a2817; }
+.app.playmat .card-batch-check input { margin: 0; }
+.app.playmat .board:has(> .batch-tools > details[open]) .card-batch-check { padding: 4px; }
+.app.playmat .board:has(> .batch-tools > details[open]) .card-batch-check > span { display: none; }
 .app.playmat .board > .error-banner { flex: none; margin: 0; color: #fbe5df; background: rgba(90, 30, 24, .85); border: 0; border-radius: 4px; box-shadow: inset 0 0 0 1px #000; }
 
 /* Footer status strip. */

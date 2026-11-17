@@ -41,6 +41,27 @@ describe('SQLite persistence and compatibility', () => {
     expect(second.db.prepare('SELECT id,name FROM character_profiles').get()).toMatchObject({ id: 'stable-id', name: '한글 캐릭터' });
     second.close();
   });
+  it('v1.1: keeps recent-action display marks in their own settings key without touching play events or preferences', () => {
+    const path = fixture();
+    const first = new AppStore(path);
+    const mark = { clearedEventId: 'event-1', clearedAt: '2026-11-18T10:00:00.000Z' };
+    const events = first.db.prepare('SELECT COUNT(*) AS n FROM play_events').get();
+    first.saveSettings({ ...DEFAULT_SETTINGS, historyViews: { 'character-1': mark } });
+    const raw = (key: string, store = first) => JSON.parse((store.db.prepare('SELECT value_json FROM settings WHERE key=?').get(key) as { value_json: string }).value_json);
+    expect(raw('preferences')).toEqual(DEFAULT_SETTINGS);
+    expect(raw('history_view')).toEqual({ 'character-1': mark });
+    expect(first.db.prepare('SELECT COUNT(*) AS n FROM play_events').get()).toEqual(events);
+    first.saveSettings(DEFAULT_SETTINGS);
+    first.close();
+    const second = new AppStore(path);
+    expect(second.getSettings().historyViews).toEqual({ 'character-1': mark });
+    for (const bad of [{ c: { clearedEventId: '', clearedAt: mark.clearedAt } }, { c: { clearedEventId: 'e', clearedAt: 'yesterday' } }, { c: { ...mark, extra: 1 } }])
+      expect(() => second.saveSettings({ ...DEFAULT_SETTINGS, historyViews: bad })).toThrow();
+    expect(raw('history_view', second)).toEqual({ 'character-1': mark });
+    second.saveSettings({ ...DEFAULT_SETTINGS, historyViews: {} });
+    expect(second.getSettings().historyViews).toEqual({});
+    second.close();
+  });
   it('rejects invalid inputs and preserves last saved settings', () => {
     const store = new AppStore(fixture());
     store.saveSettings(DEFAULT_SETTINGS);

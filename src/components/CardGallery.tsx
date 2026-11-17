@@ -9,7 +9,7 @@ const CardTile = memo(function CardTile({ card, selected, checked, selectionMode
   onSelect: (cardId: string, button: HTMLButtonElement) => void; onCheck: (cardId: string, checked: boolean) => void; onPreview: (cardId: string, button: HTMLButtonElement) => void;
 }) {
   return <div className={`card-item ${selected ? 'is-selected' : ''}`}>
-    {selectionMode && <label className="card-batch-check" onPointerDown={event => event.stopPropagation()}><input type="checkbox" aria-label={`${card.name} 일괄 선택`} checked={checked} onChange={event => onCheck(card.id, event.target.checked)}/>선택 관리</label>}
+    {selectionMode && <label className="card-batch-check" onPointerDown={event => event.stopPropagation()}><input type="checkbox" aria-label={`${card.name} 일괄 선택`} checked={checked} onChange={event => onCheck(card.id, event.target.checked)}/><span>선택</span></label>}
     <button className={`card-button ${selected ? 'selected' : ''}`} tabIndex={-1} aria-label={`${card.name} 카드 선택`} aria-pressed={selected} onClick={event => { if (event.detail < 2) onSelect(card.id, event.currentTarget); }} onDoubleClick={event => { if (card.imageAssetId) onPreview(card.id, event.currentTarget); }}>
       <CardFace key={`${card.id}-${card.imageAssetId}`} card={card}/>
       <span className="card-caption"><strong title={card.name}>{card.name}</strong><span>{card.roles.map(role => ROLE_NAMES[role]).join(' · ') || KIND_NAMES[card.kind]}</span>{note && <small className="card-resource-note">{note}</small>}</span>

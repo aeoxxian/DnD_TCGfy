@@ -56,19 +56,22 @@ export class AppStore {
     // Invalid persisted values must surface as an error, never silently reset.
     const display = this.db.prepare("SELECT value_json FROM settings WHERE key = 'resource_display'").get() as { value_json: string } | undefined;
     const appearance = this.db.prepare("SELECT value_json FROM settings WHERE key = 'appearance'").get() as { value_json: string } | undefined;
-    return settingsSchema.parse({ ...(row ? JSON.parse(row.value_json) : DEFAULT_SETTINGS), ...(display ? { resourceViews: JSON.parse(display.value_json) } : {}), ...(appearance ? { appearance: JSON.parse(appearance.value_json) } : {}) });
+    const history = this.db.prepare("SELECT value_json FROM settings WHERE key = 'history_view'").get() as { value_json: string } | undefined;
+    return settingsSchema.parse({ ...(row ? JSON.parse(row.value_json) : DEFAULT_SETTINGS), ...(display ? { resourceViews: JSON.parse(display.value_json) } : {}), ...(appearance ? { appearance: JSON.parse(appearance.value_json) } : {}), ...(history ? { historyViews: JSON.parse(history.value_json) } : {}) });
   }
   saveSettings(input: unknown): Settings {
     const settings = settingsSchema.parse(input);
     transaction(this.db, () => {
       // Keep the original preferences object readable by P0–P4-A. UI display state and the
       // play-mat appearance have their own keys and never participate in resource revisions or Undo.
-      const { resourceViews, appearance, ...preferences } = settings;
+      // v1.1: the recent-actions "hidden through" marks are display state too (`history_view`); play events stay intact.
+      const { resourceViews, appearance, historyViews, ...preferences } = settings;
       if (appearance) for (const back of appearance.customBacks)
         if (!this.db.prepare('SELECT 1 FROM assets WHERE id = ?').get(back.assetId)) throw new UserInputError('카드 뒷면 이미지를 찾을 수 없습니다. 이미지를 다시 선택해 주세요.');
       this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('preferences', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(preferences));
       if (resourceViews !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('resource_display', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(resourceViews));
       if (appearance !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('appearance', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(appearance));
+      if (historyViews !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('history_view', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(historyViews));
     });
     return this.getSettings();
   }

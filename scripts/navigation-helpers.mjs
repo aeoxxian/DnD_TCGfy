@@ -20,3 +20,9 @@ export async function closeExtraFilters(page){
   // The close button, not Escape: Escape in a focused search field clears the field instead.
   if(await panel.evaluate(el=>el.matches(':popover-open'))){await panel.locator('.extra-filters-close').click();await panel.waitFor({state:'hidden'});}
 }
+// v1.1 P2: card edits and the move to the trash sit inside the "선택 카드 일괄 작업" disclosure of the selection bar.
+export async function openBulkActions(page){
+  const details=page.locator('.batch-tools > details');
+  if(!await details.evaluate(el=>el.open))await details.locator(':scope > summary').click();
+  return details;
+}
