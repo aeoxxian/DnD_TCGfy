@@ -1,0 +1,362 @@
+{
+  "outcome": "PASS",
+  "runtime": {
+    "appVersion": "0.5.1",
+    "packaged": false,
+    "electron": "45.3.3",
+    "node": "24.22.3",
+    "hostDisplays": [
+      {
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "scaleFactor": 1
+      }
+    ]
+  },
+  "baseline": false,
+  "mode": "development",
+  "actualRegisteredImages": 14,
+  "temporaryImages": 186,
+  "actualHashes": [
+    "4d4bb2fee88417c4cc7121081f5a91108713b2a65ca69e3aafd7c128f9ca91c0",
+    "c8976e02da34b05cb0150cda9d3b2f7a3a7e50fd87c0cdcdfd9bd4b632736ce2",
+    "7e0f772e8e5f882396c4aa8cc26cdb2253c9ead2f44fe35c1c0d009d8d71125c",
+    "ef7127bc82042c2b6ad4c78dede1b01cd649abde74d75da118912419581bb55f",
+    "d4269ff1afa60098eafd44995f330ba1d1963922820eda35ac6a75c0f017ae90",
+    "4090d0e1cf42272902276faa203fd51f1d8a069a8ab04d434733d078b694cf6b",
+    "9d242fe30e91649109b7c6746d53c91595f4676598eb01b355970106dfb6f896",
+    "4ae53c905f8d4e1ded3606023d7dff1679208781f66595f9395da4f644fb7231",
+    "9d23309f8665757a750af8d215207a69723659ec7b92bca8ee0c0022a689a42e",
+    "dce49b97a901c62fbaa75c35d5378f99a56d124adae954b3266cf979bd791896",
+    "52d629dec439ba96ae2763ebd9c30878f0d187e146f8efba358c5b9aa0cdca3e",
+    "ccc6b00005df9e82baaa26518eb7fbd394b0074b1d9458b02484517dfbc09b87",
+    "edd459c264f18c039f4f36b7e638d65ea79b84f4f11550e7be615b8fcd319ac8",
+    "8257168986db4854750ecf4fe621ee046982ea242c552cb772b02633d7dd608e"
+  ],
+  "benchmarks": [
+    {
+      "count": 20,
+      "coldLaunchMs": 730,
+      "roleFilterMs": [
+        31.700000047683716,
+        31.5,
+        29.699999809265137,
+        9.400000095367432,
+        30.799999952316284,
+        32
+      ],
+      "firstVisibleImagesWaitMs": 34,
+      "filterMs": [
+        17,
+        15.100000143051147,
+        23.600000143051147,
+        28.800000190734863,
+        31.299999952316284,
+        30.800000190734863,
+        31.200000047683716
+      ],
+      "filterMedianMs": 28.800000190734863,
+      "filterMaxMs": 31.299999952316284,
+      "wheelMs": [
+        10.100000143051147,
+        10.599999904632568,
+        10.599999904632568,
+        10.599999904632568,
+        10.599999904632568,
+        10.800000190734863,
+        11,
+        11.099999904632568,
+        10.5,
+        10.799999952316284
+      ],
+      "dragGestureMs": 218,
+      "dragFrameMedianMs": 16.600000000000136,
+      "dragFrameMaxMs": 16.799999999999955,
+      "workingSet": [
+        {
+          "type": "Browser",
+          "workingSetKiB": 168524
+        },
+        {
+          "type": "GPU",
+          "workingSetKiB": 113816
+        },
+        {
+          "type": "Utility",
+          "workingSetKiB": 56636
+        },
+        {
+          "type": "Tab",
+          "workingSetKiB": 164932
+        }
+      ],
+      "rendererHeapBytes": 20515809
+    },
+    {
+      "count": 50,
+      "coldLaunchMs": 1209,
+      "roleFilterMs": [
+        27.90000009536743,
+        31.699999809265137,
+        31.600000143051147,
+        31.90000009536743,
+        31.699999809265137,
+        31.700000047683716
+      ],
+      "firstVisibleImagesWaitMs": 27,
+      "filterMs": [
+        23.5,
+        30.90000009536743,
+        27.90000009536743,
+        26.5,
+        30.200000047683716,
+        29.40000009536743,
+        30.09999990463257
+      ],
+      "filterMedianMs": 29.40000009536743,
+      "filterMaxMs": 30.90000009536743,
+      "wheelMs": [
+        9.900000095367432,
+        10.599999904632568,
+        10.200000047683716,
+        9.899999856948853,
+        9.900000095367432,
+        11,
+        10.5,
+        11,
+        10.900000095367432,
+        11.099999904632568
+      ],
+      "dragGestureMs": 208,
+      "dragFrameMedianMs": 16.600000000000136,
+      "dragFrameMaxMs": 16.799999999999955,
+      "workingSet": [
+        {
+          "type": "Browser",
+          "workingSetKiB": 172296
+        },
+        {
+          "type": "GPU",
+          "workingSetKiB": 110064
+        },
+        {
+          "type": "Utility",
+          "workingSetKiB": 56608
+        },
+        {
+          "type": "Tab",
+          "workingSetKiB": 179660
+        }
+      ],
+      "rendererHeapBytes": 15211101
+    },
+    {
+      "count": 200,
+      "coldLaunchMs": 813,
+      "roleFilterMs": [
+        31.600000143051147,
+        33.200000047683716,
+        29.899999856948853,
+        62.59999990463257,
+        26.700000047683716,
+        59.40000009536743
+      ],
+      "firstVisibleImagesWaitMs": 30,
+      "filterMs": [
+        22.700000047683716,
+        34,
+        27.100000143051147,
+        25,
+        24.5,
+        26.600000143051147,
+        31.600000143051147
+      ],
+      "filterMedianMs": 26.600000143051147,
+      "filterMaxMs": 34,
+      "wheelMs": [
+        2.799999952316284,
+        11,
+        11,
+        11.199999809265137,
+        11.099999904632568,
+        11.300000190734863,
+        10.799999952316284,
+        10.900000095367432,
+        10.5,
+        11
+      ],
+      "dragGestureMs": 246,
+      "dragFrameMedianMs": 16.699999999999818,
+      "dragFrameMaxMs": 16.799999999999955,
+      "workingSet": [
+        {
+          "type": "Browser",
+          "workingSetKiB": 131264
+        },
+        {
+          "type": "GPU",
+          "workingSetKiB": 109256
+        },
+        {
+          "type": "Utility",
+          "workingSetKiB": 56620
+        },
+        {
+          "type": "Tab",
+          "workingSetKiB": 249336
+        }
+      ],
+      "rendererHeapBytes": 26494325
+    }
+  ],
+  "matrix": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "dpr": 1,
+      "scroll": {
+        "width": 1920,
+        "height": 1080
+      },
+      "use": {
+        "top": 1029,
+        "bottom": 1068
+      },
+      "preview": {
+        "width": 178,
+        "height": 260.4375
+      },
+      "imageFit": "contain"
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scale": 1,
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "dpr": 1,
+      "scroll": {
+        "width": 1366,
+        "height": 768
+      },
+      "use": {
+        "top": 717,
+        "bottom": 756
+      },
+      "preview": {
+        "width": 158,
+        "height": 231.265625
+      },
+      "imageFit": "contain"
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1.25,
+      "viewport": {
+        "width": 1536,
+        "height": 864
+      },
+      "dpr": 1.25,
+      "scroll": {
+        "width": 1536,
+        "height": 864
+      },
+      "use": {
+        "top": 812.7999877929688,
+        "bottom": 851.9999885559082
+      },
+      "preview": {
+        "width": 178.40000915527344,
+        "height": 260.8374938964844
+      },
+      "imageFit": "contain"
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scale": 1.25,
+      "viewport": {
+        "width": 1094,
+        "height": 616
+      },
+      "dpr": 1.25,
+      "scroll": {
+        "width": 1094,
+        "height": 616
+      },
+      "use": {
+        "top": 568.7999877929688,
+        "bottom": 607.9999885559082
+      },
+      "preview": {
+        "width": 70.4000015258789,
+        "height": 103.375
+      },
+      "imageFit": "contain"
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "dpr": 1.5,
+      "scroll": {
+        "width": 1280,
+        "height": 720
+      },
+      "use": {
+        "top": 669.3333740234375,
+        "bottom": 708.0000419616699
+      },
+      "preview": {
+        "width": 152.17709350585938,
+        "height": 222.4791717529297
+      },
+      "imageFit": "contain"
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scale": 1.5,
+      "viewport": {
+        "width": 912,
+        "height": 512
+      },
+      "dpr": 1.5,
+      "scroll": {
+        "width": 912,
+        "height": 512
+      },
+      "use": {
+        "top": 465.3333435058594,
+        "bottom": 504.0000114440918
+      },
+      "preview": {
+        "width": 70.66667175292969,
+        "height": 103.63542175292969
+      },
+      "imageFit": "contain"
+    }
+  ],
+  "checks": [
+    "Weak overlap <=8.1%, hover lift and selected stacking, grid preserved, user/OS reduced motion disable lift",
+    "Roving Tab / arrows / Home / End / Space; selected card unchanged on focus navigation, no resource consumption; Ctrl+F and text input isolation; original enlargement and Escape; priority/group state restart"
+  ],
+  "errors": [],
+  "artifacts": "C:\\Users\\HIKI\\Desktop\\DnD_TCG-FY\\DnD_TCGfy_v1_0_Codex_Handoff\\artifacts\\p4-b-mfC0Bt"
+}

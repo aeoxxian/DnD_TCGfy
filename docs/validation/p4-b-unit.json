@@ -1,0 +1,95 @@
+{
+  "success": true,
+  "numTotalTests": 390,
+  "numPassedTests": 390,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTotalTestSuites": 40,
+  "numPassedTestSuites": 40,
+  "startTime": 1794885297679,
+  "testFiles": [
+    {
+      "file": "App.test.tsx",
+      "status": "passed",
+      "tests": 10
+    },
+    {
+      "file": "assets.test.ts",
+      "status": "passed",
+      "tests": 7
+    },
+    {
+      "file": "bulk.test.ts",
+      "status": "passed",
+      "tests": 16
+    },
+    {
+      "file": "classes.test.ts",
+      "status": "passed",
+      "tests": 258
+    },
+    {
+      "file": "library.test.ts",
+      "status": "passed",
+      "tests": 15
+    },
+    {
+      "file": "p11.test.tsx",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "P4AUI.test.tsx",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "P4BUI.test.tsx",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "resources.test.ts",
+      "status": "passed",
+      "tests": 19
+    },
+    {
+      "file": "security.test.ts",
+      "status": "passed",
+      "tests": 4
+    },
+    {
+      "file": "store.test.ts",
+      "status": "passed",
+      "tests": 10
+    },
+    {
+      "file": "trash.test.ts",
+      "status": "passed",
+      "tests": 17
+    },
+    {
+      "file": "TrashUI.test.tsx",
+      "status": "passed",
+      "tests": 4
+    },
+    {
+      "file": "use-rules.test.ts",
+      "status": "passed",
+      "tests": 8
+    },
+    {
+      "file": "UseRulesUI.test.tsx",
+      "status": "passed",
+      "tests": 7
+    }
+  ],
+  "lint": {
+    "command": "node node_modules/eslint/bin/eslint.js . --max-warnings 0",
+    "exitCode": 0
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit",
+    "exitCode": 0
+  }
+}

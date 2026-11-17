@@ -104,7 +104,7 @@ try {
     const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
     return { packaged: app.isPackaged, appVersion: app.getVersion(), electron: process.versions.electron, node: process.versions.node, userData: app.getPath('userData'), sandbox: prefs.sandbox, nodeIntegration: prefs.nodeIntegration, contextIsolation: prefs.contextIsolation, webSecurity: prefs.webSecurity };
   });
-  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.5.0');
+  assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,'0.5.1');
   assert.equal(runtime.sandbox, true); assert.equal(runtime.nodeIntegration, false); assert.equal(runtime.contextIsolation, true); assert.equal(runtime.webSecurity, true);
   let data = await state(); assert.equal(data.schemaVersion, 6); assert.deepEqual(data.settings, initialSettings);
   assert.deepEqual(data.cards[0].castOptions, legacyCard.castOptions); assert.equal(data.cards[0].id, 'p0-card');

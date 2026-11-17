@@ -53,14 +53,19 @@ export class AppStore {
   getSettings(): Settings {
     const row = this.db.prepare("SELECT value_json FROM settings WHERE key = 'preferences'").get() as { value_json: string } | undefined;
     // Invalid persisted values must surface as an error, never silently reset.
-    return row ? settingsSchema.parse(JSON.parse(row.value_json)) : { ...DEFAULT_SETTINGS };
+    const display = this.db.prepare("SELECT value_json FROM settings WHERE key = 'resource_display'").get() as { value_json: string } | undefined;
+    return settingsSchema.parse({ ...(row ? JSON.parse(row.value_json) : DEFAULT_SETTINGS), ...(display ? { resourceViews: JSON.parse(display.value_json) } : {}) });
   }
   saveSettings(input: unknown): Settings {
     const settings = settingsSchema.parse(input);
     transaction(this.db, () => {
-      this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('preferences', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(settings));
+      // Keep the original preferences object readable by P0–P4-A. UI display state
+      // has its own key and never participates in resource revisions or Undo.
+      const { resourceViews, ...preferences } = settings;
+      this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('preferences', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(preferences));
+      if (resourceViews !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('resource_display', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(resourceViews));
     });
-    return settings;
+    return this.getSettings();
   }
   close(): void { this.db.close(); }
 }

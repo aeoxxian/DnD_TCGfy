@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { LibraryState, Tag, CardDefinition } from '../shared/contracts';
 import { ROLE_NAMES, ACTION_NAMES, KIND_NAMES, RANGE_NAMES } from '../shared/library';
 
@@ -5,11 +6,11 @@ export function toggleValue<T>(values: T[], value: T): T[] { return values.inclu
 function Chips<T extends string>({ title, choices, selected, onChange, counts }: { title: string; choices: Record<T, string>; selected: T[]; onChange: (next: T[]) => void; counts?: Partial<Record<T, number>> }) {
   return <fieldset className="filter-group" data-filter-group={title}><legend>{title}</legend><div className="chips">{(Object.entries(choices) as [T, string][]).map(([key, name]) => <button key={key} type="button" aria-label={name} data-filter-value={key} aria-pressed={selected.includes(key)} onClick={() => onChange(toggleValue(selected, key))}>{name}{counts && <span aria-hidden="true"> · {counts[key] ?? 0}</span>}</button>)}</div></fieldset>;
 }
-export function Filters({ state, tags, onChange, cards = [] }: { state: LibraryState; tags: Tag[]; onChange: (patch: Partial<LibraryState>) => void; cards?: CardDefinition[] }) {
+export const Filters = memo(function Filters({ state, tags, onChange, cards = [] }: { state: LibraryState; tags: Tag[]; onChange: (patch: Partial<LibraryState>) => void; cards?: CardDefinition[] }) {
   const extraCount = state.actions.length + state.kinds.length + state.ranges.length + state.tagIds.length;
   const activeCount = extraCount + state.roles.length + (state.query ? 1 : 0);
   return <section className="filters" aria-label="카드 검색 및 필터">
-    <div className="search-row"><label className="search-field"><span className="sr-only">카드 이름 검색</span><input type="search" placeholder="카드 이름 검색" value={state.query} maxLength={200} onChange={event => onChange({ query: event.target.value })} /></label><button type="button" disabled={!activeCount} onClick={() => onChange({ query: '', roles: [], actions: [], kinds: [], ranges: [], tagIds: [] })}>필터 초기화</button></div>
+    <div className="search-row"><label className="search-field"><span className="sr-only">카드 이름 검색</span><input id="card-name-search" aria-keyshortcuts="Control+f Meta+f" type="search" placeholder="카드 이름 검색" value={state.query} maxLength={200} onChange={event => onChange({ query: event.target.value })} /></label><button type="button" disabled={!activeCount} onClick={() => onChange({ query: '', roles: [], actions: [], kinds: [], ranges: [], tagIds: [] })}>필터 초기화</button></div>
     <div className="role-filter"><button type="button" aria-pressed={!state.roles.length} onClick={() => onChange({ roles: [] })}>전체</button><Chips title="역할 필터" choices={ROLE_NAMES} selected={state.roles} onChange={roles => onChange({ roles })} /></div>
     <details className="extra-filters"><summary>추가 필터{extraCount ? ` · ${extraCount}개 선택` : ''}</summary>
       <Chips title="행동 경제 필터" choices={ACTION_NAMES} selected={state.actions} onChange={actions => onChange({ actions })} />
@@ -21,4 +22,4 @@ export function Filters({ state, tags, onChange, cards = [] }: { state: LibraryS
     </details>
     {(state.roles.length > 0 || state.kinds.length > 0) && <p className="filter-help">{state.roles.length ? `역할: ${state.roles.map(role => ROLE_NAMES[role]).join(' OR ')}` : ''}{state.roles.length && state.kinds.length ? ' · AND · ' : ''}{state.kinds.length ? `유형: ${state.kinds.map(kind => KIND_NAMES[kind]).join(' OR ')}` : ''}</p>}
   </section>;
-}
+});

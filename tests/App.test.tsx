@@ -30,6 +30,12 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('bulk selection scope',()=>{
+  it('reflects motion settings immediately and restores the prior preference when saving fails',async()=>{
+    let finish!: (result: {ok:false;error:string}) => void;
+    vi.mocked(window.desktop.saveSettings).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+    render(<App/>);await screen.findByRole('button',{name:'환경 설정'});fireEvent.click(screen.getByRole('button',{name:'환경 설정'}));const box=screen.getByRole('checkbox',{name:'모션 줄이기'}) as HTMLInputElement;fireEvent.click(box);expect(box.checked).toBe(true);expect(box.disabled).toBe(true);
+    finish({ok:false,error:'설정 저장 실패'});await waitFor(()=>expect(box.checked).toBe(false));expect(box.disabled).toBe(false);expect(window.desktop.changeResource).not.toHaveBeenCalled();
+  });
   it('moves card management off the play board and keeps selection/search after closing it',async()=>{
     render(<App/>);await screen.findByRole('button',{name:'상처 치료 카드 선택'});fireEvent.change(screen.getByRole('searchbox',{name:'카드 이름 검색'}),{target:{value:'치료'}});const card=screen.getByRole('button',{name:'상처 치료 카드 선택'});fireEvent.click(card);expect(screen.queryByRole('button',{name:'카드 등록'})).toBeNull();expect(screen.queryByRole('button',{name:'정보 수정'})).toBeNull();expect(screen.queryByRole('button',{name:'카드 사용 규칙'})).toBeNull();fireEvent.click(screen.getByRole('button',{name:'관리'}));expect(screen.getByRole('button',{name:'카드 등록'})).toBeDefined();expect(screen.getByRole('button',{name:'정보 수정'})).toBeDefined();expect(screen.getByRole('button',{name:'선택 관리'})).toBeDefined();fireEvent.click(screen.getByRole('button',{name:'관리 메뉴 닫기'}));expect(card.getAttribute('aria-pressed')).toBe('true');expect((screen.getByRole('searchbox',{name:'카드 이름 검색'}) as HTMLInputElement).value).toBe('치료');expect(window.desktop.changeResource).not.toHaveBeenCalled();
   });

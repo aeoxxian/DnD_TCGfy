@@ -1,0 +1,39 @@
+{
+  "registeredImageCopies": 14,
+  "distinctOriginalHashes": 14,
+  "originalHashesMatchPackagedFixtures": true,
+  "sourcePolicy": "Read source DB/WAL as files; query a stable isolated copy; original image bytes only read. No application SQL writes to source.",
+  "isolatedDatasetCounts": [
+    {
+      "cards": 20,
+      "registeredImages": 14,
+      "temporaryTextImages": 6
+    },
+    {
+      "cards": 50,
+      "registeredImages": 14,
+      "temporaryTextImages": 36
+    },
+    {
+      "cards": 200,
+      "registeredImages": 14,
+      "temporaryTextImages": 186
+    }
+  ],
+  "sourceHashes": [
+    "4d4bb2fee88417c4cc7121081f5a91108713b2a65ca69e3aafd7c128f9ca91c0",
+    "c8976e02da34b05cb0150cda9d3b2f7a3a7e50fd87c0cdcdfd9bd4b632736ce2",
+    "7e0f772e8e5f882396c4aa8cc26cdb2253c9ead2f44fe35c1c0d009d8d71125c",
+    "ef7127bc82042c2b6ad4c78dede1b01cd649abde74d75da118912419581bb55f",
+    "d4269ff1afa60098eafd44995f330ba1d1963922820eda35ac6a75c0f017ae90",
+    "4090d0e1cf42272902276faa203fd51f1d8a069a8ab04d434733d078b694cf6b",
+    "9d242fe30e91649109b7c6746d53c91595f4676598eb01b355970106dfb6f896",
+    "4ae53c905f8d4e1ded3606023d7dff1679208781f66595f9395da4f644fb7231",
+    "9d23309f8665757a750af8d215207a69723659ec7b92bca8ee0c0022a689a42e",
+    "dce49b97a901c62fbaa75c35d5378f99a56d124adae954b3266cf979bd791896",
+    "52d629dec439ba96ae2763ebd9c30878f0d187e146f8efba358c5b9aa0cdca3e",
+    "ccc6b00005df9e82baaa26518eb7fbd394b0074b1d9458b02484517dfbc09b87",
+    "edd459c264f18c039f4f36b7e638d65ea79b84f4f11550e7be615b8fcd319ac8",
+    "8257168986db4854750ecf4fe621ee046982ea242c552cb772b02633d7dd608e"
+  ]
+}

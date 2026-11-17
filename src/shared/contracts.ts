@@ -3,10 +3,17 @@ import type { EditBridge } from './bulk';
 import { z } from 'zod';
 import type { ResourceBridge } from './resources';
 
+export const resourceDisplaySchema = z.strictObject({
+  collapsedGroups: z.array(z.enum(['standard', 'pact', 'counter', 'generic'])).max(4),
+  priorityIds: z.array(z.string().min(1).max(128)).max(1000),
+});
+export type ResourceDisplay = z.infer<typeof resourceDisplaySchema>;
+
 export const settingsSchema = z.strictObject({
   viewMode: z.enum(['hand', 'grid']),
   reducedMotion: z.boolean(),
   resourcePanelCollapsed: z.boolean(),
+  resourceViews: z.record(z.string().min(1).max(128), resourceDisplaySchema).refine(value => Object.keys(value).length <= 200).optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };
