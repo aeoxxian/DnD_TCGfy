@@ -89,3 +89,23 @@ describe('v1.1 Phase 3 tilt option', () => {
     expect(screen.getByText('모션 줄이기가 켜져 있어 기울임과 확대 전환 효과가 꺼집니다.')).toBeDefined();
   });
 });
+
+describe('v1.1 Phase 4 cursor option', () => {
+  it('uses the table cursors by default and switches to system cursors from 환경 설정', async () => {
+    window.desktop = {
+      getBootstrap: vi.fn().mockResolvedValue({ ok: true, value: { settings: DEFAULT_SETTINGS, cards: SAMPLE_CARDS, appVersion: '0.6.0', schemaVersion: 6, libraryState: DEFAULT_LIBRARY_STATE, tags: [], profiles: [], decks: [], warnings: [] } }),
+      saveSettings: vi.fn().mockImplementation(async value => ({ ok: true, value })),
+      saveLibraryState: vi.fn().mockImplementation(async value => ({ ok: true, value })),
+      getResources: vi.fn(), getTrash: vi.fn(), getUseHistory: vi.fn(),
+    } as unknown as DesktopBridge;
+    const view = render(<App/>);
+    fireEvent.click(await screen.findByRole('button', { name: '환경 설정' }));
+    expect(view.container.querySelector('.app')!.classList.contains('custom-cursor')).toBe(true);
+    const system = screen.getByRole<HTMLInputElement>('checkbox', { name: '시스템 기본 커서 사용' });
+    expect(system.checked).toBe(false);
+    fireEvent.click(system);
+    expect(window.desktop.saveSettings).toHaveBeenLastCalledWith({ ...DEFAULT_SETTINGS, effects: { systemCursor: true } });
+    await screen.findByText('환경 설정 저장됨');
+    expect(view.container.querySelector('.app')!.classList.contains('custom-cursor')).toBe(false);
+  });
+});

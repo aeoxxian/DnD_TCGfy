@@ -72,7 +72,10 @@ describe('SQLite persistence and compatibility', () => {
     first.close();
     const second = new AppStore(path);
     expect(second.getSettings().effects).toEqual({ cardTilt: false });
-    for (const bad of [{ cardTilt: 'yes' }, { cardTilt: true, extra: 1 }, {}]) expect(() => second.saveSettings({ ...DEFAULT_SETTINGS, effects: bad })).toThrow();
+    for (const bad of [{ cardTilt: 'yes' }, { cardTilt: true, extra: 1 }, { systemCursor: 1 }]) expect(() => second.saveSettings({ ...DEFAULT_SETTINGS, effects: bad })).toThrow();
+    second.saveSettings({ ...DEFAULT_SETTINGS, effects: { cardTilt: false, systemCursor: true } });
+    expect(raw('effects', second)).toEqual({ cardTilt: false, systemCursor: true });
+    second.saveSettings({ ...DEFAULT_SETTINGS, effects: { cardTilt: false } });
     expect(raw('effects', second)).toEqual({ cardTilt: false });
     second.close();
   });

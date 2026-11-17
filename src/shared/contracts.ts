@@ -16,7 +16,7 @@ export const historyViewSchema = z.strictObject({
 });
 export type HistoryView = z.infer<typeof historyViewSchema>;
 /** v1.1: visual effects preferences, kept apart from `preferences` so older versions still read the DB. */
-export const effectsSchema = z.strictObject({ cardTilt: z.boolean() });
+export const effectsSchema = z.strictObject({ cardTilt: z.boolean().optional(), systemCursor: z.boolean().optional() });
 export type Effects = z.infer<typeof effectsSchema>;
 /** v1.1: per-character spell slot gem colours (display only). Levels are "1"–"9". */
 export const hexColorSchema = z.string().regex(/^#[0-9a-f]{6}$/, '색상은 #rrggbb 형식이어야 합니다.');

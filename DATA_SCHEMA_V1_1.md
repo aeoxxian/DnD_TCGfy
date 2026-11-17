@@ -21,16 +21,17 @@ SQLite 버전은 **v6 유지**. DDL·마이그레이션은 없다. 자원 엔진
 - 런타임 계약은 `settingsSchema.historyViews`(선택, 캐릭터 200개 이하, 항목은 `strictObject`)다. 설정 저장 요청에 이 맵이 없으면 기존 값을 지우지 않는다. 앱은 현재 캐릭터 목록에 없는 ID의 항목을 저장할 때 정리한다.
 - “숨긴 기록 다시 표시”는 해당 캐릭터 항목을 지운다.
 
-## `settings` 키 `effects` (Phase 3)
+## `settings` 키 `effects` (Phase 3·4)
 
 시각 효과 선택. 사용자가 환경 설정에서 바꿀 때만 생긴다.
 
 ```json
-{ "cardTilt": false }
+{ "cardTilt": false, "systemCursor": true }
 ```
 
-- `cardTilt`: 확대 카드 3D 기울임. 키가 없으면 켬으로 본다. 앱의 “모션 줄이기”가 켜져 있거나 Windows의 동작 줄이기 설정이면 값과 관계없이 기울이지 않는다.
-- 런타임 계약은 `settingsSchema.effects`(선택, `strictObject`). `preferences`에 넣지 않으므로 0.6.0도 DB를 읽는다.
+- `cardTilt`(선택): 확대 카드 3D 기울임. 없으면 켬으로 본다. 앱의 “모션 줄이기”가 켜져 있거나 Windows의 동작 줄이기 설정이면 값과 관계없이 기울이지 않는다.
+- `systemCursor`(선택, Phase 4): `true`면 테이블 전용 커서 대신 Windows 커서를 쓴다. 없으면 전용 커서.
+- 런타임 계약은 `settingsSchema.effects`(선택, `strictObject`, 두 필드 모두 선택). `preferences`에 넣지 않으므로 0.6.0도 DB를 읽는다.
 - 자원·사용 기록·카드 데이터와 무관하며 Undo 대상이 아니다.
 
 ## `settings` 키 `slot_colors` (Phase 4)

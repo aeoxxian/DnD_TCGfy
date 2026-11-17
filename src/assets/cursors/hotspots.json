@@ -1,0 +1,23 @@
+{
+  "draft": "a",
+  "name": "시안 A · 철과 금",
+  "size": 24,
+  "hotspots": {
+    "default": [
+      2,
+      2
+    ],
+    "pointer": [
+      8,
+      2
+    ],
+    "grab": [
+      12,
+      12
+    ],
+    "grabbing": [
+      12,
+      12
+    ]
+  }
+}

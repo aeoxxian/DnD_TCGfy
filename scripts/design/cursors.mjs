@@ -11,13 +11,14 @@ const palettes = {
   b: { name: '시안 B · 상아와 잉크', note: '상아색 바탕에 잉크 테와 루비 소매. 양피지 계열이라 어두운 가죽 위에서 더 잘 보임.', fill: '#f3ead6', edge: '#2a1c12', cuff: '#a3283a', shine: '#ffffff' },
 };
 // Hotspots are the exact pixel the click lands on: arrow tip, fingertip, centre of the hand.
+// They sit on whole pixels at 1×, 1.5× and 2× (even coordinates), so Windows never rounds the click point.
 const shapes = {
-  default: { label: '기본', hotspot: [1, 1], body: p => `<path d="M1 1 L1 18.6 L5.6 14.2 L8.8 20.9 L12.4 19.4 L9.3 12.9 L15.5 12.9 Z" fill="${p.edge}"/><path d="M2.3 3.9 L2.3 15.8 L6 12.3 L9.4 19.2 L11 18.5 L7.8 11.7 L12.6 11.7 Z" fill="${p.fill}"/><path d="M3.1 5.6 L3.1 9.5" stroke="${p.shine}" stroke-opacity=".55" stroke-width=".9" stroke-linecap="round"/>` },
-  pointer: { label: '클릭 가능', hotspot: [8, 1], body: p => hand(p, `
+  default: { label: '기본', hotspot: [2, 2], body: p => `<g transform="translate(1 1)"><path d="M1 1 L1 18.6 L5.6 14.2 L8.8 20.9 L12.4 19.4 L9.3 12.9 L15.5 12.9 Z" fill="${p.edge}"/><path d="M2.3 3.9 L2.3 15.8 L6 12.3 L9.4 19.2 L11 18.5 L7.8 11.7 L12.6 11.7 Z" fill="${p.fill}"/><path d="M3.1 5.6 L3.1 9.5" stroke="${p.shine}" stroke-opacity=".55" stroke-width=".9" stroke-linecap="round"/></g>` },
+  pointer: { label: '클릭 가능', hotspot: [8, 2], body: p => hand(p, `
     <rect x="2.8" y="11.6" width="5.6" height="3.4" rx="1.7" transform="rotate(28 5.6 13.3)"/>
     <rect x="10.3" y="8.8" width="3.4" height="5.2" rx="1.7"/><rect x="13.4" y="9.6" width="3.4" height="5.2" rx="1.7"/><rect x="16.4" y="10.8" width="3.1" height="4.8" rx="1.55"/>
     <rect x="6.2" y="10.4" width="13.4" height="8.4" rx="3"/>
-    <rect x="6.3" y="1.55" width="3.6" height="12" rx="1.8"/>`, '<rect x="7.4" y="18.2" width="11.4" height="4.6" rx=".9"/>', '<path d="M7.4 3.6 V8.2"/>') },
+    <rect x="6.3" y="2.55" width="3.6" height="11" rx="1.8"/>`, '<rect x="7.4" y="18.2" width="11.4" height="4.6" rx=".9"/>', '<path d="M7.4 4.6 V8.2"/>') },
   grab: { label: '손패 드래그 가능', hotspot: [12, 12], body: p => hand(p, `
     <rect x="2" y="10.5" width="6.5" height="3.3" rx="1.65" transform="rotate(32 5.2 12.1)"/>
     <rect x="5.6" y="3" width="3.3" height="9.5" rx="1.65" transform="rotate(-12 7.2 7.7)"/><rect x="9" y="1.6" width="3.3" height="10.5" rx="1.65"/>
@@ -122,3 +123,16 @@ const html = `<!doctype html>
 `;
 await writeFile(join(out, 'preview.html'), html);
 console.log(JSON.stringify({ out, files: Object.keys(palettes).length * Object.keys(shapes).length + 1 }));
+
+// `--apply <draft>`: rasterise the approved draft for the app (1×, 1.5×, 2×) and record its hotspots.
+const applyAt = process.argv.indexOf('--apply');
+if (applyAt >= 0) {
+  const id = process.argv[applyAt + 1]; const p = palettes[id];
+  if (!p) throw new Error(`unknown draft: ${id}`);
+  const { default: sharp } = await import('sharp');
+  const dir = resolve('src/assets/cursors'); await mkdir(dir, { recursive: true });
+  for (const kind of Object.keys(shapes)) for (const [suffix, scale] of [['', 1], ['@1.5x', 1.5], ['@2x', 2]])
+    await sharp(Buffer.from(svg(p, shapes[kind])), { density: 72 * scale }).png().toFile(join(dir, `${kind}${suffix}.png`));
+  await writeFile(join(dir, 'hotspots.json'), JSON.stringify({ draft: id, name: p.name, size: SIZE, hotspots: Object.fromEntries(Object.entries(shapes).map(([kind, s]) => [kind, s.hotspot])) }, null, 2) + '\n');
+  console.log(JSON.stringify({ applied: id, dir }));
+}

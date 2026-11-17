@@ -2,7 +2,7 @@
 
 - 기준: Phase 3 `e74463b` → 브랜치 `feat/v1.1-phase4`
 - 범위: [V1_1_PLAN.md](V1_1_PLAN.md)의 Phase 4 두 항목. SQLite v6·IPC 채널 변경 없음, 앱 버전 0.6.0 유지.
-- 상태: **1. 주문 슬롯 색상 — 구현·검증 완료. 2. 전용 커서 — 시안 제시, 사용자 승인 대기**(지시서: 기존 커서 에셋이 없으면 시안 승인 후 적용). 커서 적용과 Phase 4 전체 회귀 검증은 승인 뒤에 이어서 한다.
+- 상태: **구현·검증 완료, 사용자 최종 검수 대기.** 1. 주문 슬롯 색상, 2. 전용 커서(사용자가 고른 시안 A 적용). 승인 없이 새 기능이나 다음 버전을 시작하지 않는다.
 
 ## 1. 주문 슬롯 색상
 
@@ -43,51 +43,63 @@
 
 실행 환경별 결과와 회귀는 아래 4절.
 
-## 2. 전용 커서 — 시안(승인 대기)
+## 2. 전용 커서 — 시안 A “철과 금” 적용
 
-프로젝트에 커서 에셋이 없어 지시서대로 **시안만 만들었고 앱에는 적용하지 않았다.**
+프로젝트에 커서 에셋이 없어 지시서대로 시안 두 가지(A 철과 금, B 상아와 잉크)를 먼저 제시했고, 사용자가 **시안 A**를 골라 적용했다.
 
-- 미리보기: [docs/design/cursors/preview.html](docs/design/cursors/preview.html) — 100·125·150% 크기, 가죽·양피지 위, 빨간 점이 클릭 지점. 아래 “직접 움직여 보기”에서 버튼·카드·손패 드래그·검색 칸 위로 실제 커서를 움직여 볼 수 있다(시안 A·B·시스템 커서 전환).
-- 생성 스크립트: `scripts/design/cursors.mjs`(SVG 원본 `docs/design/cursors/*.svg`).
+![커서 시안](docs/design/cursors/sheet-6x.png)
 
-![커서 시안 확대](docs/design/cursors/sheet-6x.png)
+| 상태 | 쓰이는 곳 | 클릭 지점(100%) |
+| --- | --- | --- |
+| 기본 화살표 | 앱 전체 | 화살표 끝 (2, 2) |
+| 검지를 편 장갑 | 버튼·카드·요약(펼치기)·선택 상자·라벨·IN PLAY 미리보기 | 검지 끝 (8, 2) |
+| 편 손 | 손패 빈 곳(드래그로 넘길 수 있음) | 손 중심 (12, 12) |
+| 쥔 주먹 | 손패를 드래그하는 동안 | 손 중심 (12, 12) |
+| 시스템 텍스트 커서 | 검색·이름 등 글자 입력 칸(그대로 유지) | — |
+| 시스템 금지 커서 | 비활성 버튼(그대로 유지) | — |
 
-| | 기본 | 클릭 가능 | 손패 드래그 가능 | 드래그 중 |
-| --- | --- | --- | --- | --- |
-| 모양 | 화살표 | 검지를 편 장갑 | 편 손 | 쥔 주먹 |
-| 클릭 지점 | 화살표 끝 (1, 1) | 검지 끝 (8, 1) | 손 중심 (12, 12) | 손 중심 (12, 12) |
+- 크기는 100%에서 24px이다. 1×·1.5×·2× PNG를 `image-set()`으로 지정해 배율에서도 흐리지 않다. 클릭 지점은 1× 기준 짝수 좌표라 1.5×·2×에서도 정확히 정수 픽셀이다.
+- 환경 설정에 **“시스템 기본 커서 사용”**(기본 끔)을 두었고 재시작 후에도 유지된다(`effects.systemCursor`). 화면: [환경 설정](docs/screenshots/v1.1-p4/after-settings.png)
+- 커서는 그림만 바꾸며 클릭 판정은 그대로다.
+- 원본: `scripts/design/cursors.mjs`(시안 생성, `--apply a`로 앱 에셋 생성), `docs/design/cursors/`(시안·미리보기), `src/assets/cursors/`(적용 에셋·클릭 지점).
 
-- **시안 A · 철과 금:** 어두운 철 바탕에 금테. 가죽 매트·금속 장식과 같은 계열이며 양피지 위에서 특히 또렷하다.
-- **시안 B · 상아와 잉크:** 상아색 바탕에 잉크 테, 루비 소매. 어두운 가죽 위에서 더 잘 보인다.
-- 크기는 100%에서 24px(Windows 기본 커서와 비슷한 크기)이고 화면 배율에 맞춰 커진다. 실제 크기 비교: [sheet-actual.png](docs/design/cursors/sheet-actual.png)(위 두 줄 100%, 아래 두 줄 150%).
+### 검증(Electron이 Windows로 보내는 실제 커서를 받아 확인)
 
-승인 후 적용 계획:
+| 지시서 체크 항목 | 확인한 내용 | 결과 |
+| --- | --- | --- |
+| 커서 유형별 표시 | 빈 곳=화살표, 버튼·카드=장갑, 손패 빈 곳=편 손, 드래그 중=주먹이 모두 전용(custom) 커서로 전달, 텍스트 칸=`text`, 비활성 버튼=`not-allowed` | 통과 |
+| 커서 핫스팟 및 클릭 위치 | 전달된 클릭 지점이 에셋 정의×배율과 같고, 그 픽셀이 그림의 끝(칠해짐, 바로 위·왼쪽 위는 투명). 손은 손바닥 안 | 통과 |
+| Windows 화면 배율 | 100%: 24px·(2,2)/(8,2)/(12,12). 125%: 1.5× 그림 36px·(3,3)/(12,3)/(18,18). 150%: 36px·같은 지점 | 통과 |
+| 기존 카드 선택 및 드래그 동작 | 전용 커서 상태에서 카드 클릭 선택·✕ 해제, 손패 드래그, 전체 회귀 E2E(메인·P4-A·B·C·P5·v1.1 1~3) | 통과 |
+| 앱 재시작 후 설정 유지 | 시스템 커서로 바꾼 뒤 재시작해도 Windows 커서(`hand`·`grab`), 되돌리면 전용 커서 | 통과 |
 
-1. 고른 시안을 1×·2× PNG로 만들어 `image-set()`과 정확한 클릭 지점으로 지정한다(배율에서 흐려지지 않게).
-2. 기본·버튼/카드·손패(잡기)·드래그 중에만 적용하고, 검색·이름 입력 같은 텍스트 칸은 시스템 텍스트 커서를 그대로 둔다.
-3. 환경 설정에 “시스템 기본 커서 사용”을 두고 재시작 후 유지한다(기존 `effects` 키).
-4. E2E로 요소별 커서 종류, 클릭 지점 픽셀(시각적 끝점과 일치), 100·125·150%, 카드 선택·드래그 동작을 확인하고 Phase 4 전체 회귀를 다시 돌린다.
+참고: 125%에서는 Chromium이 1.5× 그림(36px)을 골라 그대로 쓴다. 클릭 지점은 정확하지만 커서가 정배율(30px)보다 약간 크게 보인다.
 
 ## 3. 변경 파일
 
-`src/shared/slot-colors.ts`(신규), `src/components/SlotColorEditor.tsx`(신규), `src/components/ResourceManager.tsx`, `src/components/ResourcePanel.tsx`, `src/App.tsx`, `src/shared/contracts.ts`, `electron/store.ts`, `src/theme-playmat.css`, 테스트·E2E, 커서 시안(`scripts/design/cursors.mjs`, `docs/design/cursors/`), 문서.
+`src/shared/slot-colors.ts`(신규), `src/components/SlotColorEditor.tsx`(신규), `src/assets/cursors/`(신규), `src/components/ResourceManager.tsx`, `src/components/ResourcePanel.tsx`, `src/App.tsx`, `src/shared/contracts.ts`, `electron/store.ts`, `src/theme-playmat.css`, 테스트·E2E, 커서 시안·생성기(`scripts/design/cursors.mjs`, `docs/design/cursors/`), 문서.
 
 ## 4. 실행 환경·회귀
 
-| 환경 | Phase 4(슬롯 색상) E2E |
+`scripts/v11-p4-e2e.mjs` 9개 검사(슬롯 색상 7 + 커서 2), 사본 데이터·재시작 포함:
+
+| 환경 | Phase 4 E2E |
 | --- | --- |
-| 빌드 번들(`dist/`) | 7/7 통과 |
-| Windows 개발 모드(Vite `--dev`) | 7/7 통과 |
-| 패키징 EXE(`release/win-unpacked/DnD TCG-fy.exe`, `npm run pack:win`) | 7/7 통과 |
+| 빌드 번들(`dist/`) | 9/9 통과 |
+| Windows 개발 모드(Vite `--dev`) | 9/9 통과 |
+| 패키징 EXE(`release/win-unpacked/DnD TCG-fy.exe`, `npm run pack:win`) | 9/9 통과 |
+
+Phase 4 전체 회귀(커서 적용 후 최종 코드):
 
 - `npm run lint` 통과(경고 0), `npm run typecheck` 통과.
-- `npm test`: **443/443 통과**(새 `tests/SlotColorsUI.test.tsx` 5개, `store.test` 1개 추가). 이전 단계와 같이 `tests/p11.test.tsx`·`tests/P4BUI.test.tsx`는 Node 22.20에서 로드되지 않았다.
-- 기존 E2E(빌드 번들): 메인 38개 PASS, P4-A, P4-B, P4-C, P5, v1.1 Phase 1·2·3 모두 통과. 메인 E2E는 패키징 EXE에서도 38개 PASS.
-- 패키징은 첫 시도가 실패하고 20초 뒤 자동 재시도에서 성공했다(첫 시도 로그는 재시도에 덮어써져 원인은 확인하지 못함, Phase 2 때는 EXE 파일 잠금이었다). EXE 검사는 재시도로 만든 EXE에서 실행했다.
+- `npm test`: **444/444 통과**(Phase 4에서 `tests/SlotColorsUI.test.tsx` 5개, 커서 옵션 1개, `store.test` 1개 추가). `tests/p11.test.tsx`·`tests/P4BUI.test.tsx`는 이 PC의 Node 22.20에서 로드되지 않았다(변경 전에도 같음, 프로젝트 요구는 Node 24).
+- 기존 E2E(빌드 번들, 전용 커서 적용 상태): 메인 38개 PASS, P4-A, P4-B, P4-C, P5, v1.1 Phase 1(8)·2(9)·3(11)·4(9) 모두 통과. 메인 E2E는 패키징 EXE에서도 38개 PASS.
+- 슬롯 색상만 있던 중간 커밋(`15ad5de`)에서도 같은 회귀를 한 번 돌려 통과했다. 그때 패키징 첫 시도가 실패하고 재시도에서 성공했으며, 이번 최종 패키징은 첫 시도에 성공했다.
 
 ## 5. 미검증·제한
 
-- **커서 전체(유형별 표시·클릭 지점·배율·카드 선택/드래그와의 관계):** 시안 승인 전이라 앱에 적용하지 않았다. **미검증**.
-- **실제 Windows 디스플레이 배율:** Chromium `--force-device-scale-factor`로 재현했다. **미검증**.
+- **실제 Windows 디스플레이 배율:** 배율은 Chromium `--force-device-scale-factor`로 재현했고, 커서는 Electron이 운영체제로 넘기는 이미지·배율·클릭 지점으로 확인했다. Windows 설정에서 배율을 바꾼 실제 화면과 화면에 그려진 커서를 눈으로 본 것은 **미검증**이다. 직접 확인을 권한다.
+- **Windows 커서 크기·색 접근성 설정(마우스 포인터 크게 등):** 전용 커서는 이 설정을 따르지 않는다. 필요하면 “시스템 기본 커서 사용”을 쓴다. 설정과의 상호작용은 **미검증**.
 - **NSIS 설치 파일:** 다시 만들지 않았다(폴더형 EXE만). **미검증**.
+- **터치·펜:** 커서가 없는 입력이라 대상이 아니며 **미검증**.
 - Node 24가 필요한 테스트 파일 2개는 이전 단계와 같이 이 PC에서 로드되지 않는다.
