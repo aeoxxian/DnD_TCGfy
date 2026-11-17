@@ -29,7 +29,7 @@ Quality gate before moving on: `lint`, `typecheck` and `test` must all pass.
 E2E scripts drive a real Electron window with Playwright. Each run isolates its data in `artifacts/p1-e2e-*/user-data` through `DND_TCG_TEST_USER_DATA`, which must be an absolute path.
 - `npm run test:e2e` or `node scripts/e2e.mjs --dev [--from-v5]` covers the main scenario. `--from-vN` seeds an older schema to exercise the migrations.
 - To test the packaged EXE, set `$env:DND_TCG_EXECUTABLE` to `release\win-unpacked\DnD TCG-fy.exe` and drop `--dev`.
-- Phase suites are `scripts/p4-a-e2e.mjs`, `p4-b-e2e.mjs` (run `prepare-p4-b-fixtures.mjs` first) and `p4-c-e2e.mjs`. `scripts/v11-p1-e2e.mjs` checks the v1.1 Phase 1 filter bar (`--dev`, built bundle or `DND_TCG_EXECUTABLE`; it covers 3 window sizes × 100/125/150% scaling), and `scripts/v11-p2-e2e.mjs` checks Phase 2 (main-screen registration, selection bar, recent-history clearing, including a restart).
+- Phase suites are `scripts/p4-a-e2e.mjs`, `p4-b-e2e.mjs` (run `prepare-p4-b-fixtures.mjs` first) and `p4-c-e2e.mjs`. `scripts/v11-p1-e2e.mjs` checks the v1.1 Phase 1 filter bar (`--dev`, built bundle or `DND_TCG_EXECUTABLE`; it covers 3 window sizes × 100/125/150% scaling), and `scripts/v11-p2-e2e.mjs` checks Phase 2 (main-screen registration, selection bar, recent-history clearing, including a restart), and `scripts/v11-p3-e2e.mjs` checks Phase 3 (re-click enlargement, drag vs click, unusable-card overlay, motion, tilt option, reduced motion, image files unchanged).
 - Dev-mode E2E uses port 5173, so never run two at once.
 
 ## Architecture
@@ -53,7 +53,7 @@ Backup and restore (`electron/backup.ts`, UI `src/components/BackupManager.tsx`,
 
 P5 checks: `node scripts/p5-e2e.mjs` covers offline play, a hard kill, export, restore into a new profile and copy import; it also runs against a packaged exe via `DND_TCG_EXECUTABLE`. `node scripts/p5-installer-check.mjs <older-setup> <new-setup>` does a silent install, upgrade and uninstall, and refuses to run if the app is already installed.
 
-Appearance (theme and card backs) is `Settings.appearance`, validated by `appearanceSchema`. `AppStore` stores it under its own `appearance` settings key and checks that custom card-back asset ids exist. Pure helpers are in `src/shared/appearance.ts`. v1.1 adds `Settings.historyViews` (key `history_view`): a per-character "hidden through" mark for the recent-actions list (`src/shared/history-view.ts`); it never touches play events or Undo.
+Appearance (theme and card backs) is `Settings.appearance`, validated by `appearanceSchema`. `AppStore` stores it under its own `appearance` settings key and checks that custom card-back asset ids exist. Pure helpers are in `src/shared/appearance.ts`. v1.1 adds `Settings.historyViews` (key `history_view`): a per-character "hidden through" mark for the recent-actions list (`src/shared/history-view.ts`); it never touches play events or Undo. `Settings.effects` (key `effects`, `{cardTilt}`) holds the enlarged-card tilt option. Card usability (`src/shared/usability.ts`, computed by `cardUsability` in `CardResources.tsx`) drives the card-back overlay on unusable hand cards; clicking a selected card opens `ImageLightbox`, which animates from `previewOrigin` unless motion is reduced.
 
 Adding an IPC operation touches four places: `IPC` and the types in `contracts.ts`, the bridge in `preload.ts`, a `safeHandler` that validates input with zod in `main.ts`, and the store method.
 

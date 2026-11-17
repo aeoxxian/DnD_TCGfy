@@ -171,7 +171,7 @@ await deckBox.click();
 const counter = snapshot.resources.find(r => r.id === options[0].value);
 await page.getByRole('button', { name: '사용 확정', exact: true }).click();
 await page.waitForFunction(async ({ id, rid, before }) => (await window.desktop.getResources(id)).value.resources.find(r => r.id === rid).remaining === before - 1, { id: profile.id, rid: counter.id, before: counter.remaining });
-await page.getByRole('button', { name: `${NEW} 카드 선택`, exact: true }).click();
+await page.getByRole('button', { name: '카드 선택 닫기', exact: true }).click();
 const history = await openHistory(page);
 const shownBefore = await historyCount(page);
 const beforeClear = await resourcesOf(page, profile.id);

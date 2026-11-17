@@ -15,6 +15,9 @@ export const historyViewSchema = z.strictObject({
   clearedAt: z.iso.datetime(),
 });
 export type HistoryView = z.infer<typeof historyViewSchema>;
+/** v1.1: visual effects preferences, kept apart from `preferences` so older versions still read the DB. */
+export const effectsSchema = z.strictObject({ cardTilt: z.boolean() });
+export type Effects = z.infer<typeof effectsSchema>;
 
 export const idSchema = z.string().min(1).max(128);
 
@@ -48,6 +51,7 @@ export const settingsSchema = z.strictObject({
   resourceViews: z.record(z.string().min(1).max(128), resourceDisplaySchema).refine(value => Object.keys(value).length <= 200).optional(),
   appearance: appearanceSchema.optional(),
   historyViews: z.record(z.string().min(1).max(128), historyViewSchema).refine(value => Object.keys(value).length <= 200).optional(),
+  effects: effectsSchema.optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };

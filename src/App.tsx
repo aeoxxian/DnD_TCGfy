@@ -18,7 +18,8 @@ import { Modal } from './components/Modal';
 import { CardGallery } from './components/CardGallery';
 import { ResourcePanel, useResources } from './components/ResourcePanel';
 import { ResourceManager } from './components/ResourceManager';
-import { CardCostEditor, cardResourceNote } from './components/CardResources';
+import { CardCostEditor, cardUsability } from './components/CardResources';
+import { USABILITY_NOTES } from './shared/usability';
 import { CharacterSettings } from './components/CharacterSettings';
 import { TagManager, ProfileManager } from './components/Managers';
 
@@ -44,6 +45,8 @@ export function App() {
   const filterRef = useRef<LibraryState | undefined>(undefined);
   const filterSequence = useRef(0);
   const selectedButton = useRef<HTMLButtonElement | null>(null);
+  // Where the enlargement grows from and shrinks back to (hand card face or IN PLAY preview).
+  const previewOrigin = useRef<Element | null>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
 
   async function load() {
@@ -129,12 +132,13 @@ export function App() {
   const libraryCards = bootstrap?.cards; const filterState = bootstrap?.libraryState; const deckCardIds = activeDeck?.cardIds;
   const visibleCards = useMemo(() => libraryCards && filterState ? filterCards(libraryCards, filterState, deckCardIds) : [], [libraryCards, filterState, deckCardIds]);
   const filterCardsSource = useMemo(() => filterState?.viewScope === 'deck' ? (libraryCards ?? []).filter(card => deckCardIds?.includes(card.id)) : libraryCards ?? [], [libraryCards, filterState?.viewScope, deckCardIds]);
-  const selectCard = useCallback((id: string, button: HTMLButtonElement) => { selectedButton.current = button; setSelectedId(current => current === id ? undefined : id); }, []);
-  const previewCard = useCallback((id: string, button: HTMLButtonElement) => { selectedButton.current = button; setSelectedId(id); setPanel('preview'); }, []);
+  const selectCard = useCallback((id: string, button: HTMLButtonElement) => { selectedButton.current = button; setSelectedId(id); }, []);
+  const previewCard = useCallback((id: string, button: HTMLButtonElement) => { selectedButton.current = button; previewOrigin.current = button.querySelector('.card-face'); setSelectedId(id); setPanel('preview'); }, []);
   const checkCard = useCallback((id: string, checked: boolean) => setSelectedCards(current => checked ? [...new Set([...current, id])] : current.filter(value => value !== id)), []);
   const selected = bootstrap?.cards.find(card => card.id === selectedId);
   const resourceController = useResources(activeProfile?.id);
-  const resourceNotes = useMemo(() => new Map((bootstrap?.cards ?? []).map(card => [card.id, cardResourceNote(card,resourceController.snapshot)])),[bootstrap?.cards,resourceController.snapshot]);
+  const usability = useMemo(() => new Map((bootstrap?.cards ?? []).map(card => [card.id, cardUsability(card, resourceController.snapshot)])), [bootstrap?.cards, resourceController.snapshot]);
+  const resourceNotes = useMemo(() => new Map([...usability].map(([id, state]) => [id, USABILITY_NOTES[state]])), [usability]);
   async function trashChanged(result:TrashResult){
     if(result.type==='move')setLastTrashed(result.cardIds);else setLastTrashed(current=>current.filter(id=>!result.cardIds.includes(id)));
     setSelectedCards([]);setSelectedId(undefined);await load();await resourceController.refresh();
@@ -158,6 +162,9 @@ export function App() {
     requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.cards-area .card-button[tabindex="0"]')?.focus({ preventScroll: true }));
   };
   const appearance: Appearance = settings.appearance ?? DEFAULT_APPEARANCE;
+  const deckBack = cardBackSource(cardBackFor(appearance, activeDeck?.id));
+  const tiltSetting = settings.effects?.cardTilt ?? true;
+  const tiltOn = tiltSetting && !settings.reducedMotion;
   const classLine = resourceController.snapshot?.profile ? `${CLASS_NAMES[resourceController.snapshot.profile.classId as keyof typeof CLASS_NAMES] ?? '홈브루'} · ${resourceController.snapshot.profile.level}레벨` : '';
   const deckCount = activeDeck ? activeDeck.cardIds.filter(id => cards.some(card => card.id === id)).length : cards.length;
   return <div className={`app p4-a p4-b playmat ${settings.reducedMotion ? 'reduced-motion' : ''} ${settings.resourcePanelCollapsed ? 'resources-collapsed' : ''}`} data-theme={appearance.theme}>
@@ -170,7 +177,7 @@ export function App() {
       </div>
       <div className="top-actions"><button className="register-card" aria-haspopup="dialog" disabled={busy} title={registrationLabel} onClick={openNew}><Icon name="add"/>카드 등록</button><ThemeMenu value={appearance.theme} disabled={saving} onChange={theme => void updateSettings({ appearance: { ...appearance, theme } })}/><button aria-haspopup="dialog" onClick={()=>setPanel('management')}><Icon name="manage"/>관리</button><button aria-haspopup="dialog" onClick={()=>setSettingsOpen(true)}><Icon name="settings"/>환경 설정</button></div>
     </header>
-    {settingsOpen&&<Modal title="환경 설정" onClose={()=>setSettingsOpen(false)}><p>이 기기에 저장되며 다시 실행해도 유지됩니다.</p><label className="checkbox-line"><input type="checkbox" checked={settings.reducedMotion} disabled={saving} onChange={e=>void updateSettings({reducedMotion:e.target.checked})}/>모션 줄이기</label></Modal>}
+    {settingsOpen&&<Modal title="환경 설정" onClose={()=>setSettingsOpen(false)}><p>이 기기에 저장되며 다시 실행해도 유지됩니다.</p><label className="checkbox-line"><input type="checkbox" checked={settings.reducedMotion} disabled={saving} onChange={e=>void updateSettings({reducedMotion:e.target.checked})}/>모션 줄이기</label><label className="checkbox-line"><input type="checkbox" checked={tiltOn} disabled={saving||settings.reducedMotion} onChange={e=>void updateSettings({effects:{...settings.effects,cardTilt:e.target.checked}})}/>확대 카드 3D 기울임</label><p className="muted settings-note">{settings.reducedMotion?'모션 줄이기가 켜져 있어 기울임과 확대 전환 효과가 꺼집니다.':'확대한 카드를 마우스 위치에 따라 살짝 기울입니다.'}</p></Modal>}
     {backsOpen&&<CardBackDialog appearance={appearance} deck={activeDeck ? { id: activeDeck.id, name: activeDeck.name } : undefined} busy={saving} onClose={()=>setBacksOpen(false)} onSave={next=>{setBacksOpen(false);void updateSettings({ appearance: next });}}/>}
     {usedOpen&&activeProfile&&<UseHistory characterId={activeProfile.id} onClose={()=>setUsedOpen(false)}/>}
     <div className="workspace">
@@ -181,12 +188,12 @@ export function App() {
           <Filters state={libraryState} tags={tags} cards={filterCardsSource} onChange={updateFilters} />
         </div>
         {selectionMode&&<CardBatchTools key={`${libraryState.activeCharacterId}-${activeDeck?.id}`} ids={selectedCards.filter(id=>visibleCards.some(card=>card.id===id))} visibleCount={visibleCards.length} scopeLabel={scopeLabel} tags={tags} decks={bootstrap.decks.map(d=>({...d,name:`${bootstrap.profiles.find(p=>p.id===d.characterId)?.name} · ${d.name}`}))} activeDeck={activeDeck} onAll={()=>setSelectedCards(visibleCards.map(card=>card.id))} onClear={()=>setSelectedCards([])} onExit={exitSelection} onTrashed={trashChanged} onSaved={async()=>{setSelectedCards([]);await load();await resourceController.refresh();}}/>}
-        <SelectedCardPanel card={selected} tags={tags} controller={resourceController} onPreview={()=>setPanel('preview')} onClose={closeSelection} closeRef={closeButton}/>
+        <SelectedCardPanel card={selected} tags={tags} controller={resourceController} onPreview={()=>{ previewOrigin.current = document.querySelector('.in-play-slot .card-face'); setPanel('preview'); }} onClose={closeSelection} closeRef={closeButton}/>
         <div className="hand-row">
-          <DeckPile src={cardBackSource(cardBackFor(appearance, activeDeck?.id))} deckName={activeDeck?.name ?? '전체 라이브러리'} count={deckCount} onOpen={()=>setBacksOpen(true)}/>
+          <DeckPile src={deckBack} deckName={activeDeck?.name ?? '전체 라이브러리'} count={deckCount} onOpen={()=>setBacksOpen(true)}/>
           <div className="hand-zone">
             <div className="hand-header"><div className="deck-label"><strong>{libraryState.viewScope === 'deck' ? activeDeck?.name ?? '덱' : '라이브러리'}</strong><span aria-label="표시 카드 수">{visibleCards.length} / {cards.length}장</span></div><span className="hand-title" aria-hidden="true">HAND</span><div className="board-toolbar"><div className="toolbar-switches"><div className="view-switch" role="group" aria-label="카드 범위"><button aria-pressed={libraryState.viewScope === 'library'} onClick={() => updateFilters({ viewScope: 'library' })}>전체 카드</button><button disabled={!activeDeck} aria-pressed={libraryState.viewScope === 'deck'} onClick={() => updateFilters({ viewScope: 'deck' })}>활성 덱</button></div><div className="view-switch" role="group" aria-label="카드 보기 방식"><button aria-pressed={settings.viewMode === 'hand'} disabled={saving} onClick={() => void updateSettings({ viewMode: 'hand' })}>손패</button><button aria-pressed={settings.viewMode === 'grid'} disabled={saving} onClick={() => void updateSettings({ viewMode: 'grid' })}>격자</button></div></div></div></div>
-            {visibleCards.length ? <CardGallery cards={visibleCards} mode={settings.viewMode} selectedId={selectedId} selectedIds={selectedCards} selectionMode={selectionMode} notes={resourceNotes} onSelect={selectCard} onCheck={checkCard} onPreview={previewCard}/> : <div className="empty-library"><span aria-hidden="true">◇</span><h3>{cards.length ? '조건에 맞는 카드가 없어요' : '첫 손패를 만들어 보세요'}</h3><p>{cards.length ? '필터를 바꾸거나 전체 라이브러리를 살펴보세요.' : '카드 이미지를 여기에 놓거나 카드 등록을 누르세요.'}</p>{!cards.length && <button onClick={()=>setPanel('management')}>관리 메뉴 열기</button>}</div>}
+            {visibleCards.length ? <CardGallery cards={visibleCards} mode={settings.viewMode} selectedId={selectedId} selectedIds={selectedCards} selectionMode={selectionMode} notes={resourceNotes} usability={usability} backSrc={resourceController.snapshot ? deckBack : undefined} onSelect={selectCard} onCheck={checkCard} onPreview={previewCard}/> : <div className="empty-library"><span aria-hidden="true">◇</span><h3>{cards.length ? '조건에 맞는 카드가 없어요' : '첫 손패를 만들어 보세요'}</h3><p>{cards.length ? '필터를 바꾸거나 전체 라이브러리를 살펴보세요.' : '카드 이미지를 여기에 놓거나 카드 등록을 누르세요.'}</p>{!cards.length && <button onClick={()=>setPanel('management')}>관리 메뉴 열기</button>}</div>}
           </div>
           <UsedPile events={resourceController.snapshot?.events ?? []} cards={cards} disabled={!activeProfile || !resourceController.snapshot} onOpen={()=>setUsedOpen(true)}/>
         </div>
@@ -201,7 +208,7 @@ export function App() {
     {panel === 'costs' && selected && resourceController.snapshot && <CardCostEditor card={selected} controller={resourceController} onSaved={load} onClose={() => setPanel(undefined)} />}
     {panel === 'tags' && <TagManager library={bootstrap} onLibrary={applyLibrary} onClose={() => setPanel(undefined)} />}
     {panel === 'profiles' && <ProfileManager onClass={()=>setPanel('class')} library={bootstrap} onLibrary={applyLibrary} onClose={() => setPanel(undefined)} />}
-    {panel === 'preview' && selected && <ImageLightbox card={selected} onClose={()=>setPanel(undefined)}/>}
+    {panel === 'preview' && selected && <ImageLightbox card={selected} origin={previewOrigin.current} tilt={tiltOn} onClose={()=>setPanel(undefined)}/>}
     {panel==='management'&&<Modal title="관리 메뉴" wide onClose={()=>setPanel(undefined)}><p className="manager-help">관리창을 닫으면 선택한 카드와 검색 조건을 유지한 채 플레이로 돌아갑니다.</p><div className="management-sections"><section><h3>카드·라이브러리</h3><button disabled={busy} onClick={openNew}>카드 등록</button><button onClick={()=>setPanel('libraryMenu')}>라이브러리 관리</button><button onClick={()=>setPanel('backup')}>백업·복원</button><button onClick={()=>{setSelectionMode(true);setSelectedCards([]);setPanel(undefined);}}>선택 관리</button></section><section><h3>캐릭터·자원</h3><button onClick={()=>setPanel('profiles')}>캐릭터·덱</button><button onClick={()=>setPanel('resources')}>자원 관리</button><button onClick={()=>setPanel('history')}>일괄 편집 복원</button></section><section><h3>선택 카드{selected?` · ${selected.name}`:''}</h3><button disabled={!selected} onClick={()=>setPanel('edit')}>정보 수정</button><button disabled={!selected||!resourceController.snapshot} onClick={()=>setPanel('costs')}>카드 사용 규칙</button>{activeDeck&&selected&&<button disabled={busy} onClick={async()=>{if(await mutate(()=>window.desktop.setDeckCards({deckId:activeDeck.id,cardIds:activeDeck.cardIds.includes(selected.id)?activeDeck.cardIds.filter(id=>id!==selected.id):[...activeDeck.cardIds,selected.id]})))setPanel(undefined);}}>{activeDeck.cardIds.includes(selected.id)?'활성 덱에서 빼기':'활성 덱에 추가'}</button>}<button className="trash-move" disabled={!selected} onClick={()=>setPanel('archive')}>휴지통으로 이동</button></section></div></Modal>}
     {panel==='libraryMenu'&&<Modal title="라이브러리 관리" onClose={()=>setPanel(undefined)}><p>공통 태그와 삭제된 카드를 관리합니다.</p><div className="batch-actions"><button onClick={()=>setPanel('tags')}>태그 관리</button><button onClick={()=>setPanel('trash')}>휴지통</button></div></Modal>}
     {panel==='backup'&&<BackupManager onClose={()=>setPanel(undefined)} onLibrary={library=>{applyLibrary(library);void resourceController.refresh();}}/>}

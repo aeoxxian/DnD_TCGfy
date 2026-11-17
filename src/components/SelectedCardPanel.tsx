@@ -24,6 +24,6 @@ export function SelectedCardPanel({card,tags,controller,onPreview,onClose,closeR
     </article></div>
   </div>:<div className="selection is-empty">
     <div className="in-play-slot"><span className="zone-label" aria-hidden="true">IN PLAY</span><span className="empty-slot" aria-hidden="true">◇</span></div>
-    <div className="codex"><div className="codex-page empty-selection"><h3>어떤 카드를 고를까요?</h3><p>손패에서 카드를 선택하세요.<br/>이곳에서 내용을 읽고 사용합니다.</p><p className="keyboard-hint">← → 이동 · Enter 선택 · 더블클릭 확대</p></div></div>
+    <div className="codex"><div className="codex-page empty-selection"><h3>어떤 카드를 고를까요?</h3><p>손패에서 카드를 선택하세요.<br/>이곳에서 내용을 읽고 사용합니다.</p><p className="keyboard-hint">← → 이동 · Enter 선택 · 다시 눌러 확대</p></div></div>
   </div>}</aside>;
 }

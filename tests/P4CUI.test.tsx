@@ -37,7 +37,13 @@ describe('P4-C image-only lightbox',()=>{
   it('restores the opener focus when closed',()=>{
     const opener=document.createElement('button');document.body.appendChild(opener);opener.focus();const view=render(<ImageLightbox card={c} onClose={vi.fn()}/>);expect(document.activeElement).toBe(screen.getByRole('dialog'));view.unmount();expect(document.activeElement).toBe(opener);opener.remove();
   });
-  it('keeps single-click selection and double-click enlargement separate without a second selection toggle',()=>{
-    const select=vi.fn(),preview=vi.fn();render(<CardGallery cards={[c]} mode="hand" selectedIds={[]} selectionMode={false} notes={new Map()} onSelect={select} onCheck={vi.fn()} onPreview={preview}/>);const button=screen.getByRole('button');fireEvent.click(button,{detail:1});fireEvent.click(button,{detail:2});fireEvent.doubleClick(button);expect(select).toHaveBeenCalledTimes(1);expect(preview).toHaveBeenCalledTimes(1);
+  it('v1.1: a click selects, clicking the selected card again enlarges it, and a double click adds nothing else',()=>{
+    const select=vi.fn(),preview=vi.fn();const props={cards:[c],mode:'hand' as const,selectedIds:[],selectionMode:false,notes:new Map<string,string>(),onSelect:select,onCheck:vi.fn(),onPreview:preview};
+    const view=render(<CardGallery {...props}/>);const button=screen.getByRole('button');
+    fireEvent.click(button,{detail:1});expect(select).toHaveBeenCalledTimes(1);expect(preview).not.toHaveBeenCalled();
+    fireEvent.doubleClick(button);expect(select).toHaveBeenCalledTimes(1);expect(preview).not.toHaveBeenCalled();
+    view.rerender(<CardGallery {...props} selectedId={c.id}/>);
+    fireEvent.click(button,{detail:2});expect(preview).toHaveBeenCalledTimes(1);expect(select).toHaveBeenCalledTimes(1);
+    fireEvent.click(button,{detail:0});expect(preview).toHaveBeenCalledTimes(2);
   });
 });

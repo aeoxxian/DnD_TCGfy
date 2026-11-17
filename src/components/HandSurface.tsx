@@ -3,7 +3,6 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 export function HandSurface({ mode, children }: { mode: 'hand' | 'grid'; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const gesture = useRef({ pointerId: -1, x: 0, scroll: 0, dragging: false, suppress: false });
-  const doubleClickBlockedUntil = useRef(0);
   const [dragging, setDragging] = useState(false);
   useLayoutEffect(() => {
     const buttons = Array.from(ref.current!.querySelectorAll<HTMLButtonElement>('.card-button'));
@@ -24,7 +23,6 @@ export function HandSurface({ mode, children }: { mode: 'hand' | 'grid'; childre
   }, [mode]);
   function finish(pointerId: number) {
     if (gesture.current.pointerId !== pointerId) return;
-    if (gesture.current.dragging) doubleClickBlockedUntil.current = performance.now() + 450;
     gesture.current.pointerId = -1; gesture.current.dragging = false; setDragging(false);
     if (ref.current?.hasPointerCapture(pointerId)) ref.current.releasePointerCapture(pointerId);
     setTimeout(() => { gesture.current.suppress = false; }, 0);
@@ -56,7 +54,7 @@ export function HandSurface({ mode, children }: { mode: 'hand' | 'grid'; childre
       if (g.dragging) { event.preventDefault(); event.currentTarget.scrollLeft = g.scroll - delta; }
     }}
     onPointerUp={event => finish(event.pointerId)} onPointerCancel={event => finish(event.pointerId)} onLostPointerCapture={event => finish(event.pointerId)}
-    onDoubleClickCapture={event => { if (gesture.current.dragging || performance.now() < doubleClickBlockedUntil.current) { event.preventDefault(); event.stopPropagation(); } }}
+    // A drag is never a click, so it can never count as re-clicking the selected card (v1.1: re-click enlarges).
     onClickCapture={event => { if (gesture.current.suppress) { event.preventDefault(); event.stopPropagation(); gesture.current.suppress = false; } }}>
     {children}
   </div>;

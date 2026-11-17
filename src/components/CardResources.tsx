@@ -1,3 +1,4 @@
+import { USABILITY_NOTES, type CardUsability } from '../shared/usability';
 import { useEffect, useMemo, useState } from 'react';
 import type { CardDefinition, CastOption } from '../shared/contracts';
 import type { ResourcePreview, ResourceSnapshot } from '../shared/resources';
@@ -17,11 +18,12 @@ function optionChoices(card:CardDefinition,option:CastOption,snapshot:ResourceSn
   }
   return result;
 }
-export function cardResourceNote(base:CardDefinition,snapshot?:ResourceSnapshot):string {
-  const card=effectiveCard(base,snapshot);if(card.costStatus==='unconfigured')return '비용 미설정';if(!snapshot)return '';let insufficient=false;
-  for(const option of card.castOptions){try{const plan=planUse(card,option.id,snapshot.resources,snapshot.bindings,optionChoices(card,option,snapshot,{}));if(plan.canUse)return '';insufficient||=plan.canOverride;}catch{/* Detail preview gives the exact reason. */}}
-  return insufficient?'자원 부족 · 열람 가능':'비용 연결 확인';
+export function cardUsability(base:CardDefinition,snapshot?:ResourceSnapshot):CardUsability {
+  const card=effectiveCard(base,snapshot);if(card.costStatus==='unconfigured')return 'unconfigured';if(!snapshot)return 'unknown';let insufficient=false;
+  for(const option of card.castOptions){try{const plan=planUse(card,option.id,snapshot.resources,snapshot.bindings,optionChoices(card,option,snapshot,{}));if(plan.canUse)return 'usable';insufficient||=plan.canOverride;}catch{/* Detail preview gives the exact reason. */}}
+  return insufficient?'insufficient':'unbound';
 }
+export function cardResourceNote(base:CardDefinition,snapshot?:ResourceSnapshot):string { return USABILITY_NOTES[cardUsability(base,snapshot)]; }
 export function CardUsage({card:base,controller}:{card:CardDefinition;controller:ResourceController}){
   const {snapshot,busy,perform,error}=controller;const card=useMemo(()=>effectiveCard(base,snapshot),[base,snapshot]);
   const [optionId,setOptionId]=useState(card.castOptions[0].id);const option=card.castOptions.find(option=>option.id===optionId)??card.castOptions[0];

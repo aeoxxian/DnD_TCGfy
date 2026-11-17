@@ -62,6 +62,20 @@ describe('SQLite persistence and compatibility', () => {
     expect(second.getSettings().historyViews).toEqual({});
     second.close();
   });
+  it('v1.1: keeps the enlarged-card tilt option in its own effects key, readable after restart', () => {
+    const path = fixture();
+    const first = new AppStore(path);
+    first.saveSettings({ ...DEFAULT_SETTINGS, reducedMotion: true, effects: { cardTilt: false } });
+    const raw = (key: string, store = first) => JSON.parse((store.db.prepare('SELECT value_json FROM settings WHERE key=?').get(key) as { value_json: string }).value_json);
+    expect(raw('preferences')).toEqual({ ...DEFAULT_SETTINGS, reducedMotion: true });
+    expect(raw('effects')).toEqual({ cardTilt: false });
+    first.close();
+    const second = new AppStore(path);
+    expect(second.getSettings().effects).toEqual({ cardTilt: false });
+    for (const bad of [{ cardTilt: 'yes' }, { cardTilt: true, extra: 1 }, {}]) expect(() => second.saveSettings({ ...DEFAULT_SETTINGS, effects: bad })).toThrow();
+    expect(raw('effects', second)).toEqual({ cardTilt: false });
+    second.close();
+  });
   it('rejects invalid inputs and preserves last saved settings', () => {
     const store = new AppStore(fixture());
     store.saveSettings(DEFAULT_SETTINGS);
