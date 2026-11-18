@@ -26,3 +26,14 @@ export async function openBulkActions(page){
   if(!await details.evaluate(el=>el.open))await details.locator(':scope > summary').click();
   return details;
 }
+// v1.2: decks are built from the whole library (전체 라이브러리 → select the card → 관리 → "<캐릭터> · <덱>에 넣기").
+export async function showWholeLibrary(page){
+  const character=page.getByLabel('활성 캐릭터',{exact:true});
+  if(await character.inputValue()){await character.selectOption('');await page.locator('.deck-label strong',{hasText:'전체 라이브러리'}).waitFor();}
+}
+export async function putInDeck(page,title,deckLabel){
+  await showWholeLibrary(page);
+  const card=page.getByRole('button',{name:`${title} 카드 선택`,exact:true});if(await card.getAttribute('aria-pressed')!=='true')await card.click();
+  await page.getByRole('button',{name:'관리',exact:true}).click();const menu=page.getByRole('dialog',{name:'관리 메뉴',exact:true});
+  await menu.getByRole('button',{name:`${deckLabel}에 넣기`,exact:true}).click();await menu.getByRole('button',{name:`${deckLabel}에서 빼기`,exact:true}).waitFor();await page.keyboard.press('Escape');
+}

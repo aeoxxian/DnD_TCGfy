@@ -1,11 +1,16 @@
 import { castingLevels } from '../src/shared/casting';
 import { createHash, randomUUID } from 'node:crypto';
-import { saveCardsSchema } from '../src/shared/contracts';
+import { z } from 'zod';
+import { idSchema, saveCardsSchema } from '../src/shared/contracts';
+import { templateDraftSchema } from '../src/shared/resources';
+import { sameResourceName } from '../src/shared/resource-drafts';
 import { transaction } from './migrations';
 import { UserInputError } from './errors';
 import type { AppStore } from './store';
 import { LibraryStore } from './library-store';
 import { ResourceStore } from './resource-store';
+
+const newResourcesSchema = z.array(z.strictObject({ draftId: idSchema, template: templateDraftSchema })).max(4);
 
 /** Compose existing writers in one transaction. Never accepts existing card IDs. */
 export class RegistrationStore {
@@ -20,6 +25,9 @@ export class RegistrationStore {
     const intentRules = { ...rules, expectedRevision: undefined };
     const fingerprint = createHash('sha256').update(JSON.stringify({ ...parsed, initialRules: intentRules })).digest('hex');
     const receiptKey = `registration:${rules.requestId}`;
+    const draftsResult = newResourcesSchema.safeParse(rules.newResources ?? []);
+    if (!draftsResult.success) throw new UserInputError('새 자원 설정을 확인해 주세요.');
+    const drafts = draftsResult.data;
     return transaction(this.store.db, () => {
       const receipt = this.store.db.prepare('SELECT value_json FROM settings WHERE key=?').get(receiptKey) as {value_json: string} | undefined;
       if (receipt) {
@@ -32,6 +40,18 @@ export class RegistrationStore {
       if (!rules.configured && (rules.bindings.length || rules.castOptions.some(option => option.costs.length || option.casting))) throw new UserInputError('비용 미설정 등록에는 비용을 함께 저장할 수 없습니다.');
       if (new Set(rules.castOptions.map(option => option.id)).size !== rules.castOptions.length) throw new UserInputError('사용 방식 ID가 중복됩니다.');
       if (rules.configured && rules.characterId && rules.expectedRevision !== this.resources.snapshot(rules.characterId).revision) throw new UserInputError('자원 구성이 바뀌었습니다. 자원을 다시 불러와 확인해 주세요.');
+      if (drafts.length) {
+        if (!rules.configured || !rules.characterId) throw new UserInputError('새 자원은 캐릭터를 선택한 등록에서만 만들 수 있습니다.');
+        if (new Set(drafts.map(draft => draft.draftId)).size !== drafts.length) throw new UserInputError('새 자원 초안이 중복됩니다.');
+        const existing = this.resources.snapshot(rules.characterId).resources;
+        drafts.forEach((draft, index) => {
+          if (draft.template.kind !== 'counter' || draft.template.id) throw new UserInputError('카드 등록 중에는 횟수·포인트 자원만 새로 만들 수 있습니다.');
+          if (existing.some(resource => resource.id === draft.draftId)) throw new UserInputError('새 자원 초안 ID가 기존 자원과 겹칩니다.');
+          if (!rules.bindings.some(binding => binding.resourceInstanceId === draft.draftId)) throw new UserInputError('비용에 연결하지 않은 새 자원은 만들지 않습니다.');
+          const same = existing.find(resource => sameResourceName(resource.name, draft.template.name))?.name ?? drafts.slice(0, index).find(other => sameResourceName(other.template.name, draft.template.name))?.template.name;
+          if (same) throw new UserInputError(`같은 이름의 자원 “${same}”이(가) 이미 있습니다. 기존 자원을 선택해 주세요.`);
+        });
+      }
       for (const draft of parsed.cards) for (const option of rules.castOptions) {
         if(option.casting || option.costs.some(cost=>cost.type==='slot')) {
           try { castingLevels({...draft,id:'registration',castOptions:rules.castOptions,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},option); }
@@ -46,12 +66,26 @@ export class RegistrationStore {
       const library = this.library.saveCards(cardsInput, true);
       const created = library.cards.filter(card => !before.has(card.id));
       if (created.length !== parsed.cards.length) throw new UserInputError('등록 카드 수가 일치하지 않습니다.');
+      // New counters are created here, after the cards and inside the same transaction, with the
+      // same engine path as 자원 관리 (template + character-shared instance + "자원 생성" record).
+      let bindings = rules.bindings;
+      if (drafts.length && rules.characterId) {
+        const ids = new Map<string, string>();
+        for (const draft of drafts) {
+          const before = this.resources.snapshot(rules.characterId);
+          const result = this.resources.change({ requestId: randomUUID(), characterId: rules.characterId, expectedRevision: before.revision, action: { type: 'create_resource', template: draft.template, scope: 'character' } }, true);
+          const added = result.snapshot.resources.filter(resource => !before.resources.some(old => old.id === resource.id));
+          if (added.length !== 1) throw new UserInputError('새 자원을 만들지 못했습니다.');
+          ids.set(draft.draftId, added[0].id);
+        }
+        bindings = rules.bindings.map(binding => ({ ...binding, resourceInstanceId: ids.get(binding.resourceInstanceId) ?? binding.resourceInstanceId }));
+      }
       for (const card of created) {
         this.store.db.prepare("UPDATE card_definitions SET attributes_json=json_set(attributes_json,'$.costStatus','unconfigured') WHERE id=?").run(card.id);
         if (!rules.configured) continue;
         if (rules.characterId) {
           const current = this.resources.snapshot(rules.characterId);
-          for (const binding of rules.bindings) {
+          for (const binding of bindings) {
             const resource = current.resources.find(resource => resource.id === binding.resourceInstanceId);
             if (!resource) throw new UserInputError('현재 캐릭터의 활성 자원만 연결할 수 있습니다.');
             for (const option of rules.castOptions) for (const cost of option.costs.filter(cost => cost.costKey === binding.costKey)) {
@@ -59,7 +93,7 @@ export class RegistrationStore {
               if (cost.type !== 'slot' && resource.kind === 'slot_track' && (cost.slotLevel === undefined || resource.capacityByLevel?.[String(cost.slotLevel)] === undefined)) throw new UserInputError('사용할 자원 단계를 확인해 주세요.');
             }
           }
-          this.resources.change({ requestId: randomUUID(), characterId: rules.characterId, expectedRevision: current.revision, action: { type: 'save_costs', scope: rules.scope, cardId: card.id, castOptions: rules.castOptions, bindings: rules.bindings } }, true, true);
+          this.resources.change({ requestId: randomUUID(), characterId: rules.characterId, expectedRevision: current.revision, action: { type: 'save_costs', scope: rules.scope, cardId: card.id, castOptions: rules.castOptions, bindings } }, true, true);
         } else {
           if (rules.bindings.length || rules.castOptions.some(option => option.costs.some(cost => cost.type !== 'slot' || !cost.autoBind && card.spellLevel !== 0))) throw new UserInputError('횟수·포인트 연결에는 캐릭터가 필요합니다.');
           this.store.db.prepare("UPDATE card_definitions SET attributes_json=json_set(attributes_json,'$.castOptions',json(?),'$.costStatus','configured') WHERE id=?").run(JSON.stringify(rules.castOptions), card.id);

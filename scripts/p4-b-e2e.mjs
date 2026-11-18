@@ -46,7 +46,7 @@ try{
   await launch();await size(1920,1080);
   await seed(0,20);
   const fixture=await page.evaluate(async()=>{
-    const ok=r=>{if(!r.ok)throw Error(r.error);return r.value;};const lib=ok(await window.desktop.createProfile({name:'P4-B 가독성 검수'})),profile=lib.profiles[0];
+    const ok=r=>{if(!r.ok)throw Error(r.error);return r.value;};const lib=ok(await window.desktop.createProfile({name:'P4-B 가독성 검수'})),profile=lib.profiles[0];ok(await window.desktop.setDeckCards({deckId:profile.activeDeckId,cardIds:lib.cards.map(c=>c.id)}));// v1.2: a character shows its active deck
     let state=ok(await window.desktop.getResources(profile.id));const configuration={classId:'wizard',level:11};const preview=ok(await window.desktop.previewClass({characterId:profile.id,configuration}));
     state=ok(await window.desktop.changeResource({requestId:crypto.randomUUID(),characterId:profile.id,expectedRevision:state.revision,action:{type:'configure_class',configuration,quote:preview.quote}})).snapshot;
     const first=lib.cards[0];ok(await window.desktop.saveCards({cards:[{id:first.id,name:first.name,imageAssetId:first.imageAssetId,roles:first.roles,actions:first.actions,range:first.range,tags:first.tags,kind:'spell',spellLevel:4,description:'가독성 검수용 설명.\n'.repeat(80)}]}));

@@ -69,3 +69,59 @@ describe('P4-C atomic registration',()=>{
     const initial:InitialRules={requestId:randomUUID(),configured:true,scope:'shared',castOptions:[{id:'use',label:'슬롯',costs:[{type:'slot',costKey:'s',slotSelection:'standard',autoBind:true}]}],bindings:[]};const lib=registration.save({cards:[{...draft(),kind:'spell',spellLevel:1}],registrationTarget:null,initialRules:initial});expect(lib.cards[0].costStatus).toBe('configured');store.close();
   });
 });
+
+describe('v1.2 Phase 1 · new resource created inside the registration transaction',()=>{
+  const DRAFT='draft-charges';
+  const charges=(patch:Record<string,unknown>={})=>({name:'지팡이 충전',unit:'회',kind:'counter',capacity:{type:'fixed',value:7},recovery:[{triggers:['dawn'],amount:{type:'fixed',value:3}}],...patch});
+  const withNew=(f:Fixture,patch:Partial<InitialRules>={},template:Record<string,unknown>=charges())=>rules(f,{castOptions:[{id:'use',label:'충전 사용',costs:[{type:'fixed',costKey:'c',amount:1}]}],bindings:[{costKey:'c',resourceInstanceId:DRAFT}],newResources:[{draftId:DRAFT,template}],...patch});
+  const templates=(f:Fixture)=>f.store.db.prepare("SELECT name FROM resource_templates WHERE source='user'").all().map(row=>(row as {name:string}).name);
+
+  it('creates the counter with the card, binds the cost to it, links the deck, and the card spends from it',()=>{
+    const f=fixture(),before=f.resources.snapshot(f.a.id);
+    const lib=register(f,withNew(f)),card=lib.cards[0],after=f.resources.snapshot(f.a.id),created=after.resources.find(r=>r.name==='지팡이 충전')!;
+    expect(lib.decks[0].cardIds).toEqual([card.id]);expect(card.costStatus).toBe('configured');
+    expect(created).toMatchObject({kind:'counter',unit:'회',capacity:7,remaining:7,overrides:{scope:'character'}});expect(created.id).not.toBe(DRAFT);
+    expect(after.bindings).toEqual([expect.objectContaining({cardId:card.id,costKey:'c',resourceInstanceId:created.id})]);
+    expect(templates(f)).toEqual(['지팡이 충전']);expect(after.events[0].label).toBe('지팡이 충전 자원 생성');expect(after.revision).toBe(before.revision+1);
+    use(f,card);expect(f.resources.snapshot(f.a.id).resources.find(r=>r.id===created.id)!.remaining).toBe(6);
+    change(f,{type:'recover',trigger:'dawn'});expect(f.resources.snapshot(f.a.id).resources.find(r=>r.id===created.id)!.remaining).toBe(7);
+    expect(f.store.db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);f.store.close();
+  });
+  it('binds every card of a multi-image registration to one new resource and supports variable point costs',()=>{
+    const f=fixture();const lib=register(f,withNew(f,{castOptions:[{id:'use',label:'포인트',costs:[{type:'variable',costKey:'c',min:1,max:3,step:1}]}]},charges({name:'영혼 점수',unit:'점'})),[draft('하나'),draft('둘')]);
+    const resources=f.resources.snapshot(f.a.id).resources;expect(resources.map(r=>r.name)).toEqual(['영혼 점수']);
+    expect(f.resources.snapshot(f.a.id).bindings.map(b=>[b.cardId,b.resourceInstanceId])).toEqual(lib.cards.map(card=>[card.id,resources[0].id]));
+    use(f,lib.cards[1],{c:3});expect(f.resources.snapshot(f.a.id).resources[0].remaining).toBe(4);f.store.close();
+  });
+  it('rolls back the resource, template, card, deck link, bindings, events and receipt when a later write fails',()=>{
+    const f=fixture(),before=f.resources.snapshot(f.a.id),decks=f.library.getLibrary().decks;
+    f.store.db.exec("CREATE TRIGGER fail_binding BEFORE INSERT ON card_bindings BEGIN SELECT RAISE(ABORT,'injected write failure'); END;");
+    const input=withNew(f);expect(()=>register(f,input)).toThrow();
+    expect(f.library.getLibrary().cards).toEqual([]);expect(f.library.getLibrary().decks).toEqual(decks);expect(f.resources.snapshot(f.a.id)).toEqual(before);expect(templates(f)).toEqual([]);
+    expect(f.store.db.prepare('SELECT COUNT(*) AS n FROM resource_instances').get()).toEqual({n:0});expect(f.store.db.prepare("SELECT * FROM settings WHERE key LIKE 'registration:%'").all()).toEqual([]);
+    f.store.db.exec('DROP TRIGGER fail_binding');register(f,input);expect(f.resources.snapshot(f.a.id).resources.map(r=>r.name)).toEqual(['지팡이 충전']);f.store.close();
+  });
+  it('replays a retried request once: no second card, resource or template',()=>{
+    const f=fixture(),input=withNew(f);register(f,input);const once=f.resources.snapshot(f.a.id);
+    register(f,{...input,expectedRevision:once.revision});expect(f.library.getLibrary().cards).toHaveLength(1);expect(f.resources.snapshot(f.a.id)).toEqual(once);expect(templates(f)).toEqual(['지팡이 충전']);f.store.close();
+  });
+  it('refuses duplicates and leaves existing resources untouched',()=>{
+    const f=fixture(),existing=counter(f),before=f.resources.snapshot(f.a.id);
+    expect(()=>register(f,withNew(f,{},charges({name:'  영력 '})))).toThrow('같은 이름의 자원 “영력”');
+    expect(()=>register(f,withNew(f,{bindings:[{costKey:'c',resourceInstanceId:DRAFT}],newResources:[{draftId:DRAFT,template:charges()},{draftId:'other',template:charges({name:'지팡이 충전'})}]}))).toThrow();
+    expect(()=>register(f,withNew(f,{newResources:[{draftId:existing.id,template:charges()}],bindings:[{costKey:'c',resourceInstanceId:existing.id}]}))).toThrow('겹칩니다');
+    expect(f.resources.snapshot(f.a.id)).toEqual(before);expect(f.library.getLibrary().cards).toEqual([]);f.store.close();
+  });
+  it('rejects unbound drafts, slot tracks, unconfigured rules and registrations without a character',()=>{
+    const f=fixture(),before=f.resources.snapshot(f.a.id);
+    expect(()=>register(f,withNew(f,{bindings:[]}))).toThrow();
+    expect(()=>register(f,withNew(f,{castOptions:[{id:'use',label:'무소모',costs:[]}],bindings:[]}))).toThrow('연결하지 않은 새 자원');
+    expect(()=>register(f,withNew(f,{},{name:'트랙',unit:'슬롯',kind:'slot_track',slotKind:'generic',slotCapacity:{'1':{type:'fixed',value:2}},recovery:[]}))).toThrow('횟수·포인트');
+    expect(()=>register(f,withNew(f,{},charges({name:''})))).toThrow('새 자원 설정');
+    expect(()=>register(f,{...withNew(f),configured:false,castOptions:[{id:'use',label:'비용 미설정',costs:[]}],bindings:[]})).toThrow();
+    expect(f.resources.snapshot(f.a.id)).toEqual(before);expect(templates(f)).toEqual([]);
+    const store=new AppStore(mkdtempSync(join(root,'no-character-'))),library=new LibraryStore(store),resources=new ResourceStore(store),registration=new RegistrationStore(store,library,resources);
+    expect(()=>registration.save({cards:[draft()],registrationTarget:null,initialRules:{requestId:randomUUID(),configured:true,scope:'shared',castOptions:[{id:'use',label:'충전',costs:[{type:'fixed',costKey:'c',amount:1}]}],bindings:[{costKey:'c',resourceInstanceId:DRAFT}],newResources:[{draftId:DRAFT,template:charges()}]}})).toThrow('캐릭터를 선택한 등록');
+    expect(library.getLibrary().cards).toEqual([]);store.close();f.store.close();
+  });
+});

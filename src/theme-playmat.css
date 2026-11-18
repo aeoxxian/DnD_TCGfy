@@ -587,3 +587,24 @@ html, body { background: #0b0807; }
 .app.playmat.custom-cursor .cards-area.hand.is-dragging, .app.playmat.custom-cursor .cards-area.hand.is-dragging * { cursor: var(--cursor-grabbing), grabbing !important; }
 .app.playmat.custom-cursor.custom-cursor :is(input:not([type=checkbox], [type=radio], [type=color], [type=file], [type=range], [type=button], [type=submit]), textarea, [contenteditable=true]) { cursor: text !important; }
 .app.playmat.custom-cursor.custom-cursor :is(button, input, select):disabled { cursor: not-allowed !important; }
+
+/* ── v1.2 Phase 1: deck building from the whole library, new resource while registering ── */
+.app.playmat .modal .deck-membership { margin: 2px 0 9px; padding: 8px 12px 10px; border: 1px solid #b9a684; border-radius: 7px; color: var(--ink); background: rgba(255, 252, 244, .38); }
+.app.playmat .modal .deck-membership legend { padding: 0 6px; font: 700 13px var(--kserif); }
+.app.playmat .modal .deck-membership ul { display: grid; gap: 2px; max-height: 240px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.app.playmat .modal .deck-membership li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--ink-line); font-size: 12px; line-height: 1.4; }
+.app.playmat .modal .deck-membership li:last-child { border-bottom: 0; }
+.app.playmat .modal .deck-membership-name { min-width: 0; overflow-wrap: anywhere; }
+.app.playmat .modal .deck-membership-mark { font-weight: 700; white-space: nowrap; }
+.app.playmat .modal .management-sections .deck-membership button { flex: none; width: auto; min-width: 58px; margin: 0; padding: 4px 12px; font-size: 12px; }
+.app.playmat .modal .deck-membership li.is-member button { box-shadow: inset 0 0 0 1px var(--ribbon); }
+.app.playmat .modal .deck-membership .muted { margin: 8px 0 0; font-size: 11px; line-height: 1.6; }
+.app.playmat .modal .new-resource-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 16px; }
+.app.playmat .modal .new-resource-row p { flex: 1 1 100%; margin: 0; font-size: 12px; line-height: 1.6; }
+.app.playmat .modal .new-resource-row button { padding: 6px 14px; font-size: 12px; }
+.app.playmat .modal .new-resource-pending { padding: 8px 12px; border-left: 2px solid var(--ribbon); background: rgba(255, 252, 244, .38); }
+.app.playmat .modal :is(.resource-scope-note, .resource-duplicate) { margin: 16px 0; padding: 12px 14px; border: 1px solid #b9a684; border-radius: 7px; font-size: 12px; line-height: 1.7; color: var(--ink); background: rgba(255, 252, 244, .38); }
+.app.playmat .modal .resource-scope-note strong { display: block; margin-bottom: 4px; font: 700 13px var(--kserif); color: var(--ink-strong); }
+.app.playmat .modal :is(.resource-scope-note, .resource-duplicate) p { margin: 0 0 4px; }
+.app.playmat .modal .resource-duplicate { border-color: rgba(125, 58, 48, .55); box-shadow: inset 3px 0 0 var(--wax); }
+.app.playmat .modal .resource-duplicate button { margin-top: 6px; }

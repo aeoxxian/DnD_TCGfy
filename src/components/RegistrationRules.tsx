@@ -1,14 +1,20 @@
 import { useId } from 'react';
 import type { BasicRuleDraft, BasicRuleKind } from '../shared/use-rules';
-import type { ResourceSnapshot } from '../shared/resources';
+import type { ResourceSnapshot, ResourceView } from '../shared/resources';
+import { bindableCounters } from '../shared/resource-drafts';
+
+const NEW_RESOURCE = '__new_resource__';
 
 export type RegistrationKind = BasicRuleKind | 'unconfigured' | 'advanced';
-export function RegistrationRules({kind,onKind,draft,onChange,scope,onScope,characterId,snapshot,busy,onAdvanced,summary}:{
+export function RegistrationRules({kind,onKind,draft,onChange,scope,onScope,characterId,snapshot,busy,onAdvanced,summary,pending,pendingNote,characterName,onNewResource,onDiscardPending}:{
   kind:RegistrationKind;onKind:(kind:RegistrationKind)=>void;draft:BasicRuleDraft;onChange:(patch:Partial<BasicRuleDraft>)=>void;
   scope:'shared'|'character';onScope:(scope:'shared'|'character')=>void;characterId?:string;snapshot?:ResourceSnapshot;busy:boolean;onAdvanced:()=>void;summary:string[];
+  /** v1.2: a resource drafted in this registration (created only when the card is saved). */
+  pending?:ResourceView;pendingNote?:string;characterName?:string;onNewResource?:()=>void;onDiscardPending?:()=>void;
 }) {
   const radio=useId();
-  const counters=snapshot?.resources.filter(resource=>resource.kind==='counter'&&resource.overrides.scope!=='card')??[];
+  const counters=bindableCounters(snapshot?.resources??[]);
+  const owner=characterName??'현재 캐릭터';
   return <section className="registration-rules" aria-label="등록 카드 사용 규칙"><h3>카드 사용 규칙</h3>
     <p className="muted">카드 정보와 함께 저장됩니다. 등록이나 설정만으로 자원이 차감되지 않습니다.</p>
     <fieldset className="registration-rule-types" disabled={busy}><legend>이 카드는 어떤 자원을 사용하나요?</legend>{Object.entries({unconfigured:'나중에 설정',none:'무소모',slots:'주문 슬롯',uses:'사용 횟수',points:'포인트 자원'}).map(([key,label])=><label key={key}><input type="radio" name={radio} value={key} checked={kind===key} onChange={()=>onKind(key as RegistrationKind)}/>{label}</label>)}</fieldset>
@@ -27,9 +33,10 @@ export function RegistrationRules({kind,onKind,draft,onChange,scope,onScope,char
         </>}
       </>}
       {(kind==='uses'||kind==='points')&&<>
-        <label className="form-field">사용할 자원<select aria-label="등록 사용할 자원" value={draft.resourceId} required onChange={event=>onChange({resourceId:event.target.value})}><option value="">자원 이름을 선택하세요</option>{counters.map(resource=><option key={resource.id} value={resource.id}>{resource.name} · {resource.unlimited?'무제한':`${resource.remaining}/${resource.capacity} ${resource.unit}`}</option>)}</select></label>
+        <label className="form-field">사용할 자원<select aria-label="등록 사용할 자원" value={draft.resourceId} required onChange={event=>{if(event.target.value===NEW_RESOURCE){onNewResource?.();return;}onChange({resourceId:event.target.value});}}><option value="">자원 이름을 선택하세요</option>{pending&&<option value={pending.id}>새 자원 · {pending.name} · {pendingNote} (카드 저장 시 생성)</option>}{counters.map(resource=><option key={resource.id} value={resource.id}>{resource.name} · {resource.unlimited?'무제한':`${resource.remaining}/${resource.capacity} ${resource.unit}`}</option>)}{onNewResource&&<option value={NEW_RESOURCE}>+ 새 자원 만들기…</option>}</select></label>
+        <div className="new-resource-row">{pending?<><p className="new-resource-pending" aria-label="새 자원 초안"><strong>새 자원 ‘{pending.name}’</strong> · {pendingNote} · {owner} 전용(캐릭터 공유) · 카드를 저장할 때 함께 만들어집니다.{draft.resourceId!==pending.id&&' 지금은 비용에 연결되지 않아 만들지 않습니다.'}</p><button type="button" disabled={busy} onClick={onNewResource}>새 자원 고치기</button><button type="button" disabled={busy} onClick={onDiscardPending}>새 자원 취소</button></>:<><button type="button" className="new-resource" disabled={busy||!onNewResource} onClick={onNewResource}>+ 새 자원 만들기</button>{!onNewResource&&<p className="muted">상단에서 캐릭터를 선택하면 등록 중에 새 자원을 만들 수 있습니다.</p>}</>}</div>
         {!(kind==='points'&&draft.variable)&&<label className="form-field">한 번에 사용할 양<input aria-label="등록 사용할 양" type="number" min={0} max={1000000} step={1} required value={draft.amount} onChange={event=>onChange({amount:Number(event.target.value)})}/></label>}
-        {!counters.length&&<p className="muted">현재 캐릭터에 연결할 자원이 없습니다. 자원 관리에서 만든 뒤 다시 등록하거나 비용 미설정으로 저장하세요.</p>}
+        {!counters.length&&!pending&&onNewResource&&<p className="muted">현재 캐릭터에 연결할 자원이 없습니다. ‘+ 새 자원 만들기’로 바로 만들 수 있습니다.</p>}
       </>}
     </>}
     <details><summary>고급 사용 규칙</summary>

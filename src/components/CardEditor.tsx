@@ -7,6 +7,8 @@ import { cardDraftSchema, type CardDefinition, type CardDraft, type Tag, type As
 import { ACTION_NAMES, KIND_NAMES, RANGE_NAMES, ROLE_NAMES, normalizeText } from '../shared/library';
 import { Modal } from './Modal';
 import { toggleValue } from './Filters';
+import { NewResourceDialog } from './NewResourceDialog';
+import { describeDraft, draftResourceView, type NewResourceDraft } from '../shared/resource-drafts';
 
 function Checks<T extends string>({ title, choices, values, onChange, disabled }: { title: string; choices: Record<T, string>; values: T[]; onChange: (values: T[]) => void; disabled: boolean }) {
   return <fieldset className="editor-checks" disabled={disabled}><legend>{title}</legend><div>{(Object.entries(choices) as [T, string][]).map(([id, name]) => <label key={id}><input type="checkbox" checked={values.includes(id)} onChange={() => onChange(toggleValue(values, id))} />{name}</label>)}</div></fieldset>;
@@ -15,7 +17,7 @@ function draftFromCard(card?: CardDefinition): CardDraft {
   return card ? { id: card.id, name: card.name, kind: card.kind, imageAssetId: card.imageAssetId, roles: card.roles, actions: card.actions, range: card.range, tags: card.tags, description: card.description, spellLevel: card.spellLevel } : { name: '', kind: 'other', roles: [], actions: ['action'], range: { kind: 'special' }, tags: [] };
 }
 
-export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose, registrationTarget = null, targetLabel, controller, characterId }: { card?: CardDefinition; initialAssets?: AssetPreview[]; tags: Tag[]; onLibrary: (library: Library) => void; onClose: () => void; registrationTarget?: RegistrationTarget | null; targetLabel?: string; controller?: ResourceController; characterId?: string }) {
+export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose, registrationTarget = null, targetLabel, controller, characterId, characterName }: { card?: CardDefinition; initialAssets?: AssetPreview[]; tags: Tag[]; onLibrary: (library: Library) => void; onClose: () => void; registrationTarget?: RegistrationTarget | null; targetLabel?: string; controller?: ResourceController; characterId?: string; characterName?: string }) {
   const [target] = useState(registrationTarget);
   const [destinationLabel] = useState(targetLabel);
   const [draft, setDraft] = useState<CardDraft>(() => draftFromCard(card));
@@ -32,6 +34,11 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   const [ruleTime]=useState(()=>new Date().toISOString());
   const [advancedOpen,setAdvancedOpen]=useState(false);
   const [advancedRules,setAdvancedRules]=useState<{castOptions:CastOption[];bindings:{costKey:string;resourceInstanceId:string}[]}>();
+  // v1.2: a counter drafted from the use-rule resource picker. Created only when the card is saved.
+  const [newResource,setNewResource]=useState<NewResourceDraft>();
+  const [resourceFormOpen,setResourceFormOpen]=useState(false);
+  const draftView=newResource&&characterId?draftResourceView(newResource,characterId):undefined;
+  const ruleResources=[...(controller?.snapshot?.resources??[]),...(draftView?[draftView]:[])];
   const registrationAttempt=useRef<{signature:string;requestId:string}|undefined>(undefined);
   const saving=useRef(false);
   const ruleCard:CardDefinition={...draft,id:'registration-draft',name:draft.name||'등록할 카드',castOptions:advancedRules?.castOptions??[{id:ruleIds.optionId,label:'일반 사용',costs:[]}],createdAt:ruleTime,updatedAt:ruleTime};
@@ -74,7 +81,8 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
     const invalid = parsed.find(result => !result.success);
     if (invalid && !invalid.success) { setError(invalid.error.issues[0].message); return; }
     if(!card&&ruleError){setError(ruleError);return;}
-    const initial = card?undefined:{configured:ruleKind!=='unconfigured',scope:ruleScope,characterId,expectedRevision:controller?.snapshot?.revision,castOptions:proposal?.castOptions??[{id:ruleIds.optionId,label:'비용 미설정',costs:[]}],bindings:proposal?.bindings??[]};
+    const boundDraft=newResource&&proposal?.bindings.some(binding=>binding.resourceInstanceId===newResource.draftId)?newResource:undefined;
+    const initial = card?undefined:{configured:ruleKind!=='unconfigured',scope:ruleScope,characterId,expectedRevision:controller?.snapshot?.revision,castOptions:proposal?.castOptions??[{id:ruleIds.optionId,label:'비용 미설정',costs:[]}],bindings:proposal?.bindings??[],newResources:boundDraft?[boundDraft]:undefined};
     const signature=JSON.stringify({cards:candidates,registrationTarget:target,initial:initial?{...initial,expectedRevision:undefined}:undefined});
     if(!registrationAttempt.current||registrationAttempt.current.signature!==signature)registrationAttempt.current={signature,requestId:crypto.randomUUID()};
     saving.current=true;setBusy(true); setError('');
@@ -85,7 +93,7 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
     } catch { setError('카드를 저장하지 못했습니다. 기존 카드는 유지됩니다.'); } finally { saving.current=false;setBusy(false); }
   }
   if(advancedOpen){
-    const snapshot={...(controller?.snapshot??{characterId:characterId??'registration',revision:0,resources:[],templates:[],bindings:[],events:[],warnings:[]}),bindings:(proposal?.bindings??[]).map(binding=>({...binding,id:binding.costKey,cardId:ruleCard.id,characterId:characterId??'registration'}))};
+    const snapshot={...(controller?.snapshot??{characterId:characterId??'registration',revision:0,resources:[],templates:[],bindings:[],events:[],warnings:[]}),resources:ruleResources,bindings:(proposal?.bindings??[]).map(binding=>({...binding,id:binding.costKey,cardId:ruleCard.id,characterId:characterId??'registration'}))};
     const draftController:ResourceController={...(controller??{busy:false,error:'',perform:async()=>false,refresh:async()=>{}}),snapshot};
     return <AdvancedCardCostEditor card={{...ruleCard,castOptions:proposal?.castOptions??ruleCard.castOptions}} controller={draftController} initialScope={ruleScope} onSaved={async()=>{}} onClose={()=>setAdvancedOpen(false)} onBasic={()=>setAdvancedOpen(false)} onDraft={value=>{setAdvancedRules(value);setRuleScope(value.scope);setRuleKind('advanced');setAdvancedOpen(false);}}/>;
   }
@@ -110,9 +118,10 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
         <label className="form-field">메모 (선택)<textarea maxLength={10000} value={draft.description ?? ''} disabled={busy} rows={3} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label>
         <p className="muted">기본 주문 레벨은 시전 슬롯 검증에 사용합니다. 아래 카드 사용 규칙에서 사용할 자원과 양을 정할 수 있습니다.</p>
       </details>
-      {!card&&<fieldset disabled={busy} className="registration-rules-shell"><RegistrationRules kind={ruleKind} onKind={chooseRule} draft={{...ruleDraft,spellLevel:draft.spellLevel}} onChange={updateRule} scope={ruleScope} onScope={setRuleScope} characterId={characterId} snapshot={controller?.snapshot} busy={busy} onAdvanced={()=>setAdvancedOpen(true)} summary={proposal?describeUseRules(proposal.castOptions,proposal.bindings,controller?.snapshot?.resources??[]):ruleError?[ruleError]:[]}/>{controller?.error&&<p role="alert">{controller.error}</p>}<button type="button" disabled={busy||!controller} onClick={()=>void controller?.refresh()}>연결 자원 다시 불러오기</button></fieldset>}
+      {!card&&<fieldset disabled={busy} className="registration-rules-shell"><RegistrationRules kind={ruleKind} onKind={chooseRule} draft={{...ruleDraft,spellLevel:draft.spellLevel}} onChange={updateRule} scope={ruleScope} onScope={setRuleScope} characterId={characterId} snapshot={controller?.snapshot} busy={busy} onAdvanced={()=>setAdvancedOpen(true)} summary={proposal?describeUseRules(proposal.castOptions,proposal.bindings,ruleResources):ruleError?[ruleError]:[]} pending={draftView} pendingNote={newResource?describeDraft(newResource):undefined} characterName={characterName} onNewResource={characterId&&controller?.snapshot?()=>setResourceFormOpen(true):undefined} onDiscardPending={()=>{if(newResource&&ruleDraft.resourceId===newResource.draftId)updateRule({resourceId:''});setNewResource(undefined);}}/>{controller?.error&&<p role="alert">{controller.error}</p>}<button type="button" disabled={busy||!controller} onClick={()=>void controller?.refresh()}>연결 자원 다시 불러오기</button></fieldset>}
       {error && <p className="error-banner" role="alert">{error}</p>}
       <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>취소</button><button className="primary" type="submit" disabled={busy}>{card ? '수정 저장' : assets.length > 1 ? `${assets.length}장 등록` : '카드 저장'}</button></div>
     </form>
+    {resourceFormOpen&&<NewResourceDialog initial={newResource} ruleKind={ruleKind==='points'?'points':'uses'} resources={controller?.snapshot?.resources??[]} characterName={characterName} onCancel={()=>setResourceFormOpen(false)} onPickExisting={id=>{updateRule({resourceId:id});setResourceFormOpen(false);}} onCreate={(created,kind)=>{setNewResource(created);chooseRule(kind);updateRule({resourceId:created.draftId});setResourceFormOpen(false);}}/>}
   </Modal>;
 }

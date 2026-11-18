@@ -113,6 +113,10 @@ export const initialRulesSchema = z.strictObject({
   characterId: idSchema.optional(), expectedRevision: z.number().int().nonnegative().optional(),
   castOptions: cardSchema.shape.castOptions.max(12).refine(options => options.reduce((n, option) => n + option.costs.length, 0) <= 100),
   bindings: z.array(z.strictObject({ costKey: z.string().min(1).max(128), resourceInstanceId: idSchema })).max(100),
+  // v1.2: counters filled in during registration. Bindings name them by draftId; the registration
+  // transaction creates them (create_resource) and rewires the bindings. The template is checked
+  // with templateDraftSchema in the main process (it lives in resources.ts, which imports this file).
+  newResources: z.array(z.strictObject({ draftId: idSchema, template: z.record(z.string(), z.unknown()) })).max(4).optional(),
 });
 export type InitialRules = z.infer<typeof initialRulesSchema>;
 export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional(), initialRules: initialRulesSchema.optional() });

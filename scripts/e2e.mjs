@@ -95,7 +95,19 @@ async function capture(name) {
   const png = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'));
   await writeFile(join(runPath, `${name}.png`), Buffer.from(png, 'base64'));
 }
-async function showAll() { await page.getByRole('button', { name: '전체 카드', exact: true }).click(); const reset = page.getByRole('button', { name: '필터 초기화' }); if (await reset.isEnabled()) await reset.click(); }
+// v1.2: the whole library is the 전체 라이브러리 entry of the character selector (no 전체 카드 button).
+async function showAll() {
+  const character = page.getByLabel('활성 캐릭터', { exact: true });
+  if (await character.inputValue()) { await character.selectOption(''); await page.locator('.deck-label strong', { hasText: '전체 라이브러리' }).waitFor(); await page.getByRole('status').filter({ hasText: '필터 저장됨' }).waitFor(); }
+  const reset = page.getByRole('button', { name: '필터 초기화' }); if (await reset.isEnabled()) await reset.click();
+}
+async function selectCharacter(id) { const character = page.getByLabel('활성 캐릭터', { exact: true }); if (await character.inputValue() === id) return; await character.selectOption(id); await page.getByRole('status').filter({ hasText: '필터 저장됨' }).waitFor(); }
+// v1.2 deck building: whole library → select the card → 관리 → "<캐릭터> · <덱>에 넣기".
+async function putInDeck(title, deckLabel) {
+  await showAll(); await selectCard(title); await page.getByRole('button', { name: '관리', exact: true }).click();
+  const menu = page.getByRole('dialog', { name: '관리 메뉴', exact: true });
+  await menu.getByRole('button', { name: `${deckLabel}에 넣기`, exact: true }).click(); await menu.getByRole('button', { name: `${deckLabel}에서 빼기`, exact: true }).waitFor(); await page.keyboard.press('Escape');
+}
 async function countVisible(n) { await page.waitForFunction(n => document.querySelector('[aria-label="표시 카드 수"]')?.textContent.startsWith(`${n} /`), n); }
 
 try {
@@ -207,24 +219,24 @@ try {
   await openManagement(page,'캐릭터·덱'); dialog = page.getByRole('dialog', { name: '캐릭터와 덱' });
   await dialog.getByLabel('새 캐릭터 이름').fill('카드 플레이어 A'); await dialog.getByRole('button', { name: '캐릭터 만들기' }).click();
   await dialog.getByText('카드 플레이어 A의 덱').waitFor(); await dialog.getByRole('button', { name: '캐릭터와 덱 닫기' }).click();
-  await showAll(); await selectCard('치유의 카드'); await openManagement(page,'활성 덱에 추가'); await page.getByRole('button',{name:'관리',exact:true}).click();await page.getByRole('button',{name:'활성 덱에서 빼기',exact:true}).waitFor();await page.keyboard.press('Escape');
   data = await state(); const playerA = data.profiles.find(profile => profile.name === '카드 플레이어 A');
+  await putInDeck('치유의 카드', '카드 플레이어 A · 기본 덱');
   await openManagement(page,'캐릭터·덱'); dialog = page.getByRole('dialog', { name: '캐릭터와 덱' });
   await dialog.getByLabel('새 캐릭터 이름').fill('카드 플레이어 B'); await dialog.getByRole('button', { name: '캐릭터 만들기' }).click();
   await dialog.getByText('카드 플레이어 B의 덱').waitFor(); await dialog.getByRole('button', { name: '캐릭터와 덱 닫기' }).click();
-  await showAll(); await selectCard('치유의 카드'); await openManagement(page,'활성 덱에 추가'); await page.getByRole('button',{name:'관리',exact:true}).click();await page.getByRole('button',{name:'활성 덱에서 빼기',exact:true}).waitFor();await page.keyboard.press('Escape');
+  await putInDeck('치유의 카드', '카드 플레이어 B · 기본 덱');
   data = await state(); const playerB = data.profiles.find(profile => profile.name === '카드 플레이어 B');
   assert(data.decks.find(deck => deck.id === playerA.activeDeckId).cardIds.includes(first.id)); assert(data.decks.find(deck => deck.id === playerB.activeDeckId).cardIds.includes(first.id));
-  await page.getByLabel('활성 캐릭터', { exact: true }).selectOption(playerA.id); await page.getByRole('status').filter({ hasText: '필터 저장됨' }).waitFor();
+  await selectCharacter(playerA.id); await countVisible(1);
   await openManagement(page,'캐릭터·덱'); dialog = page.getByRole('dialog', { name: '캐릭터와 덱' });
   await dialog.getByLabel('새 덱 이름').fill('보조 덱'); await dialog.getByRole('button', { name: '덱 만들기' }).click(); await dialog.getByText('보조 덱').waitFor();
-  await dialog.getByRole('button', { name: '캐릭터와 덱 닫기' }).click(); await showAll();
-  await selectCard('반응의 카드'); await openManagement(page,'활성 덱에 추가'); await page.getByRole('button',{name:'관리',exact:true}).click();await page.getByRole('button',{name:'활성 덱에서 빼기',exact:true}).waitFor();await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '활성 덱', exact: true }).click(); await countVisible(1);
+  await dialog.getByRole('button', { name: '캐릭터와 덱 닫기' }).click(); await countVisible(0);
+  await putInDeck('반응의 카드', '카드 플레이어 A · 보조 덱');
+  await selectCharacter(playerA.id); await countVisible(1); assert.equal(await page.locator('.deck-label strong').textContent(), '보조 덱');
+  await selectCard('반응의 카드'); await page.getByRole('button',{name:'관리',exact:true}).click(); assert.equal(await page.getByRole('dialog',{name:'관리 메뉴',exact:true}).getByRole('group',{name:'덱에 넣기·빼기'}).count(), 0); await page.getByRole('button',{name:'활성 덱에서 빼기',exact:true}).waitFor(); await page.keyboard.press('Escape');
   data = await state(); assert.deepEqual(data.decks.find(deck => deck.id === playerA.activeDeckId).cardIds, [first.id]); assert.deepEqual(data.decks.find(deck => deck.id === playerB.activeDeckId).cardIds, [first.id]);
-  recordCheck('Two characters share one card with independent decks; extra deck creation/selection/membership and library/deck scope');
+  recordCheck('Two characters share one card with independent decks; extra deck creation/selection/membership; v1.2 whole-library deck building and character deck scope');
 
-  await showAll();
   await page.evaluate(() => { const input = document.createElement('input'); input.type = 'file'; input.id = 'e2e-drop-source'; document.body.append(input); });
   await page.locator('#e2e-drop-source').setInputFiles(dropped);
   await page.evaluate(() => { const input = document.querySelector('#e2e-drop-source'); const transfer = new DataTransfer(); transfer.items.add(input.files[0]); document.querySelector('[aria-label="카드 보드"]').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: transfer })); input.remove(); });
@@ -253,6 +265,8 @@ try {
   recordCheck('Explicit common-tag deletion clears only that tag and its saved filter; archive preserves original data and references');
 
   await page.getByRole('button', { name: '손패', exact: true }).click(); await page.getByRole('status').filter({ hasText: '환경 설정 저장됨' }).waitFor();
+  // v1.2: a character shows its active deck, so pick A's 기본 덱 (치유의 카드) for the use-area layout checks.
+  await selectCharacter(playerA.id); await page.getByLabel('활성 덱', { exact: true }).selectOption(playerA.activeDeckId); await page.locator('.deck-label strong', { hasText: '기본 덱' }).waitFor();
   for (const [width, height, zoom, label] of [[1280,720,1,'p1-1280'],[1280,720,1.25,'p1-125pct'],[1280,720,1.5,'p1-150pct']]) {
     await app.evaluate(({ BrowserWindow }, size) => { const win = BrowserWindow.getAllWindows()[0]; win.setContentSize(size.width,size.height); win.webContents.setZoomFactor(size.zoom); }, { width,height,zoom });
     await selectCard('치유의 카드'); await page.getByRole('button',{name:'사용 확정',exact:true}).scrollIntoViewIfNeeded();
@@ -286,7 +300,7 @@ try {
     await form.getByRole('button', { name: '카드 저장', exact: true }).click(); await form.waitFor({ state: 'hidden' });
     return (await state()).cards.find(card => card.name === title);
   }
-  await showAll(); let context = await state();
+  let context = await state();
   const ownerA = context.profiles.find(profile => profile.id === context.libraryState.activeCharacterId);
   const targetA = ownerA.activeDeckId;
   const autoA = await newTextCard('P11 A 신규', 'attack', '유틸');
@@ -296,7 +310,7 @@ try {
   const autoB = await newTextCard('P11 B 신규', 'attack', '공격');
   context = await state(); assert(context.decks.find(deck => deck.id === playerB.activeDeckId).cardIds.includes(autoB.id));
   assert(!context.decks.find(deck => deck.id === targetA).cardIds.includes(autoB.id));
-  await edit('P11 A 신규', async form => { await form.getByLabel('카드 이름', { exact: true }).fill('P11 A 수정'); });
+  await selectCharacter(playerA.id); await edit('P11 A 신규', async form => { await form.getByLabel('카드 이름', { exact: true }).fill('P11 A 수정'); });
   context = await state(); assert(!context.decks.find(deck => deck.id === playerB.activeDeckId).cardIds.includes(autoA.id));
   await page.getByLabel('활성 캐릭터', { exact: true }).selectOption(''); await page.getByRole('status').filter({ hasText: '필터 저장됨' }).waitFor();
   const loose = await newTextCard('P11 라이브러리', 'item', '유틸');
@@ -334,7 +348,8 @@ try {
   assert.equal(context.cards.find(card => card.id === autoA.id).name, 'P11 A 수정');
   recordCheck('P1.1 restart preserves new card metadata and automatic deck links');
   // P2 acceptance uses the same renderer/preload/main transaction path as a player.
-  await page.getByLabel('활성 캐릭터', { exact: true }).selectOption(playerA.id); await page.getByRole('status').filter({ hasText: '필터 저장됨' }).waitFor(); await showAll();
+  // v1.2: A uses 반응의 카드 below, so it goes into A's active deck first (whole library → 덱에 넣기).
+  await putInDeck('반응의 카드', '카드 플레이어 A · 기본 덱'); await selectCharacter(playerA.id);
   async function resourceState(characterId=playerA.id){const result=await page.evaluate(id=>window.desktop.getResources(id),characterId);assert.equal(result.ok,true,result.error);return result.value;}
   async function waitRemaining(name,value,characterId=playerA.id){await page.waitForFunction(async ({id,name,value})=>{const result=await window.desktop.getResources(id);return result.ok&&result.value.resources.find(resource=>resource.name===name)?.remaining===value;},{id:characterId,name,value});}
   let aside=page.getByRole('complementary',{name:'자원 패널'});
@@ -358,6 +373,7 @@ try {
   const energyEntry=aside.locator('.resource-entry').filter({has:page.getByRole('button',{name:'검수 영력 상태·수정',exact:true})});await energyEntry.getByRole('button',{name:'수동 조정',exact:true}).click();let modal=page.getByRole('dialog',{name:'자원 수동 조정'});await modal.getByLabel('새 현재량').fill('2');await modal.getByRole('button',{name:'현재량 변경 확정'}).click();await modal.waitFor({state:'hidden'});await waitRemaining('검수 영력',2);await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',3);
   await configure('반응의 카드',[{id:energy.id,amount:1}]);await page.getByRole('button',{name:'사용 확정',exact:true}).click();await waitRemaining('검수 영력',2);
   recordCheck('P2 shared pool across cards, four explicit recovery events, manual set/plus and persistent sequential Undo');
+  await putInDeck('반응의 카드', '카드 플레이어 B · 기본 덱');
   await page.getByLabel('활성 캐릭터',{exact:true}).selectOption(playerB.id);await page.getByRole('status').filter({hasText:'필터 저장됨'}).waitFor();await openManagement(page,'자원 관리');let manager=page.getByRole('dialog',{name:'자원 관리',exact:true});await manager.getByRole('button',{name:'검수 영력 템플릿 장착',exact:true}).click();modal=page.getByRole('dialog',{name:'템플릿 장착',exact:true});await modal.getByRole('button',{name:'장착 확정'}).click();await modal.waitFor({state:'hidden'});await page.getByRole('button',{name:'자원 관리 닫기',exact:true}).click();await waitRemaining('검수 영력',5,playerB.id);
   const bEnergy=(await resourceState(playerB.id)).resources.find(resource=>resource.name==='검수 영력');assert.notEqual(bEnergy.id,energy.id);await configure('반응의 카드',[{id:bEnergy.id,amount:1}]);await page.getByRole('button',{name:'사용 확정',exact:true}).click();await waitRemaining('검수 영력',4,playerB.id);assert.equal((await resourceState(playerA.id)).resources.find(resource=>resource.id===energy.id).remaining,2);await aside.getByRole('button',{name:'직전 자원 변경 실행 취소',exact:true}).click();await waitRemaining('검수 영력',5,playerB.id);
   await page.getByLabel('활성 캐릭터',{exact:true}).selectOption(playerA.id);await page.getByRole('status').filter({hasText:'필터 저장됨'}).waitFor();await waitRemaining('검수 영력',2);const persistedResources=await resourceState();await app.close();app=undefined;await launch();aside=page.getByRole('complementary',{name:'자원 패널'});assert.deepEqual(await resourceState(),persistedResources);await waitRemaining('검수 영력',2);await capture('p2-restart');
