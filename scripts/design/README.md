@@ -26,3 +26,11 @@ The frame image is used as a 9-slice: `border-image: url(frame-gold.png) 120 / 6
 | `node frames_v12.mjs <out>` | Board frames `frame-{oxblood,ebony,felt,arcane}.png` (240-unit 9-slice → 480 px, 60-unit corners) and page corners `panel-{oxblood,ebony,felt,arcane}.png` (160-unit 9-slice → 320 px, 40-unit corners). Set `FRAMES_SVG=1` to also keep the SVG sources. |
 
 The frames are used with `border-image: var(--frame-img) 120 / 64px round` (board) and `var(--panel-img) 80 / 30px round` (ledger and card page). The edges hold only lines and details whose period divides the edge slice, so `round` tiles them seamlessly; the band's material is the element's own textured background. Every filter uses `filterUnits="userSpaceOnUse"` and straight strokes use user-space gradients, because a horizontal line has a zero-height bounding box (the effect would otherwise disappear). `frame-gold.png` and `frame-silver.png` are the v1.1 frames, no longer referenced.
+
+## v1.2 Phase 4 (bookmarks and recovery tokens)
+
+| Script | Output |
+| --- | --- |
+| `node tokens_v12.mjs <out> [preview_dir]` | Vector SVGs: recovery tokens `rest-{oxblood,ebony,felt,arcane}.svg` (96 units, shown at 44/38 px) and card-page bookmarks `bookmark-{oxblood,ebony,felt,arcane}.svg` (40×100 units, shown at 20×50 px). Each root `<svg>` carries `id="<file name>"` so it can be recognised when Vite inlines it as a data URI. With a preview dir it also writes 4× PNG previews. |
+
+The theme blocks in `src/theme-playmat.css` point `--rest-token`, `--rest-icon`, `--rest-icon-shadow` and `--bookmark` at them; `tests/V12ThemeAssets.test.ts` checks the wiring and that the SVGs are self-contained.

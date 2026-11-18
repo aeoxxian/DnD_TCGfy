@@ -12,6 +12,8 @@
   --parchment: url('./assets/playmat/parchment.png');
   --frame-img: url('./assets/playmat/frame-oxblood.png');
   --panel-img: url('./assets/playmat/panel-oxblood.png');
+  --rest-token: url('./assets/playmat/rest-oxblood.svg'); --rest-icon: #2a1a0b; --rest-icon-shadow: rgba(255, 240, 200, .55);
+  --bookmark: url('./assets/playmat/bookmark-oxblood.svg');
   --coin: url('./assets/playmat/coin-gold.svg');
   --logo: url('./assets/playmat/logo-gold.png');
   --seal: url('./assets/playmat/wax-seal.png');
@@ -45,6 +47,7 @@
 .app.playmat[data-theme=ebony] {
   --grain: url('./assets/playmat/wood-grain.png'); --grain-size: 420px; --parchment: url('./assets/playmat/paper.png');
   --frame-img: url('./assets/playmat/frame-ebony.png'); --panel-img: url('./assets/playmat/panel-ebony.png');
+  --rest-token: url('./assets/playmat/rest-ebony.svg'); --rest-icon: #eef1f5; --rest-icon-shadow: rgba(0, 0, 0, .9); --bookmark: url('./assets/playmat/bookmark-ebony.svg');
   --coin: url('./assets/playmat/coin-silver.svg'); --logo: url('./assets/playmat/logo-silver.png');
   --frame: #070606; --frame-hi: #151211; --hdr-hi: #1f1a18; --hdr-lo: #0b0908;
   --mat-hi: #3a332f; --mat: #28231f; --mat-lo: #12100e; --bind-hi: #342d29; --bind: #231e1b; --bind-lo: #110e0c;
@@ -55,6 +58,7 @@
 .app.playmat[data-theme=verdant] {
   --grain: url('./assets/playmat/felt-grain.png'); --grain-size: 300px; --parchment: url('./assets/playmat/paper.png');
   --frame-img: url('./assets/playmat/frame-felt.png'); --panel-img: url('./assets/playmat/panel-felt.png');
+  --rest-token: url('./assets/playmat/rest-felt.svg'); --rest-icon: #1d170a; --rest-icon-shadow: rgba(238, 226, 188, .5); --bookmark: url('./assets/playmat/bookmark-felt.svg');
   --frame: #070b08; --frame-hi: #101812; --hdr-hi: #18261c; --hdr-lo: #0a120d;
   --mat-hi: #2f4b37; --mat: #23392b; --mat-lo: #102017; --bind-hi: #26392c; --bind: #1b2b21; --bind-lo: #0e1812;
   /* Matte bronze: close stops, so plates and lines read soft and unpolished. */
@@ -65,6 +69,7 @@
 .app.playmat[data-theme=abyss] {
   --grain: url('./assets/playmat/stone-grain.png'); --grain-size: 360px; --parchment: url('./assets/playmat/stone-light.png');
   --frame-img: url('./assets/playmat/frame-arcane.png'); --panel-img: url('./assets/playmat/panel-arcane.png');
+  --rest-token: url('./assets/playmat/rest-arcane.svg'); --rest-icon: #d4f1ff; --rest-icon-shadow: rgba(127, 207, 255, .9); --bookmark: url('./assets/playmat/bookmark-arcane.svg');
   --coin: url('./assets/playmat/coin-silver.svg'); --logo: url('./assets/playmat/logo-silver.png');
   --frame: #07090d; --frame-hi: #121722; --hdr-hi: #1e2532; --hdr-lo: #0d1118;
   --mat-hi: #37435a; --mat: #273041; --mat-lo: #131824; --bind-hi: #303a4b; --bind: #242b39; --bind-lo: #12161f;
@@ -239,9 +244,10 @@ html, body { background: #0b0807; }
 .app.playmat .rest-buttons { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; margin: 0 0 2px; }
 .app.playmat .rest-buttons button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0; background: transparent; box-shadow: none;
   font: 700 10.5px/1.25 var(--kserif); color: var(--ink-l); text-align: center; word-break: keep-all; }
-.app.playmat .coin { width: 44px; height: 44px; display: grid; place-items: center; color: var(--engrave);
-  background: var(--coin) center / contain no-repeat; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .7)); }
-.app.playmat .coin svg { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .55)); }
+/* Recovery tokens (v1.2 P4): a per-theme vector token behind the icon; states below. Recovery logic is unchanged. */
+.app.playmat .coin { width: 44px; height: 44px; display: grid; place-items: center; color: var(--rest-icon);
+  background: var(--rest-token) center / contain no-repeat; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .7)); transition: transform 120ms ease, filter 120ms ease; }
+.app.playmat .coin svg { filter: drop-shadow(0 1px 0 var(--rest-icon-shadow)); }
 .app.playmat .undo-button { width: 100%; padding: 4px; background: transparent; box-shadow: none; font: 400 11px var(--sans); color: var(--mute-l); }
 
 /* ---------- The mat ---------- */
@@ -329,8 +335,9 @@ html, body { background: #0b0807; }
 .app.playmat .codex-page { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 16px 24px 12px; overflow: hidden; color: var(--ink);
   background: var(--parchment) 0 0 / 420px, #e9e1cf; clip-path: var(--deckle);
   box-shadow: inset 0 0 44px rgba(95, 72, 48, .42), inset 0 0 8px rgba(80, 58, 36, .35); }
-.app.playmat .codex-page::before { content: ''; position: absolute; top: 0; right: 58px; width: 18px; height: 46px; pointer-events: none;
-  background: linear-gradient(90deg, #1a0a08, var(--ribbon) 45%, #1a0a08); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%); }
+/* Bookmark (v1.2 P4): same place as before, drawn per theme (scripts/design/tokens_v12.mjs); a contact shadow where it lies on the page. */
+.app.playmat .codex-page::before { content: ''; position: absolute; top: 0; right: 56px; width: 20px; height: 50px; pointer-events: none;
+  background: var(--bookmark) center top / 100% 100% no-repeat; filter: drop-shadow(1.4px 2px 1.4px rgba(40, 25, 10, .4)); }
 .app.playmat .codex-page > .panel-title { position: absolute; top: 8px; right: 12px; min-height: 0; z-index: 2; }
 .app.playmat .codex-close { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; font-size: 15px; color: var(--ink-mute); background: transparent; box-shadow: none; }
 .app.playmat .selected-card-summary { display: block; flex: none; margin: 0; padding-right: 60px; }
@@ -633,7 +640,7 @@ html, body { background: #0b0807; }
 
 /* ── v1.2 Phase 3: theme materials and ornaments ─────────────────────────────────────────────────
    Structure and sizes are shared; each theme below changes material, ornament and the language of its trim.
-   Recovery buttons (coins) and the bookmark ribbon are redesigned per theme in Phase 4. */
+   Recovery tokens and the bookmark are drawn per theme in the Phase 4 section at the end. */
 
 /* Header bar and dialog headings: the seam under them follows the theme's trim. */
 .app.playmat[data-theme=verdant] :is(.topbar, .modal-heading)::before { border-top-color: rgba(200, 188, 144, .34); }
@@ -743,3 +750,25 @@ html, body { background: #0b0807; }
 .app.playmat .theme-swatch-abyss::before { border: 1px solid rgba(127, 207, 255, .7); box-shadow: 0 0 5px rgba(127, 207, 255, .5), inset 0 0 4px rgba(127, 207, 255, .3); }
 .app.playmat .theme-swatch-abyss > span { background: #2a3242; box-shadow: inset 0 0 0 1px rgba(127, 207, 255, .45); }
 .app.playmat .theme-swatch-verdant > span, .app.playmat .theme-swatch-ebony > span { background: #efe9dc; }
+
+/* ── v1.2 Phase 4: recovery button states and theme details ───────────────────────────────────── */
+.app.playmat .rest-buttons button { border-radius: 8px; transition: color 120ms ease; }
+.app.playmat .rest-buttons button:hover:not(:disabled) { filter: none; color: #fff; }
+.app.playmat .rest-buttons button:hover:not(:disabled) .coin { transform: translateY(-1.5px); filter: drop-shadow(0 5px 4px rgba(0, 0, 0, .7)) brightness(1.12); }
+.app.playmat .rest-buttons button:active:not(:disabled) .coin { transform: translateY(1px) scale(.95); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .85)) brightness(.9); }
+.app.playmat .rest-buttons button:disabled { opacity: 1; color: var(--mute-l); }
+.app.playmat .rest-buttons button:disabled .coin { filter: grayscale(.75) brightness(.62) drop-shadow(0 1px 1px rgba(0, 0, 0, .6)); }
+.app.playmat .rest-buttons button:disabled .coin svg { opacity: .55; }
+/* Ebony: the silver bezel catches a cold highlight on hover. */
+.app.playmat[data-theme=ebony] .rest-buttons button:hover:not(:disabled) .coin { filter: drop-shadow(0 5px 4px rgba(0, 0, 0, .7)) drop-shadow(0 0 4px rgba(235, 240, 248, .35)) brightness(1.08); }
+/* Felt: matte bronze does not shine; hover lifts it and warms it slightly. */
+.app.playmat[data-theme=verdant] .rest-buttons button:hover:not(:disabled) .coin { filter: drop-shadow(0 5px 4px rgba(0, 0, 0, .65)) brightness(1.08) saturate(1.1); }
+/* Arcane Blue: carved stone, the engraving glows; hover and press make the glow stronger, disabled puts it out. */
+.app.playmat[data-theme=abyss] .coin svg { filter: drop-shadow(0 0 2px rgba(127, 207, 255, .95)) drop-shadow(0 0 5px rgba(127, 207, 255, .45)); }
+.app.playmat[data-theme=abyss] .rest-buttons button:hover:not(:disabled) .coin { filter: drop-shadow(0 4px 4px rgba(0, 0, 0, .75)) drop-shadow(0 0 7px rgba(127, 207, 255, .55)); }
+.app.playmat[data-theme=abyss] .rest-buttons button:active:not(:disabled) .coin { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .85)) drop-shadow(0 0 10px rgba(160, 222, 255, .8)); }
+.app.playmat[data-theme=abyss] .rest-buttons button:disabled .coin svg { filter: none; opacity: .35; }
+.app.playmat[data-theme=abyss] .codex-page::before { filter: none; }
+.app.playmat.reduced-motion .coin { transition: none; }
+.app.playmat.reduced-motion .rest-buttons button .coin { transform: none !important; }
+@media (prefers-reduced-motion: reduce) { .app.playmat .rest-buttons button .coin { transform: none !important; } }
