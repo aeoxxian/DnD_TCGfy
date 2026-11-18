@@ -9,10 +9,10 @@ import { CardFace, imageUrl } from './CardFace';
 import { Modal } from './Modal';
 
 export const THEMES: { id: ThemeId; name: string; description: string }[] = [
-  { id: 'oxblood', name: '적갈 가죽', description: '기본 · 붉은 기 도는 짙은 갈색 가죽과 금박' },
-  { id: 'ebony', name: '흑단과 은', description: '검은 가죽과 은 장식' },
-  { id: 'verdant', name: '숲의 펠트', description: '초록 펠트와 황동, 갈색 가죽 장부' },
-  { id: 'abyss', name: '심연의 남색', description: '남색 가죽과 은 장식' },
+  { id: 'oxblood', name: '적갈 가죽', description: '기본 · 적갈색 가죽과 리벳 박은 금속 모서리' },
+  { id: 'ebony', name: '흑단과 은', description: '흑단 목재와 정밀한 은 상감' },
+  { id: 'verdant', name: '숲의 펠트', description: '짙은 녹색 펠트와 무광 청동 장식' },
+  { id: 'abyss', name: '아케인 블루', description: '심청색 석재와 하늘빛 음각 문양' },
 ];
 export const BUILTIN_BACK_INFO: Record<BuiltinCardBack, { name: string; src: string }> = {
   dragon: { name: '용의 인장', src: backDragon },
@@ -46,7 +46,7 @@ export function ThemeMenu({ value, disabled, onChange }: { value: ThemeId; disab
   return <>
     <button type="button" className="theme-button" popoverTarget={id} aria-haspopup="menu" disabled={disabled}><Icon name="theme"/>테마</button>
     <div id={id} popover="auto" role="menu" aria-label="테마 선택" className="theme-menu">
-      <div className="theme-menu-heading"><strong>테마 선택</strong><p>배치 · 카드 · 자원은 그대로, 가죽과 금속만 바뀝니다.</p></div>
+      <div className="theme-menu-heading"><strong>테마 선택</strong><p>배치 · 카드 · 자원은 그대로, 보드의 재질과 장식만 바뀝니다.</p></div>
       {THEMES.map(theme => <button key={theme.id} type="button" role="menuitemradio" aria-checked={value === theme.id} disabled={disabled} className="theme-option"
         onClick={() => { hidePopover(id); if (value !== theme.id) onChange(theme.id); }}>
         <span className={`theme-swatch theme-swatch-${theme.id}`} aria-hidden="true"><span/></span>

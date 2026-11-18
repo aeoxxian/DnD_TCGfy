@@ -192,7 +192,10 @@ assert(await maxScroll(page) > 300, 'the whole library overflows the hand');
 async function enlarge(page) {
   const card = page.locator('.cards-area .card-button').first();
   if (await card.getAttribute('aria-pressed') !== 'true') { await card.click(); await page.waitForTimeout(300); }
-  await card.click(); const frame = page.locator('.image-lightbox .lightbox-card'); await frame.waitFor(); await page.waitForTimeout(500);
+  await card.click(); const frame = page.locator('.image-lightbox .lightbox-card'); await frame.waitFor();
+  // Tilt only starts once the opening animation has settled; under load that can take longer than a fixed wait.
+  await page.waitForFunction(() => { const el = document.querySelector('.image-lightbox .lightbox-card'); return el && el.getAnimations().length === 0 && document.querySelector('.image-lightbox').getAnimations().length === 0; });
+  await page.waitForTimeout(150);
   return frame.boundingBox();
 }
 const transformAt = async (page, x, y, wait = 400) => { await page.mouse.move(x, y, { steps: 5 }); await page.waitForTimeout(wait); return page.locator('.image-lightbox img').evaluate(img => ({ inline: img.style.transform, computed: getComputedStyle(img).transform })); };
@@ -231,7 +234,7 @@ for (const [width, height, zoom] of [[1920, 1080, 1], [1280, 720, 1.25], [1280, 
   const run2 = await launch(await freshData(), { width, height, zoom });
   await wholeLibrary(run2.page);
   const card = await enlarge(run2.page);
-  const { margin, w, h } = await run2.page.evaluate(() => ({ w: innerWidth, h: innerHeight, margin: Math.round(Math.max(60, Math.min(100, Math.min(innerWidth, innerHeight) * 0.08))) }));
+  const { margin, w } = await run2.page.evaluate(() => ({ w: innerWidth, margin: Math.round(Math.max(60, Math.min(100, Math.min(innerWidth, innerHeight) * 0.08))) }));
   const x = card.x + card.width;
   const within = await transformAt(run2.page, Math.min(w - 2, x + margin - 8), card.y + card.height / 2);
   assert.equal(rotateY(within.inline), 6, `lean within ${margin}px at ${width}x${height}@${zoom}`);

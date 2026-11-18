@@ -17,3 +17,12 @@ await sharp('frame-corners-gold.svg', { density: 600 }).resize({ width: 480 }).p
 ```
 
 The frame image is used as a 9-slice: `border-image: url(frame-gold.png) 120 / 64px stretch`. Only the 120 px corners are decorated; the edges are two plain rails.
+
+## v1.2 Phase 3 (per-theme materials and ornaments)
+
+| Script | Output |
+| --- | --- |
+| `python materials_v12.py <out>` | Seamless 512 px tiles: `felt-grain.png` (숲의 펠트), `wood-grain.png` (흑단과 은), `stone-grain.png` (아케인 블루) as RGBA overlays like `leather-grain.png`, plus the page tiles `paper.png` and `stone-light.png`. Also writes `materials-preview.png`. |
+| `node frames_v12.mjs <out>` | Board frames `frame-{oxblood,ebony,felt,arcane}.png` (240-unit 9-slice → 480 px, 60-unit corners) and page corners `panel-{oxblood,ebony,felt,arcane}.png` (160-unit 9-slice → 320 px, 40-unit corners). Set `FRAMES_SVG=1` to also keep the SVG sources. |
+
+The frames are used with `border-image: var(--frame-img) 120 / 64px round` (board) and `var(--panel-img) 80 / 30px round` (ledger and card page). The edges hold only lines and details whose period divides the edge slice, so `round` tiles them seamlessly; the band's material is the element's own textured background. Every filter uses `filterUnits="userSpaceOnUse"` and straight strokes use user-space gradients, because a horizontal line has a zero-height bounding box (the effect would otherwise disappear). `frame-gold.png` and `frame-silver.png` are the v1.1 frames, no longer referenced.

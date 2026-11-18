@@ -1,12 +1,17 @@
 /* Play mat — "The Adventurer's Table".
-   Leather frame and mat, ivory parchment for anything you read, real-looking metal for trim,
-   wax only for the Use seal. Themes swap leather colours and metal; the structure stays.
-   Card artwork is never altered: card images keep object-fit: contain. */
+   v1.2: every theme is its own material with its own ornament language; the layout stays.
+     적갈 가죽 (oxblood)  leather, saddle stitching, hammered brass corner guards with rivets, parchment
+     흑단과 은 (ebony)    ebony wood, flush silver inlay lines and filigree, smooth card paper
+     숲의 펠트 (verdant)  green felt, running stitch, matte bronze oak leaves held by tacks, paper on felt
+     아케인 블루 (abyss)  carved slate, engraved grooves glowing sky blue, no metal; stone tablets for reading
+   `--grain` is the theme's material overlay, `--frame-img`/`--panel-img` its ornaments (scripts/design/*_v12.*).
+   Wax only for the Use seal. Card artwork is never altered: card images keep object-fit: contain. */
 
 .app.playmat {
-  --grain: url('./assets/playmat/leather-grain.png');
+  --grain: url('./assets/playmat/leather-grain.png'); --grain-size: 340px;
   --parchment: url('./assets/playmat/parchment.png');
-  --frame-img: url('./assets/playmat/frame-gold.png');
+  --frame-img: url('./assets/playmat/frame-oxblood.png');
+  --panel-img: url('./assets/playmat/panel-oxblood.png');
   --coin: url('./assets/playmat/coin-gold.svg');
   --logo: url('./assets/playmat/logo-gold.png');
   --seal: url('./assets/playmat/wax-seal.png');
@@ -22,6 +27,10 @@
   --p0: #f8f4ea; --p1: #e6dcc4; --p2: #cdbf9f; --p3: #b3a37f;
   --engrave: #2a1d0e; --ink-l: #e6ded1; --mute-l: #b0a392; --glow: rgba(200, 186, 156, .3); --ribbon: #5a2f29;
   --ink: #3a2c20; --ink-strong: #241a10; --ink-mute: #5e4a37; --ink-line: rgba(95, 72, 48, .35); --wax: #7d3a30;
+  /* Reading pages (ledger, card page). Defaults are ink on parchment/paper; 아케인 블루 flips them for its dark tablets. */
+  --page-title: #2b1f15; --page-head: #3f2e1f; --page-label: #4f3d2c; --page-kicker: #7d6750; --page-body: #3f2e20; --page-mute: #5e4a37;
+  --page-hover: rgba(255, 250, 238, .5); --page-ctrl-bg: rgba(255, 252, 244, .45); --page-ctrl-ring: #9c866a; --page-field-bg: rgba(255, 252, 244, .55); --page-scroll: #b9a684;
+  --page-tag: #553029; --page-tag-ring: #7f5246; --page-tag-gap: rgba(233, 225, 207, .9); --page-tag-ring2: rgba(127, 82, 70, .45);
 
   --display: 'Palatino Linotype', 'Book Antiqua', Palatino, Batang, serif;
   --kserif: Batang, '바탕', 'Palatino Linotype', serif;
@@ -34,24 +43,36 @@
   scrollbar-color: #5a4236 transparent;
 }
 .app.playmat[data-theme=ebony] {
-  --frame: #060606; --frame-hi: #121212; --hdr-hi: #181818; --hdr-lo: #0a0a0a;
-  --mat-hi: #2f2c2b; --mat: #201e1d; --mat-lo: #100f0e; --bind-hi: #2b2725; --bind: #1d1a19; --bind-lo: #0f0d0c;
-  --ink-l: #e8e8ea; --mute-l: #a8abb1; --ribbon: #3d4550;
-}
-.app.playmat[data-theme=verdant] {
-  --frame: #0a0c0a; --frame-hi: #141813; --hdr-hi: #182019; --hdr-lo: #0b0f0c;
-  --mat-hi: #36433a; --mat: #28322b; --mat-lo: #151b17; --bind-hi: #3b281c; --bind: #2a1c13; --bind-lo: #170f0a;
-  --ink-l: #e9e3d0; --mute-l: #adb39b;
-}
-.app.playmat[data-theme=abyss] {
-  --frame: #07080b; --frame-hi: #11141b; --hdr-hi: #171c27; --hdr-lo: #0a0d13;
-  --mat-hi: #2d3443; --mat: #1f2430; --mat-lo: #11141b; --bind-hi: #2c2234; --bind: #1e1725; --bind-lo: #100c15;
-  --ink-l: #e4e7ef; --mute-l: #a3aabb; --ribbon: #4e3343;
-}
-.app.playmat:is([data-theme=ebony], [data-theme=abyss]) {
-  --frame-img: url('./assets/playmat/frame-silver.png'); --coin: url('./assets/playmat/coin-silver.svg'); --logo: url('./assets/playmat/logo-silver.png');
+  --grain: url('./assets/playmat/wood-grain.png'); --grain-size: 420px; --parchment: url('./assets/playmat/paper.png');
+  --frame-img: url('./assets/playmat/frame-ebony.png'); --panel-img: url('./assets/playmat/panel-ebony.png');
+  --coin: url('./assets/playmat/coin-silver.svg'); --logo: url('./assets/playmat/logo-silver.png');
+  --frame: #070606; --frame-hi: #151211; --hdr-hi: #1f1a18; --hdr-lo: #0b0908;
+  --mat-hi: #3a332f; --mat: #28231f; --mat-lo: #12100e; --bind-hi: #342d29; --bind: #231e1b; --bind-lo: #110e0c;
   --m0: #f7f8fa; --m1: #c4c8ce; --m2: #5c6169; --m3: #8f959e; --m4: #e1e4e8; --m5: #464a51;
   --p0: #fdfdfe; --p1: #e8eaee; --p2: #ccd0d6; --p3: #adb2ba; --engrave: #1e2126; --glow: rgba(205, 212, 224, .3);
+  --ink-l: #eceae8; --mute-l: #aeb0b4; --ribbon: #3d4550;
+}
+.app.playmat[data-theme=verdant] {
+  --grain: url('./assets/playmat/felt-grain.png'); --grain-size: 300px; --parchment: url('./assets/playmat/paper.png');
+  --frame-img: url('./assets/playmat/frame-felt.png'); --panel-img: url('./assets/playmat/panel-felt.png');
+  --frame: #070b08; --frame-hi: #101812; --hdr-hi: #18261c; --hdr-lo: #0a120d;
+  --mat-hi: #2f4b37; --mat: #23392b; --mat-lo: #102017; --bind-hi: #26392c; --bind: #1b2b21; --bind-lo: #0e1812;
+  /* Matte bronze: close stops, so plates and lines read soft and unpolished. */
+  --m0: #d8caa1; --m1: #a8966b; --m2: #5f5337; --m3: #857651; --m4: #c3b387; --m5: #4a402a;
+  --p0: #d5c69e; --p1: #bba97e; --p2: #a08e63; --p3: #84744f; --engrave: #211b0d; --glow: rgba(190, 176, 130, .26);
+  --ink-l: #e8e7d8; --mute-l: #a9b39f; --ribbon: #3f4a2b;
+}
+.app.playmat[data-theme=abyss] {
+  --grain: url('./assets/playmat/stone-grain.png'); --grain-size: 360px; --parchment: url('./assets/playmat/stone-light.png');
+  --frame-img: url('./assets/playmat/frame-arcane.png'); --panel-img: url('./assets/playmat/panel-arcane.png');
+  --coin: url('./assets/playmat/coin-silver.svg'); --logo: url('./assets/playmat/logo-silver.png');
+  --frame: #07090d; --frame-hi: #121722; --hdr-hi: #1e2532; --hdr-lo: #0d1118;
+  --mat-hi: #37435a; --mat: #273041; --mat-lo: #131824; --bind-hi: #303a4b; --bind: #242b39; --bind-lo: #12161f;
+  /* No metal: the "metal" variables become engraving light (sky-blue glow) and stone plates. */
+  --sky: #7fcfff; --sky-soft: rgba(127, 207, 255, .42); --sky-faint: rgba(127, 207, 255, .2);
+  --m0: #e4f7ff; --m1: #8fd4ff; --m2: #2e4d68; --m3: #5d8cb0; --m4: #bfe6ff; --m5: #20384d;
+  --p0: #3b4659; --p1: #2e3747; --p2: #242c39; --p3: #1b222d; --engrave: #bfe6ff; --glow: rgba(127, 207, 255, .3);
+  --ink-l: #e3e9f3; --mute-l: #9eabc0; --ribbon: #2c5576;
 }
 html, body { background: #0b0807; }
 
@@ -158,23 +179,24 @@ html, body { background: #0b0807; }
 .app.playmat.resources-collapsed .resource-panel { padding: 12px 6px; }
 .app.playmat .live-resources { gap: 10px; }
 .app.playmat .ledger-sheet { position: relative; flex: 1; min-height: 0; display: flex; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .6)); }
-.app.playmat .ledger-sheet::after { content: ''; position: absolute; inset: 7px; pointer-events: none;
-  --rivet: radial-gradient(circle at 34% 28%, #fff 0, var(--m0) 1px, var(--m1) 2.2px, var(--m2) 3.4px, var(--m5) 4.2px, transparent 4.8px);
-  background: var(--rivet) 0 0 / 10px 10px no-repeat, var(--rivet) 100% 0 / 10px 10px no-repeat, var(--rivet) 0 100% / 10px 10px no-repeat, var(--rivet) 100% 100% / 10px 10px no-repeat; }
+/* Corner ornaments of the theme (rivet guards / bronze clips / silver inlay / engraved brackets) over the page. */
+.app.playmat .ledger-sheet::after, .app.playmat .codex::after { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  border: 15px solid transparent; border-image: var(--panel-img) 80 / 30px round; }
+.app.playmat .codex { position: relative; }
 .app.playmat .ledger-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 16px 8px; color: var(--ink);
   background: var(--parchment) 0 0 / 420px, #e9e1cf; clip-path: var(--deckle);
   box-shadow: inset 0 0 34px rgba(95, 72, 48, .42), inset 0 0 6px rgba(80, 58, 36, .35); }
 .app.playmat .ledger-heading { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.app.playmat .ledger-heading span { font: 9px var(--display); letter-spacing: 4px; color: #7d6750; }
-.app.playmat .ledger-heading strong { font: 700 19px var(--kserif); color: #2b1f15; }
+.app.playmat .ledger-heading span { font: 9px var(--display); letter-spacing: 4px; color: var(--page-kicker); }
+.app.playmat .ledger-heading strong { font: 700 19px var(--kserif); color: var(--page-title); }
 .app.playmat .ledger-heading i { width: 70%; height: 9px; margin-top: 4px;
   background: linear-gradient(45deg, transparent 38%, var(--ribbon) 38% 62%, transparent 62%) center / 7px 7px no-repeat,
     linear-gradient(-45deg, transparent 38%, var(--ribbon) 38% 62%, transparent 62%) center / 7px 7px no-repeat,
-    linear-gradient(90deg, transparent, #7d6750 40%, transparent 46%, transparent 54%, #7d6750 60%, transparent) center / 100% 1px no-repeat; }
+    linear-gradient(90deg, transparent, var(--page-kicker) 40%, transparent 46%, transparent 54%, var(--page-kicker) 60%, transparent) center / 100% 1px no-repeat; }
 .app.playmat .class-summary { flex: none; margin: 4px 0 6px; text-align: center; font-size: 11px; color: var(--ink-mute); }
-.app.playmat .resource-scroll { scrollbar-color: #b9a684 transparent; }
+.app.playmat .resource-scroll { scrollbar-color: var(--page-scroll) transparent; }
 .app.playmat .resource-group { margin: 0 0 6px; border: 0; }
-.app.playmat .resource-group > summary { display: flex; align-items: center; gap: 7px; padding: 6px 0 3px; border-bottom: 1px solid var(--ink-line); font: 700 13px var(--kserif); color: #3f2e1f; }
+.app.playmat .resource-group > summary { display: flex; align-items: center; gap: 7px; padding: 6px 0 3px; border-bottom: 1px solid var(--ink-line); font: 700 13px var(--kserif); color: var(--page-head); }
 .app.playmat .resource-group > summary::before { content: ''; width: 12px; height: 12px; flex: none; background: var(--gem-sapphire) center / contain no-repeat; }
 .app.playmat .resource-group[data-group=counter] > summary::before, .app.playmat .resource-group[data-group=generic] > summary::before { background-image: var(--gem-amber); }
 .app.playmat .resource-group > summary small { margin-left: auto; font: 400 10px var(--sans); color: var(--ink-mute); }
@@ -183,9 +205,9 @@ html, body { background: #0b0807; }
 .app.playmat .resource-track { margin: 0; padding: 0; border: 0; border-bottom: 1px dotted rgba(95, 72, 48, .4); border-radius: 0; background: transparent; }
 .app.playmat .resource-track span { color: inherit; }
 .app.playmat .resource-status-row { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 3px; color: var(--ink); background: transparent; box-shadow: none; border-radius: 3px; font-family: var(--sans); font-weight: 400; }
-.app.playmat .resource-status-row:hover:not(:disabled) { filter: none; background: rgba(255, 250, 238, .5); }
-.app.playmat .resource-name { min-width: 26px; font: 700 12px var(--kserif); color: #3f2e1f; overflow-wrap: anywhere; }
-.app.playmat .slot-numeral { font: 700 12px var(--display); letter-spacing: .5px; color: #4f3d2c; }
+.app.playmat .resource-status-row:hover:not(:disabled) { filter: none; background: var(--page-hover); }
+.app.playmat .resource-name { min-width: 26px; font: 700 12px var(--kserif); color: var(--page-head); overflow-wrap: anywhere; }
+.app.playmat .slot-numeral { font: 700 12px var(--display); letter-spacing: .5px; color: var(--page-label); }
 .app.playmat .resource-gems { flex: 1; display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
 .app.playmat .resource-gems .gem { display: block; width: 13px; height: 13px; background: var(--gem-socket) center / contain no-repeat; }
 .app.playmat .resource-gems.sapphire .gem.filled { background-image: var(--gem-sapphire); }
@@ -199,10 +221,10 @@ html, body { background: #0b0807; }
 .app.playmat .resource-expanded { color: var(--ink); }
 .app.playmat .resource-expanded p { color: var(--ink-mute); }
 .app.playmat :is(.ledger-page, .codex-page) button:not(.resource-status-row):not(.use-button):not(.exception-button):not(.codex-close) {
-  color: var(--ink); background: rgba(255, 252, 244, .45); box-shadow: inset 0 0 0 1px #9c866a; font-family: var(--kserif); }
+  color: var(--ink); background: var(--page-ctrl-bg); box-shadow: inset 0 0 0 1px var(--page-ctrl-ring); font-family: var(--kserif); }
 .app.playmat .resource-priority[aria-pressed=true] { box-shadow: inset 0 0 0 1px var(--wax); color: var(--wax); }
 .app.playmat .resource-history { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--ink-line); color: var(--ink); }
-.app.playmat .resource-history > summary { font: 700 12px var(--kserif); color: #4f3d2c; }
+.app.playmat .resource-history > summary { font: 700 12px var(--kserif); color: var(--page-label); }
 .app.playmat .resource-history li { border-bottom-color: var(--ink-line); }
 .app.playmat .resource-history :is(span, small) { color: var(--ink-mute); }
 /* v1.1 P2: display-only history controls. */
@@ -224,8 +246,8 @@ html, body { background: #0b0807; }
 
 /* ---------- The mat ---------- */
 .app.playmat .board { position: relative; isolation: isolate; gap: 10px; padding: 12px 22px 10px; overflow: hidden;
-  border: 26px solid transparent; border-image: var(--frame-img) 120 / 64px stretch;
-  background: var(--grain) 0 0 / 340px, radial-gradient(ellipse 75% 65% at 50% 40%, var(--mat-hi) 0%, var(--mat) 52%, var(--mat-lo) 100%);
+  border: 26px solid transparent; border-image: var(--frame-img) 120 / 64px round;
+  background: var(--grain) 0 0 / var(--grain-size), radial-gradient(ellipse 75% 65% at 50% 40%, var(--mat-hi) 0%, var(--mat) 52%, var(--mat-lo) 100%);
   background-origin: border-box; box-shadow: 0 16px 44px rgba(0, 0, 0, .8), inset 0 0 80px rgba(0, 0, 0, .55); }
 .app.playmat .board::before { content: ''; position: absolute; z-index: -1; left: 50%; top: -6px; width: 520px; height: 520px; margin-left: -150px;
   background: var(--arcane) center / contain no-repeat; opacity: .45; pointer-events: none; }
@@ -312,24 +334,24 @@ html, body { background: #0b0807; }
 .app.playmat .codex-page > .panel-title { position: absolute; top: 8px; right: 12px; min-height: 0; z-index: 2; }
 .app.playmat .codex-close { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; font-size: 15px; color: var(--ink-mute); background: transparent; box-shadow: none; }
 .app.playmat .selected-card-summary { display: block; flex: none; margin: 0; padding-right: 60px; }
-.app.playmat .codex-kicker { font: 600 10px var(--display); letter-spacing: 3px; color: #7d6750; }
+.app.playmat .codex-kicker { font: 600 10px var(--display); letter-spacing: 3px; color: var(--page-kicker); }
 .app.playmat .selected-card-heading h2 { margin: 1px 0 0; font: 700 23px/1.25 var(--kserif); color: var(--ink-strong); -webkit-line-clamp: 1; }
-.app.playmat .selected-properties { margin-top: 4px; font: 700 12px var(--kserif); color: #4f3d2c; }
+.app.playmat .selected-properties { margin-top: 4px; font: 700 12px var(--kserif); color: var(--page-label); }
 .app.playmat .detail-tags { margin: 6px 0 0; gap: 6px; max-height: 26px; }
-.app.playmat .detail-tags span { padding: 1px 10px; border: 0; border-radius: 3px; background: transparent; font: 700 11px var(--kserif); color: #553029;
-  box-shadow: inset 0 0 0 1px #7f5246, inset 0 0 0 3px rgba(233, 225, 207, .9), inset 0 0 0 4px rgba(127, 82, 70, .45); }
+.app.playmat .detail-tags span { padding: 1px 10px; border: 0; border-radius: 3px; background: transparent; font: 700 11px var(--kserif); color: var(--page-tag);
+  box-shadow: inset 0 0 0 1px var(--page-tag-ring), inset 0 0 0 3px var(--page-tag-gap), inset 0 0 0 4px var(--page-tag-ring2); }
 .app.playmat .description-pane { flex: 1 1 auto; min-height: 44px; border: 0; }
-.app.playmat .description-pane > summary { padding: 2px 0; font: 700 12px var(--kserif); color: #4f3d2c; }
-.app.playmat .description-content { padding: 0 6px 4px 12px; border-left: 1px solid var(--ink-line); scrollbar-color: #b9a684 transparent; }
-.app.playmat .description-content p { max-width: 72ch; margin-bottom: 6px; font-size: 13px; line-height: 1.8; color: #3f2e20; text-align: justify; word-break: keep-all; }
+.app.playmat .description-pane > summary { padding: 2px 0; font: 700 12px var(--kserif); color: var(--page-label); }
+.app.playmat .description-content { padding: 0 6px 4px 12px; border-left: 1px solid var(--ink-line); scrollbar-color: var(--page-scroll) transparent; }
+.app.playmat .description-content p { max-width: 72ch; margin-bottom: 6px; font-size: 13px; line-height: 1.8; color: var(--page-body); text-align: justify; word-break: keep-all; }
 .app.playmat .card-use { flex: 0 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr); align-items: center; gap: 4px 16px; min-height: 76px; max-height: 128px;
   margin: 0; padding: 8px 0 0; border: 0; border-top: 1px solid var(--ink-line); }
 .app.playmat .card-use.insufficient { padding-left: 0; border-left: 0; }
-.app.playmat .use-options-scroll { align-self: stretch; min-height: 0; max-height: none; overflow-y: auto; padding-right: 4px; color: var(--ink); scrollbar-color: #b9a684 transparent; }
+.app.playmat .use-options-scroll { align-self: stretch; min-height: 0; max-height: none; overflow-y: auto; padding-right: 4px; color: var(--ink); scrollbar-color: var(--page-scroll) transparent; }
 .app.playmat .card-use .cost-preview { padding: 0 0 2px; font: 700 11px var(--kserif); }
 .app.playmat .card-use .cost-preview span { color: var(--ink-mute); }
 .app.playmat .card-use .form-field { margin: 3px 0 6px; font: 700 11px var(--kserif); color: var(--ink-mute); }
-.app.playmat .card-use :is(select, input) { color: var(--ink-strong); background: rgba(255, 252, 244, .55); box-shadow: inset 0 1px 3px rgba(95, 72, 48, .25), 0 0 0 1px #9c866a; font-weight: 700; }
+.app.playmat .card-use :is(select, input) { color: var(--ink-strong); background: var(--page-field-bg); box-shadow: inset 0 1px 3px rgba(95, 72, 48, .25), 0 0 0 1px var(--page-ctrl-ring); font-weight: 700; }
 .app.playmat .card-use .change-list { margin: 2px 0; }
 .app.playmat .card-use .change-list li { padding: 3px 0; border-color: var(--ink-line); color: var(--ink); font-size: 12px; }
 .app.playmat .card-use .change-list strong, .app.playmat .card-use .change-list strong small { color: var(--ink-strong); font-weight: 700; }
@@ -343,13 +365,13 @@ html, body { background: #0b0807; }
 .app.playmat.p4-b .use-button:hover:not(:disabled) { background: var(--seal) center / contain no-repeat; filter: drop-shadow(0 6px 7px rgba(40, 14, 8, .7)) brightness(1.08); transform: translateY(-1px); }
 .app.playmat.p4-b .use-button:active:not(:disabled) { transform: translateY(1px) scale(.98); }
 .app.playmat.p4-b .use-button:disabled { background: var(--seal) center / contain no-repeat; color: #d8cfc4; text-shadow: 0 1px 0 #222; filter: grayscale(1) brightness(.6); opacity: .85; }
-.app.playmat .exception-button { width: auto; margin: 0; padding: 2px 4px; background: transparent; box-shadow: none; font: 700 11px var(--kserif); color: #5e4a37;
+.app.playmat .exception-button { width: auto; margin: 0; padding: 2px 4px; background: transparent; box-shadow: none; font: 700 11px var(--kserif); color: var(--page-mute);
   text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(94, 74, 55, .4); }
 .app.playmat .selection.is-empty .codex-page { justify-content: center; align-items: flex-start; padding: 20px 28px; }
 .app.playmat .empty-selection { text-align: left; }
 .app.playmat .empty-selection h3 { font: 700 20px var(--kserif); color: var(--ink-strong); margin-bottom: 8px; }
 .app.playmat .empty-selection p { font-size: 13px; line-height: 1.8; color: var(--ink-mute); }
-.app.playmat .empty-selection .keyboard-hint { margin-top: 10px; font-size: 11px; color: #7d6750; }
+.app.playmat .empty-selection .keyboard-hint { margin-top: 10px; font-size: 11px; color: var(--page-kicker); }
 
 /* Hand row: DECK pile, the hand, USED pile. */
 .app.playmat .hand-row { flex: 1; min-height: 130px; display: flex; gap: 16px; align-items: stretch; }
@@ -608,3 +630,116 @@ html, body { background: #0b0807; }
 .app.playmat .modal :is(.resource-scope-note, .resource-duplicate) p { margin: 0 0 4px; }
 .app.playmat .modal .resource-duplicate { border-color: rgba(125, 58, 48, .55); box-shadow: inset 3px 0 0 var(--wax); }
 .app.playmat .modal .resource-duplicate button { margin-top: 6px; }
+
+/* ── v1.2 Phase 3: theme materials and ornaments ─────────────────────────────────────────────────
+   Structure and sizes are shared; each theme below changes material, ornament and the language of its trim.
+   Recovery buttons (coins) and the bookmark ribbon are redesigned per theme in Phase 4. */
+
+/* Header bar and dialog headings: the seam under them follows the theme's trim. */
+.app.playmat[data-theme=verdant] :is(.topbar, .modal-heading)::before { border-top-color: rgba(200, 188, 144, .34); }
+.app.playmat[data-theme=verdant] :is(.topbar, .modal-heading, .theme-menu-heading)::after { background: linear-gradient(90deg, transparent, #6f6243 15%, #a39168 50%, #6f6243 85%, transparent); opacity: .75; }
+.app.playmat[data-theme=ebony] :is(.topbar, .modal-heading)::before { border-top: 1px solid rgba(222, 227, 234, .24); }
+.app.playmat[data-theme=ebony] :is(.topbar, .modal-heading, .theme-menu-heading)::after { height: 1px; background: linear-gradient(90deg, transparent, #9aa1ab 10%, #fbfcfd 50%, #9aa1ab 90%, transparent); opacity: .85; }
+.app.playmat[data-theme=abyss] :is(.topbar, .modal-heading)::before { border-top: 1px solid rgba(0, 0, 0, .65); box-shadow: 0 1px 0 rgba(160, 185, 220, .12); }
+.app.playmat[data-theme=abyss] :is(.topbar, .modal-heading, .theme-menu-heading)::after { height: 1px; opacity: 1;
+  background: linear-gradient(90deg, transparent, var(--sky-soft) 18%, rgba(214, 243, 255, .85) 50%, var(--sky-soft) 82%, transparent); box-shadow: 0 0 6px rgba(127, 207, 255, .45); }
+.app.playmat[data-theme=abyss] .brand h1 { color: #dceefe; background: none; -webkit-background-clip: border-box; background-clip: border-box;
+  filter: none; text-shadow: 0 1px 0 #000, 0 0 10px rgba(127, 207, 255, .35); }
+.app.playmat[data-theme=abyss] .brand-logo { filter: grayscale(1) brightness(.9) drop-shadow(0 0 4px rgba(127, 207, 255, .45)); }
+
+/* ── Top action buttons (카드 등록 · 테마 · 관리 · 환경 설정): same size and hit area, theme trim ── */
+/* Layout stays exactly as v1.1 (no border, same padding) in every theme: rims are inset shadows, never borders. */
+/* 적갈 가죽: a thick, riveted metal rim on leather (highlight on top, shade below). */
+.app.playmat .top-actions > button {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .75), inset 0 1px 0 1px var(--m0), inset 0 -1px 0 1px var(--m2), inset 0 0 0 2.6px var(--m1),
+    inset 0 0 0 3.6px rgba(0, 0, 0, .55), inset 0 4px 6px rgba(0, 0, 0, .25), 0 2px 4px rgba(0, 0, 0, .55); }
+.app.playmat .top-actions > button::before, .app.playmat .top-actions > button::after { width: 6px; height: 6px; margin-top: -3px;
+  background: radial-gradient(circle at 34% 28%, #fff 0, var(--m0) 16%, var(--m1) 38%, var(--m2) 72%, var(--m5) 100%); box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 1px 1px rgba(0, 0, 0, .85); }
+.app.playmat .top-actions > button::before { left: 6px; }
+.app.playmat .top-actions > button::after { right: 6px; }
+.app.playmat .top-actions > button:hover:not(:disabled) { filter: brightness(1.16); }
+.app.playmat .top-actions > button:active:not(:disabled) { transform: translateY(1px); filter: brightness(.95);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .75), inset 0 0 0 2.6px var(--m2), inset 0 0 0 3.6px rgba(0, 0, 0, .6), inset 0 3px 7px rgba(0, 0, 0, .65); }
+.app.playmat .top-actions > button:disabled { opacity: .5; filter: grayscale(.4); }
+/* 흑단과 은: one polished silver hairline set into the wood, tiny inlaid lozenges. */
+.app.playmat[data-theme=ebony] .top-actions > button { border-radius: 3px; background: var(--grain) 0 0 / 300px, linear-gradient(180deg, var(--bind-hi), var(--bind-lo));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .85), inset 0 1px 0 1px #ffffff, inset 0 0 0 2px #c9ced6, inset 0 0 0 3px rgba(0, 0, 0, .55), 0 2px 4px rgba(0, 0, 0, .55); }
+.app.playmat[data-theme=ebony] .top-actions > button::before, .app.playmat[data-theme=ebony] .top-actions > button::after { width: 5px; height: 5px; margin-top: -2.5px; border-radius: 0;
+  transform: rotate(45deg); background: linear-gradient(135deg, #ffffff, #b9bfc8 60%, #7c838d); box-shadow: 0 0 0 1px rgba(0, 0, 0, .75); }
+.app.playmat[data-theme=ebony] .top-actions > button:hover:not(:disabled) { filter: brightness(1.12);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .85), inset 0 1px 0 1px #ffffff, inset 0 0 0 2px #eef0f3, inset 0 0 0 3px rgba(0, 0, 0, .55), 0 0 8px rgba(230, 235, 242, .24), 0 2px 4px rgba(0, 0, 0, .55); }
+.app.playmat[data-theme=ebony] .top-actions > button:active:not(:disabled) { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .85), inset 0 0 0 2px #9aa1ab, inset 0 3px 6px rgba(0, 0, 0, .65); }
+/* 숲의 펠트: soft felt with a matte bronze edge and a stitched seam inside it (no rivets). */
+.app.playmat[data-theme=verdant] .top-actions > button { border-radius: 9px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .6), inset 0 1px 0 1px #b6a479, inset 0 0 0 2.2px #8b7b53, inset 0 0 0 3px rgba(0, 0, 0, .4), 0 2px 4px rgba(0, 0, 0, .5); }
+.app.playmat[data-theme=verdant] .top-actions > button::before { inset: 4.5px; width: auto; height: auto; margin: 0; border-radius: 6px; background: none;
+  border: 1px dashed rgba(206, 194, 150, .5); box-shadow: none; }
+.app.playmat[data-theme=verdant] .top-actions > button::after { display: none; }
+.app.playmat[data-theme=verdant] .top-actions > button:hover:not(:disabled) { filter: brightness(1.12) saturate(1.05); }
+.app.playmat[data-theme=verdant] .top-actions > button:active:not(:disabled) { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .6), inset 0 0 0 2.2px #6c6043, inset 0 3px 7px rgba(0, 0, 0, .55); }
+/* 아케인 블루: a stone block with a thin line engraved inside it that glows sky blue; no metal. */
+.app.playmat[data-theme=abyss] .top-actions > button { border-radius: 4px; color: #e6f1fb;
+  background: var(--grain) 0 0 / 260px, linear-gradient(180deg, #354156, #222a38);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .65), inset 0 2px 0 rgba(170, 195, 230, .16), inset 0 -2px 0 rgba(0, 0, 0, .45), 0 2px 5px rgba(0, 0, 0, .6); }
+.app.playmat[data-theme=abyss] .top-actions > button::before { inset: 4px; width: auto; height: auto; margin: 0; border-radius: 2px; background: none;
+  border: 1px solid rgba(127, 207, 255, .4); box-shadow: 0 0 5px rgba(127, 207, 255, .26), inset 0 0 4px rgba(127, 207, 255, .16), inset 1px 1px 0 rgba(0, 0, 0, .55); transition: border-color 160ms ease, box-shadow 160ms ease; }
+.app.playmat[data-theme=abyss] .top-actions > button::after { display: none; }
+.app.playmat[data-theme=abyss] .top-actions > button .icon { color: var(--sky); filter: drop-shadow(0 0 3px rgba(127, 207, 255, .5)); }
+.app.playmat[data-theme=abyss] .top-actions > button:hover:not(:disabled) { filter: none; text-shadow: 0 0 8px rgba(127, 207, 255, .55); }
+.app.playmat[data-theme=abyss] .top-actions > button:hover:not(:disabled)::before { border-color: rgba(170, 225, 255, .78); box-shadow: 0 0 9px rgba(127, 207, 255, .5), inset 0 0 6px rgba(127, 207, 255, .3), inset 1px 1px 0 rgba(0, 0, 0, .55); }
+.app.playmat[data-theme=abyss] .top-actions > button:active:not(:disabled) { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .65), inset 0 3px 7px rgba(0, 0, 0, .7); }
+.app.playmat[data-theme=abyss] .top-actions > button:active:not(:disabled)::before { border-color: rgba(214, 243, 255, .95); box-shadow: 0 0 12px rgba(127, 207, 255, .7), inset 0 0 8px rgba(127, 207, 255, .4); }
+.app.playmat[data-theme=abyss] .top-actions > button:disabled::before { border-color: rgba(127, 207, 255, .14); box-shadow: none; }
+.app.playmat.reduced-motion .top-actions > button { transition: none; }
+.app.playmat.reduced-motion .top-actions > button:active { transform: none; }
+
+/* ── Ledger binding seam and reading pages ── */
+.app.playmat[data-theme=verdant] .resource-panel::before { border-color: rgba(200, 188, 144, .38); }
+.app.playmat[data-theme=ebony] .resource-panel::before { border: 1px solid rgba(222, 227, 234, .26); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .45); }
+.app.playmat[data-theme=abyss] .resource-panel::before { border: 1px solid rgba(0, 0, 0, .6); border-radius: 6px; box-shadow: 0 0 0 1px rgba(127, 207, 255, .2), inset 0 0 6px rgba(127, 207, 255, .1); }
+/* Felt and ebony: cut paper (straight edges) laid on the board; held by bronze clips / framed by silver inlay. */
+.app.playmat:is([data-theme=verdant], [data-theme=ebony]) :is(.ledger-page, .codex-page) { clip-path: none; border-radius: 2px;
+  background: var(--parchment) 0 0 / 420px, #efe9dc; box-shadow: inset 0 0 22px rgba(95, 72, 48, .18), inset 0 0 0 1px rgba(95, 72, 48, .22); }
+.app.playmat[data-theme=ebony] :is(.ledger-page, .codex-page) { background: var(--parchment) 0 0 / 420px, #f1ece2; box-shadow: inset 0 0 16px rgba(60, 52, 44, .14), inset 0 0 0 1px rgba(40, 34, 30, .28); }
+/* 아케인 블루: dark stone tablets with light, engraved-looking text. */
+.app.playmat[data-theme=abyss] :is(.ledger-page, .codex-page) { clip-path: none; border-radius: 4px; color-scheme: dark;
+  background: var(--grain) 0 0 / 320px, linear-gradient(165deg, #343e50 0%, #283040 55%, #1e2431 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(175, 200, 235, .14), inset 0 0 28px rgba(0, 0, 0, .45);
+  --ink: #dfe7f2; --ink-strong: #f2f6fb; --ink-mute: #a8b6ca; --ink-line: rgba(140, 172, 212, .24); --wax: #f2a090; --ribbon: #4f8fc2;
+  --page-title: #f3f7fc; --page-head: #d9e4f1; --page-label: #bccadd; --page-kicker: #8fd4ff; --page-body: #dce4ef; --page-mute: #a8b6ca;
+  --page-hover: rgba(127, 207, 255, .08); --page-ctrl-bg: rgba(10, 14, 22, .45); --page-ctrl-ring: rgba(127, 207, 255, .38); --page-field-bg: rgba(8, 12, 20, .55); --page-scroll: #4d5c74;
+  --page-tag: #c6e9ff; --page-tag-ring: rgba(127, 207, 255, .6); --page-tag-gap: rgba(30, 38, 52, .9); --page-tag-ring2: rgba(127, 207, 255, .22); }
+.app.playmat[data-theme=abyss] :is(.ledger-heading strong, .selected-card-heading h2) { text-shadow: 0 1px 0 #000, 0 0 12px rgba(127, 207, 255, .22); }
+.app.playmat[data-theme=abyss] .codex-kicker, .app.playmat[data-theme=abyss] .ledger-heading span { text-shadow: 0 0 6px rgba(127, 207, 255, .45); }
+.app.playmat[data-theme=abyss] .card-use :is(select, input) { box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6), 0 0 0 1px var(--page-ctrl-ring); }
+.app.playmat[data-theme=abyss] .resource-gems .gem:not(.filled) { filter: invert(1) brightness(.85) opacity(.85); }
+.app.playmat[data-theme=abyss] .exception-button { text-decoration-color: rgba(168, 182, 202, .4); }
+
+/* ── Metal-plate labels (IN PLAY, DECK, pressed tabs): matte bronze on felt via the variables; glowing inlay on stone ── */
+.app.playmat[data-theme=abyss] :is(.zone-label, .metal-check, .view-switch button[aria-pressed=true], .role-filter > button[aria-pressed=true], .role-filter .chips button[aria-pressed=true], .quick-actions button[aria-pressed=true]) {
+  color: #dcf3ff; text-shadow: 0 0 6px rgba(127, 207, 255, .65);
+  background: linear-gradient(180deg, #2c3648, #1b222e);
+  box-shadow: inset 0 0 0 1px rgba(127, 207, 255, .48), inset 0 0 8px rgba(127, 207, 255, .2), 0 0 0 1px rgba(0, 0, 0, .8), 0 0 7px rgba(127, 207, 255, .22); }
+.app.playmat[data-theme=abyss] .hand-title { color: #cfeaff; background: none; -webkit-background-clip: border-box; background-clip: border-box; filter: none; text-shadow: 0 0 8px rgba(127, 207, 255, .5); }
+.app.playmat[data-theme=abyss] .hand-title::before, .app.playmat[data-theme=abyss] .hand-title::after { background: var(--sky); box-shadow: 0 0 6px rgba(127, 207, 255, .8); }
+.app.playmat[data-theme=abyss] :is(.in-play-slot, .mat-zone) { box-shadow: inset 0 0 0 1px rgba(127, 207, 255, .3), inset 0 0 0 4px rgba(0, 0, 0, .22), inset 0 0 0 5px rgba(160, 190, 230, .08), inset 0 0 34px rgba(0, 0, 0, .5); }
+.app.playmat[data-theme=abyss] .pile-count { color: #dcf3ff; text-shadow: 0 0 5px rgba(127, 207, 255, .7); border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #3d4a5f, #1a202b 75%); box-shadow: 0 0 0 1px #000, inset 0 0 0 1.5px rgba(127, 207, 255, .55), 0 0 6px rgba(127, 207, 255, .3); filter: none; }
+.app.playmat[data-theme=abyss] .portrait { box-shadow: 0 0 0 1px #000, 0 0 0 2px rgba(127, 207, 255, .55), 0 0 8px rgba(127, 207, 255, .3), inset 0 2px 4px rgba(0, 0, 0, .8); }
+.app.playmat[data-theme=ebony] :is(.in-play-slot, .mat-zone) { box-shadow: inset 0 0 0 1px rgba(222, 227, 234, .32), inset 0 0 0 4px rgba(0, 0, 0, .2), inset 0 0 30px rgba(0, 0, 0, .4); }
+
+/* ── Mat emblem: tooled on leather, a faint silver inlay on ebony, none on felt, an engraved glowing circle on stone ── */
+.app.playmat[data-theme=ebony] .board::before { opacity: .16; filter: grayscale(1) brightness(1.7); }
+.app.playmat[data-theme=verdant] .board::before { display: none; }
+.app.playmat[data-theme=abyss] .board::before { opacity: .34; filter: grayscale(1) sepia(1) hue-rotate(165deg) saturate(2.4) brightness(1.25) drop-shadow(0 0 3px rgba(127, 207, 255, .55)); }
+
+/* ── Theme menu swatches show each material and trim ── */
+.app.playmat .theme-swatch-oxblood::before { border-color: #c3b08a; border-width: 2px; }
+.app.playmat .theme-swatch-ebony { background: url('./assets/playmat/wood-grain.png') 0 0 / 220px, radial-gradient(ellipse at 50% 40%, #3a332f, #28231f 55%, #12100e); }
+.app.playmat .theme-swatch-ebony::before { border: 1px solid #e6e9ee; border-radius: 1px; }
+.app.playmat .theme-swatch-verdant { background: url('./assets/playmat/felt-grain.png') 0 0 / 150px, radial-gradient(ellipse at 50% 40%, #2f4b37, #23392b 55%, #102017); }
+.app.playmat .theme-swatch-verdant::before { border: 1.5px dashed #b9a77b; border-radius: 4px; }
+.app.playmat .theme-swatch-abyss { background: url('./assets/playmat/stone-grain.png') 0 0 / 200px, radial-gradient(ellipse at 50% 40%, #37435a, #273041 55%, #131824); }
+.app.playmat .theme-swatch-abyss::before { border: 1px solid rgba(127, 207, 255, .7); box-shadow: 0 0 5px rgba(127, 207, 255, .5), inset 0 0 4px rgba(127, 207, 255, .3); }
+.app.playmat .theme-swatch-abyss > span { background: #2a3242; box-shadow: inset 0 0 0 1px rgba(127, 207, 255, .45); }
+.app.playmat .theme-swatch-verdant > span, .app.playmat .theme-swatch-ebony > span { background: #efe9dc; }
