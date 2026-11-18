@@ -95,6 +95,25 @@ describe('SQLite persistence and compatibility', () => {
     expect(raw('slot_colors', second)).toEqual(colors);
     second.close();
   });
+  it('v1.2: keeps hand momentum in its own hand_scroll key so 1.1.0 can still read effects', () => {
+    const path = fixture();
+    const first = new AppStore(path);
+    first.saveSettings({ ...DEFAULT_SETTINGS, effects: { cardTilt: true, systemCursor: true }, handScroll: { inertia: false } });
+    const raw = (key: string, store = first) => JSON.parse((store.db.prepare('SELECT value_json FROM settings WHERE key=?').get(key) as { value_json: string }).value_json);
+    expect(raw('hand_scroll')).toEqual({ inertia: false });
+    // The v1.1 keys keep exactly the fields 1.1.0 validates (effects is a strict object there).
+    expect(raw('effects')).toEqual({ cardTilt: true, systemCursor: true });
+    expect(raw('preferences')).toEqual(DEFAULT_SETTINGS);
+    first.close();
+    const second = new AppStore(path);
+    expect(second.getSettings().handScroll).toEqual({ inertia: false });
+    for (const bad of [{ inertia: 'no' }, { inertia: true, speed: 2 }]) expect(() => second.saveSettings({ ...DEFAULT_SETTINGS, handScroll: bad })).toThrow();
+    expect(raw('hand_scroll', second)).toEqual({ inertia: false });
+    // Saving without the field (an older renderer) leaves the stored choice alone.
+    second.saveSettings({ ...DEFAULT_SETTINGS });
+    expect(second.getSettings().handScroll).toEqual({ inertia: false });
+    second.close();
+  });
   it('rejects invalid inputs and preserves last saved settings', () => {
     const store = new AppStore(fixture());
     store.saveSettings(DEFAULT_SETTINGS);

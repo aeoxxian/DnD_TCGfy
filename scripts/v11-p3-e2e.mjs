@@ -132,10 +132,13 @@ const angles = [...leaning.matchAll(/rotate[XY]\((-?[\d.]+)deg\)/g)].map(m => Nu
 assert(angles.length === 2 && angles.every(a => Math.abs(a) <= 6) && angles.some(a => Math.abs(a) > 2), `tilt ${leaning}`);
 await page.mouse.click(fb.x + 3, fb.y + 3); await page.waitForTimeout(300);
 assert.equal(await lightbox(page).count(), 1, 'a click on the tilted card corner keeps the view open');
+// v1.2 Phase 2: just outside the card the lean is held (at the edge value); beyond the margin (60–100 px) it returns flat.
 await page.mouse.move(fb.x - 30, fb.y + fb.height / 2);
-assert.equal(await page.locator('.lightbox-card > img').evaluate(el => el.style.transform), '', 'returns flat when the pointer leaves');
+assert.match(await page.locator('.lightbox-card > img').evaluate(el => el.style.transform), /rotateY\(-6(\.00)?deg\)/, 'held just outside the card');
+const margin = await page.evaluate(() => Math.round(Math.max(60, Math.min(100, Math.min(innerWidth, innerHeight) * 0.08))));
+if (fb.x - margin - 10 > 0) { await page.mouse.move(fb.x - margin - 10, fb.y + fb.height / 2); assert.equal(await page.locator('.lightbox-card > img').evaluate(el => el.style.transform), '', 'returns flat beyond the tilt margin'); }
 await page.mouse.click(Math.max(2, fb.x - 30), fb.y + fb.height / 2); await lightbox(page).waitFor({ state: 'detached' });
-check('3D tilt follows the pointer (max 6°), resets on leave, and clicks on the card frame never close the view', { leaning });
+check('3D tilt follows the pointer (max 6°), held just outside the card and reset beyond the v1.2 margin, and clicks on the card frame never close the view (outside clicks do)', { leaning, margin });
 
 let state = await setSetting(page, '확대 카드 3D 기울임', false);
 assert.deepEqual(state, { checked: false, disabled: false });

@@ -1,6 +1,6 @@
 # v1.2 데이터 보충 계약
 
-SQLite 버전은 **v6 유지**. DDL·마이그레이션·새 `settings` 키는 없다. 1.1.0과 1.2 개발본은 같은 DB를 서로 열 수 있다.
+SQLite 버전은 **v6 유지**. DDL·마이그레이션은 없다. 새 `settings` 키는 Phase 2의 `hand_scroll` 하나다. 1.1.0과 1.2 개발본은 같은 DB를 서로 열 수 있다.
 
 ## `library_state.viewScope` 해석 (Phase 1)
 
@@ -39,3 +39,16 @@ SQLite 버전은 **v6 유지**. DDL·마이그레이션·새 `settings` 키는 �
 - 저장(`RegistrationStore.save`)은 하나의 트랜잭션이다: 검증 → 카드·덱 연결 저장 → 초안마다 기존 `create_resource`(사용자 템플릿 저장 + 활성 캐릭터에 `scope:'character'`로 장착, 현재량 = 최대치, “<이름> 자원 생성” 기록, revision +1) → `draftId`를 실제 자원 ID로 바꾼 비용 연결 저장 → 등록 영수증. 어느 단계든 실패하면 전부 취소된다.
 - “자원 생성” 기록은 자원 관리에서 만든 것과 같이 이전 자원 변경 Undo의 경계가 된다. 같은 요청 ID 재전송은 영수증으로 한 번만 처리된다.
 - 1.1.0은 이 필드를 보내지 않으며, 저장된 결과(템플릿·자원 인스턴스·비용 연결)는 기존 형식 그대로라 1.1.0에서도 열린다.
+
+## `settings` 키 `hand_scroll` (Phase 2)
+
+손패 관성 스크롤 선택. 사용자가 환경 설정에서 바꿀 때만 생긴다.
+
+```json
+{ "inertia": false }
+```
+
+- `inertia`(선택): 손패를 빠르게 끌다 놓았을 때 관성으로 더 움직일지. 없으면 켬으로 본다. 앱 “모션 줄이기”나 Windows 동작 줄이기면 값과 관계없이 끈다.
+- 런타임 계약은 `settingsSchema.handScroll`(선택, `strictObject`). 설정 저장 요청에 없으면 기존 값을 지우지 않는다.
+- **별도 키인 이유:** 1.1.0은 `effects`를 `strictObject`로 검사하므로 `effects`에 필드를 더하면 1.1.0이 설정을 읽다 실패해 같은 DB를 열지 못한다. `hand_scroll`은 1.1.0이 읽지 않는 키라 1.1.0으로 되돌려도 DB가 열린다. `effects`(`cardTilt`·`systemCursor`)의 형식은 1.1.0과 같게 유지한다.
+- 자원·사용 기록·카드 데이터와 무관하며 Undo 대상이 아니다. 확대 카드 기울임 범위(카드 밖 60~100px)는 저장하지 않는 고정 동작이다.

@@ -18,6 +18,12 @@ export type HistoryView = z.infer<typeof historyViewSchema>;
 /** v1.1: visual effects preferences, kept apart from `preferences` so older versions still read the DB. */
 export const effectsSchema = z.strictObject({ cardTilt: z.boolean().optional(), systemCursor: z.boolean().optional() });
 export type Effects = z.infer<typeof effectsSchema>;
+/**
+ * v1.2: hand scrolling options in their own `hand_scroll` settings key. 1.1.0 validates `effects` strictly,
+ * so a new field there would stop 1.1.0 from opening the same database.
+ */
+export const handScrollSchema = z.strictObject({ inertia: z.boolean().optional() });
+export type HandScroll = z.infer<typeof handScrollSchema>;
 /** v1.1: per-character spell slot gem colours (display only). Levels are "1"–"9". */
 export const hexColorSchema = z.string().regex(/^#[0-9a-f]{6}$/, '색상은 #rrggbb 형식이어야 합니다.');
 export const slotColorSchema = z.strictObject({
@@ -62,6 +68,7 @@ export const settingsSchema = z.strictObject({
   historyViews: z.record(z.string().min(1).max(128), historyViewSchema).refine(value => Object.keys(value).length <= 200).optional(),
   effects: effectsSchema.optional(),
   slotColors: z.record(z.string().min(1).max(128), slotColorSetSchema).refine(value => Object.keys(value).length <= 200).optional(),
+  handScroll: handScrollSchema.optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };

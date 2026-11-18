@@ -1,0 +1,12 @@
+{
+  "hand": {
+    "file": "C:\\Users\\ja010\\Desktop\\DnD_TCGfy\\docs\\screenshots\\v1.2-p2\\after-hand-glide.webp",
+    "frames": 27,
+    "seconds": 0.8
+  },
+  "tilt": {
+    "file": "C:\\Users\\ja010\\Desktop\\DnD_TCGfy\\docs\\screenshots\\v1.2-p2\\after-tilt-edge.webp",
+    "frames": 80,
+    "seconds": 1.85
+  }
+}
