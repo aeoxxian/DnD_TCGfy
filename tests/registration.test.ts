@@ -90,7 +90,8 @@ describe('v1.2 Phase 1 · new resource created inside the registration transacti
   it('binds every card of a multi-image registration to one new resource and supports variable point costs',()=>{
     const f=fixture();const lib=register(f,withNew(f,{castOptions:[{id:'use',label:'포인트',costs:[{type:'variable',costKey:'c',min:1,max:3,step:1}]}]},charges({name:'영혼 점수',unit:'점'})),[draft('하나'),draft('둘')]);
     const resources=f.resources.snapshot(f.a.id).resources;expect(resources.map(r=>r.name)).toEqual(['영혼 점수']);
-    expect(f.resources.snapshot(f.a.id).bindings.map(b=>[b.cardId,b.resourceInstanceId])).toEqual(lib.cards.map(card=>[card.id,resources[0].id]));
+    // Bindings come back in no particular order (no ORDER BY, random card ids), so compare them as a set.
+    expect(f.resources.snapshot(f.a.id).bindings.map(b=>[b.cardId,b.resourceInstanceId]).sort()).toEqual(lib.cards.map(card=>[card.id,resources[0].id]).sort());
     use(f,lib.cards[1],{c:3});expect(f.resources.snapshot(f.a.id).resources[0].remaining).toBe(4);f.store.close();
   });
   it('rolls back the resource, template, card, deck link, bindings, events and receipt when a later write fails',()=>{
