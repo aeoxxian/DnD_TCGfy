@@ -1,16 +1,25 @@
-# DnD TCG-fy · P5 데이터 보존·배포 (0.6.0)
+# DnD TCG-fy · v1.1 (1.1.0)
 
-GitHub 전체 프로젝트·Windows 실행 파일·저장된 카드 및 플레이 상태: [저장소 가져오기 안내](REPOSITORY_IMPORT.md). 큰 ZIP 파일을 받으려면 Git LFS가 필요합니다. P5 검수 결과는 [P5 검수 보고서](P5_REVIEW.md)에 있습니다.
+GitHub 전체 프로젝트·Windows 실행 파일·저장된 카드 및 플레이 상태: [저장소 가져오기 안내](REPOSITORY_IMPORT.md). 큰 ZIP 파일을 받으려면 Git LFS가 필요합니다. P5 검수 결과는 [P5 검수 보고서](P5_REVIEW.md)에, v1.1 변경 사항과 검증은 [v1.1 배포 안내](V1_1_RELEASE.md)에 있습니다.
 
 ## 설치와 실행
 
-1. `DnD-TCG-fy-Setup-0.6.0-x64.exe`를 실행합니다. 관리자 권한 없이 현재 사용자 계정에 설치되며 설치 폴더를 고를 수 있습니다. 바탕화면과 시작 메뉴에 바로가기가 생깁니다.
+1. `DnD-TCG-fy-Setup-1.1.0-x64.exe`를 실행합니다. 관리자 권한 없이 현재 사용자 계정에 설치되며 설치 폴더를 고를 수 있습니다. 바탕화면과 시작 메뉴에 바로가기가 생깁니다.
 2. 코드 서명 인증서가 없어 Windows SmartScreen이 "Windows의 PC 보호" 경고를 띄울 수 있습니다. 직접 빌드했거나 신뢰하는 파일이면 **추가 정보 → 실행**을 누르세요.
 3. 설치 뒤에는 인터넷 연결 없이 실행·카드 사용·자원 저장·휴식이 모두 동작합니다. 앱은 외부 주소로 연결하지 않습니다.
 4. 새 버전 설치 파일을 그대로 실행하면 업그레이드됩니다. 데이터는 설치 폴더가 아니라 `%APPDATA%\DnD TCG-fy`에 있으므로 업그레이드·제거해도 유지됩니다.
 5. 제거는 **Windows 설정 → 앱 → 설치된 앱 → DnD TCG-fy → 제거**입니다. 카드·이미지·기록은 지우지 않습니다. 데이터까지 지우려면 앱 데이터 폴더를 직접 삭제하세요(먼저 백업을 권장합니다).
 
 설치하지 않고 쓰려면 `release/win-unpacked/DnD TCG-fy.exe`를 실행하세요. 폴더 전체가 필요합니다.
+
+### v1.1에서 달라진 점
+
+- 추가 필터가 화면을 밀지 않는 팝오버로 열리고, 선택한 필터에 ✓가 붙으며, 역할 옆에 행동·보너스 행동 버튼이 생겼습니다.
+- 상단 **카드 등록** 버튼, 선택 관리의 **선택 관리 종료**와 일괄 작업 안의 휴지통 이동, 최근 작업 **기록 비우기**(표시만 정리)를 추가했습니다.
+- 선택한 카드를 **다시 누르면 확대**합니다(더블클릭 대신). 지금 쓸 수 없는 카드는 덱 카드 뒷면이 반투명하게 덮이고, 선택·확대 전환 효과와 확대 카드 3D 기울임(환경 설정에서 끄기)이 생겼습니다.
+- 자원 관리에서 캐릭터별 **주문 슬롯 색상**을, 환경 설정에서 **시스템 기본 커서 사용**을 고를 수 있습니다(기본은 테이블 전용 커서).
+
+자세한 내용은 [v1.1 배포 안내](V1_1_RELEASE.md)와 단계별 보고서(`V1_1_P1_REPORT.md`~`V1_1_P4_REPORT.md`)에 있습니다.
 
 ## 백업과 복원
 
@@ -201,7 +210,7 @@ npm run dist:win
 
 `prepare-p4-b-fixtures.mjs`는 원본 DB·WAL의 크기/수정 시각이 복사 중 유지되는지 확인하고 검수 폴더에 읽기 복사한 후, Python 3의 내장 SQLite 읽기 전용 URI로 복사본만 조회합니다. Python은 이 선택적 검수 도우미에만 필요하며 앱 실행·빌드에는 필요하지 않습니다. 기본 `%APPDATA%\DnD TCG-fy`의 활성 카드 이미지를 `artifacts/p4-b-input`에 복사합니다. 다른 데이터 경로는 첫 인수로 지정할 수 있습니다. P4-B E2E는 이 복사본과 별도 텍스트 테스트 이미지만 격리된 라이브러리에 등록합니다. 실제 사용자 DB에는 쓰지 않습니다. 개발 모드 테스트는 Vite 포트를 사용하므로 동시에 두 개를 실행하지 마세요.
 
-`npm run dist:win`은 NSIS 설치 파일 `release/DnD-TCG-fy-Setup-0.6.0-x64.exe`를, `npm run pack:win`은 설치 없이 쓰는 폴더형 `release/win-unpacked/`를 만듭니다. 코드 서명은 없습니다.
+`npm run dist:win`은 NSIS 설치 파일 `release/DnD-TCG-fy-Setup-1.1.0-x64.exe`를, `npm run pack:win`은 설치 없이 쓰는 폴더형 `release/win-unpacked/`를 만듭니다. 코드 서명은 없습니다.
 
 P5 검수 스크립트:
 
@@ -211,11 +220,10 @@ node scripts/p5-e2e.mjs        # 오프라인·강제 종료·ZIP 내보내기·
 $env:DND_TCG_EXECUTABLE = (Resolve-Path '.\release\win-unpacked\DnD TCG-fy.exe').Path
 node scripts/p5-e2e.mjs        # 같은 검사를 폴더형 EXE로
 Remove-Item Env:DND_TCG_EXECUTABLE
-npx electron-builder --win nsis --x64 -c.extraMetadata.version=0.5.99 -c.directories.output=artifacts/installer-old
-node scripts/p5-installer-check.mjs artifacts/installer-old/DnD-TCG-fy-Setup-0.5.99-x64.exe release/DnD-TCG-fy-Setup-0.6.0-x64.exe
+node scripts/p5-installer-check.mjs <이전-설치파일>\DnD-TCG-fy-Setup-0.6.0-x64.exe release/DnD-TCG-fy-Setup-1.1.0-x64.exe
 ```
 
-`p5-installer-check.mjs`는 이미 설치된 DnD TCG-fy나 바로가기가 있으면 실행을 거부합니다. 시험 폴더에 0.5.99를 조용히 설치하고 0.6.0으로 업그레이드한 뒤 제거하며, 앱은 격리된 데이터로만 실행합니다. `DND_TCG_TEST_NO_RELAUNCH=1`은 교체 복원 뒤 자동 재시작을 막는 E2E 전용 환경 변수입니다.
+`p5-installer-check.mjs`는 이미 설치된 DnD TCG-fy나 바로가기가 있으면 실행을 거부합니다. 시험 폴더에 이전 버전을 조용히 설치하고 새 버전으로 업그레이드한 뒤 제거하며(버전은 설치 파일 이름에서 읽음), 앱은 격리된 데이터로만 실행합니다. 이전 버전 설치 파일이 없으면 `npx electron-builder --win nsis --x64 -c.extraMetadata.version=<낮은 버전> -c.directories.output=artifacts/installer-old`로 같은 코드의 낮은 버전을 만들어 쓸 수 있습니다. `DND_TCG_TEST_NO_RELAUNCH=1`은 교체 복원 뒤 자동 재시작을 막는 E2E 전용 환경 변수입니다.
 
 ## 데이터 위치와 호환성
 
@@ -235,7 +243,7 @@ userData/
 
 v6보다 오래된 DB는 마이그레이션 전 일관성 백업을 만들고 트랜잭션으로 v6를 적용합니다. v6는 휴지통·이미지 정리 데이터를 추가하며 기존 카드/자원 행을 초기화하지 않습니다. 기존 archived 카드도 휴지통에서 확인하고 복원할 수 있습니다. 기존 카드 ID/태그 ID/캐릭터/덱/비용/자원/기록 및 P0 환경 설정을 유지합니다. 잘못된 새 입력과 지원하지 않는 미래 버전 DB를 거부하며 자동 리셋하지 않습니다. 잘못된 저장 카드 행은 경고하고 원본 행을 보존합니다.
 
-P4-C도 SQLite v6입니다. 자원 표시 설정은 기존 `settings` 테이블의 별도 `resource_display` 키에 저장합니다. 이전 `preferences`의 세 필드는 그대로 유지하므로 P4-A도 읽을 수 있습니다. [P4-B 표시 설정 계약](DATA_SCHEMA_P4.md)을 참고하세요.
+P4-C도 SQLite v6입니다. 자원 표시 설정은 기존 `settings` 테이블의 별도 `resource_display` 키에 저장합니다. 이전 `preferences`의 세 필드는 그대로 유지하므로 P4-A도 읽을 수 있습니다. [P4-B 표시 설정 계약](DATA_SCHEMA_P4.md)을 참고하세요. v1.1(1.1.0)도 SQLite v6이며, 최근 작업 표시 정리·시각 효과·주문 슬롯 색상을 각각 `history_view`·`effects`·`slot_colors` 키에 따로 저장합니다([v1.1 설정 계약](DATA_SCHEMA_V1_1.md)). 기존 키는 그대로라 0.6.0도 같은 DB를 엽니다.
 
 새 등록의 선택 필드 `costStatus`와 등록 영수증은 [P4-C 데이터 계약](DATA_SCHEMA_P4C.md)에 정의했습니다. 기존 카드 의미는 유지합니다. 0.5.1 이하 앱은 새 상태가 있는 카드를 읽지 못할 수 있으므로 새 카드를 만든 뒤 구버전으로 다운그레이드하지 마세요.
 
@@ -258,4 +266,4 @@ P4-C도 SQLite v6입니다. 자원 표시 설정은 기존 `settings` 테이블�
 
 - `electron/backup.ts`, `src/components/BackupManager.tsx`: ZIP 백업·검사·복원(교체/복제)·자동 스냅샷과 화면.
 
-현재는 플레이 매트 UI와 P5 데이터 보존·배포(0.6.0)를 마친 지점입니다. v1.0 판정은 SPEC의 15개 인수 시나리오 기준이며 [P5 보고서](P5_REVIEW.md)에 시나리오별 근거를 정리했습니다. P3의 남은 제한과 권고는 P3 보고서에 정리했습니다. 멀티클래스·서브클래스 전수 자동화·전투 판정으로 범위를 확장하지 않습니다.
+현재는 v1.1(1.1.0, 사용성 개선 4단계)을 마친 지점입니다. 그 전 단계는 플레이 매트 UI와 P5 데이터 보존·배포(0.6.0)입니다. v1.0 판정은 SPEC의 15개 인수 시나리오 기준이며 [P5 보고서](P5_REVIEW.md)에 시나리오별 근거를 정리했습니다. P3의 남은 제한과 권고는 P3 보고서에 정리했습니다. 멀티클래스·서브클래스 전수 자동화·전투 판정으로 범위를 확장하지 않습니다.

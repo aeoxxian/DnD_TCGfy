@@ -12,6 +12,10 @@ import { join, resolve } from 'node:path';
 
 const [olderSetup, newSetup] = process.argv.slice(2).map(path => resolve(path));
 assert(olderSetup && newSetup && existsSync(olderSetup) && existsSync(newSetup), 'usage: p5-installer-check.mjs <older-setup.exe> <new-setup.exe>');
+// Versions come from the electron-builder file names (…-Setup-<version>-x64.exe), e.g. 0.6.0 → 1.1.0.
+const versionOf = path => path.match(/Setup-(\d+\.\d+\.\d+)-x64\.exe$/i)?.[1];
+const [olderVersion, newVersion] = [versionOf(olderSetup), versionOf(newSetup)];
+assert(olderVersion && newVersion && olderVersion !== newVersion, `setup names must carry two different versions: ${olderVersion} / ${newVersion}`);
 const run = await mkdtemp(join(resolve('artifacts'), 'p5-install-'));
 const installDir = join(run, 'app'); const data = join(run, 'user-data');
 await cp(resolve('repository-data/user-data'), data, { recursive: true });
@@ -53,12 +57,12 @@ assert(!existsSync(desktopLink) && !existsSync(startLink), 'existing DnD TCG-fy 
 install(olderSetup);
 await waitFor(() => existsSync(join(installDir, 'DnD TCG-fy.exe')), 'older install');
 let entries = installs();
-assert.equal(entries.length, 1); assert.equal(entries[0].DisplayVersion, '0.5.99');
+assert.equal(entries.length, 1); assert.equal(entries[0].DisplayVersion, olderVersion);
 assert(existsSync(desktopLink) && existsSync(startLink), 'installer creates desktop and Start menu shortcuts');
 step('older build installed silently per user (no admin), shortcuts created', { version: entries[0].DisplayVersion });
 
 let session = await openInstalled();
-assert.equal(await footerVersion(session.page), 'v0.5.99');
+assert.equal(await footerVersion(session.page), `v${olderVersion}`);
 await session.page.locator('.card-button').first().click();
 await session.page.waitForFunction(() => !document.querySelector('.use-button')?.disabled, null, { timeout: 15000 });
 const before = await slot(session.page);
@@ -69,16 +73,16 @@ await session.app.close();
 step('installed older app ran on isolated data and recorded a card use', { slot: `${before} → ${afterUse}` });
 
 install(newSetup);
-await waitFor(() => installs()[0]?.DisplayVersion === '0.6.0', 'upgrade');
+await waitFor(() => installs()[0]?.DisplayVersion === newVersion, 'upgrade');
 entries = installs();
 assert.equal(entries.length, 1, 'upgrade keeps a single installation entry');
 session = await openInstalled();
-assert.equal(await footerVersion(session.page), 'v0.6.0');
+assert.equal(await footerVersion(session.page), `v${newVersion}`);
 assert.equal(await slot(session.page), afterUse, 'data written by the older version is intact after the upgrade');
 await session.page.locator('.card-button').first().click();
 await session.page.waitForSelector('.use-button');
 await session.app.close();
-step('upgraded in place to 0.6.0; the app opens the same data with the earlier card use intact', { version: entries[0].DisplayVersion });
+step(`upgraded in place to ${newVersion}; the app opens the same data with the earlier card use intact`, { version: entries[0].DisplayVersion });
 
 const uninstaller = join(installDir, 'Uninstall DnD TCG-fy.exe');
 assert(existsSync(uninstaller));
