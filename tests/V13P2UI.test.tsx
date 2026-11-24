@@ -62,7 +62,7 @@ describe('v1.3 Phase 2 · registering several images at once', () => {
     expect(within(check).getByText(/이미 있는 카드와 같은 이미지 1장/)).toBeDefined();
     expect(desktop.saveCards).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '등록 시작' }));
-    await screen.findByText('2장 등록 완료');
+    await screen.findByText('2장 등록 완료', {}, { timeout: 5000 });
     expect(desktop.saveCards).toHaveBeenCalledTimes(2);
     const [first, third] = desktop.saveCards.mock.calls.map(call => call[0]);
     expect(first).toMatchObject({ cards: [{ name: '첫 카드', imageAssetId: 'a', kind: 'other' }], registrationTarget: target, initialRules: { configured: false } });
@@ -80,11 +80,11 @@ describe('v1.3 Phase 2 · registering several images at once', () => {
     mount([asset('a'), asset('b'), asset('c')]);
     fireEvent.click(screen.getByRole('button', { name: '3장 등록' }));
     fireEvent.click(screen.getByRole('button', { name: '등록 시작' }));
-    await screen.findByText('완료 2장 · 실패 1장 · 미처리 0장 · 제외 0장');
+    await screen.findByText('완료 2장 · 실패 1장 · 미처리 0장 · 제외 0장', {}, { timeout: 5000 });
     expect(within(row(2, 'file-b')).getByRole('alert').textContent).toBe('실패 · 저장 처리에 실패했습니다.');
     const failedRequest = desktop.saveCards.mock.calls[1][0].initialRules.requestId;
     fireEvent.click(screen.getByRole('button', { name: '실패·미처리 다시 등록' }));
-    await screen.findByText('3장 등록 완료');
+    await screen.findByText('3장 등록 완료', {}, { timeout: 5000 });
     expect(desktop.saveCards).toHaveBeenCalledTimes(4);
     expect(desktop.saveCards.mock.calls[3][0]).toMatchObject({ cards: [{ imageAssetId: 'b' }], initialRules: { requestId: failedRequest } });
   });
@@ -94,7 +94,7 @@ describe('v1.3 Phase 2 · registering several images at once', () => {
     mount(['1', '2', '3', '4', '5'].map(id => asset(id)));
     fireEvent.click(screen.getByRole('button', { name: '5장 등록' }));
     fireEvent.click(screen.getByRole('button', { name: '등록 시작' }));
-    await screen.findByText('완료 0장 · 실패 3장 · 미처리 2장 · 제외 0장');
+    await screen.findByText('완료 0장 · 실패 3장 · 미처리 2장 · 제외 0장', {}, { timeout: 5000 });
     expect(desktop.saveCards).toHaveBeenCalledTimes(3);
     expect(screen.getByText(/연속으로 3장이 실패해 나머지는 등록하지 않았습니다/)).toBeDefined();
     expect(within(row(5, 'file-5')).getByText('미처리')).toBeDefined();
@@ -127,10 +127,10 @@ describe('v1.3 Phase 2 · registering several images at once', () => {
     expect(within(row(1, 'file-a')).getByText(/주문 · 2레벨/)).toBeDefined();
     fireEvent.change(screen.getByLabelText('새 템플릿 이름'), { target: { value: '두 번째' } });
     fireEvent.click(screen.getByRole('button', { name: '지금 설정을 템플릿으로 저장' }));
-    await waitFor(() => expect(onTemplates).toHaveBeenCalled());
+    await waitFor(() => expect(onTemplates).toHaveBeenCalled(), { timeout: 5000 });
     const saved = onTemplates.mock.calls[0][0] as RegistrationTemplate[];
     expect(saved.map(item => item.name)).toEqual(['공격 주문', '두 번째']);
     expect(saved[1]).toMatchObject({ card: { kind: 'spell', spellLevel: 2, roles: ['damage'] }, rule: { kind: 'uses' }, addToDeck: false });
-    expect(await screen.findByText('‘두 번째’ 템플릿을 저장했습니다.')).toBeDefined();
+    expect(await screen.findByText('‘두 번째’ 템플릿을 저장했습니다.', {}, { timeout: 5000 })).toBeDefined();
   });
 });

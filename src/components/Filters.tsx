@@ -5,7 +5,8 @@ import { ROLE_NAMES, ACTION_NAMES, KIND_NAMES, RANGE_NAMES } from '../shared/lib
 export function toggleValue<T>(values: T[], value: T): T[] { return values.includes(value) ? values.filter(v => v !== value) : [...values, value]; }
 
 /** Action-economy values offered next to the role chips. They edit the same `actions` state as the extra filters. */
-export const QUICK_ACTIONS = ['action', 'bonus_action'] as const;
+// v1.3 (memo 7): 반응 행동 joins the quick buttons next to 행동·보너스 행동.
+export const QUICK_ACTIONS = ['action', 'bonus_action', 'reaction'] as const;
 export const EXTRA_FILTERS_PANEL_ID = 'extra-filters-panel';
 
 /** One-line description of every active condition, shown inside the popover and as the toggle's tooltip. */

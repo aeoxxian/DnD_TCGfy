@@ -139,13 +139,14 @@ let app, page, errors, hero;
   let added = readDb(userData, 'SELECT id, relative_path FROM assets ORDER BY id').filter(row => !before.some(old => old.id === row.id));
   assert.equal(added.length, 1); const pickedPath = join(userData, added[0].relative_path); assert(await exists(pickedPath));
   await dialog.getByRole('button', { name: '이미지 빼기', exact: true }).click();
-  await until(async () => !(await exists(pickedPath)), 'removed image file deleted'); assert.equal(readDb(userData, 'SELECT count(*) AS n FROM assets WHERE id=?', added[0].id)[0].n, 0);
+  // The cleanup removes the file first and the database row right after it: wait for both.
+  await until(async () => !(await exists(pickedPath)) && readDb(userData, 'SELECT count(*) AS n FROM assets WHERE id=?', added[0].id)[0].n === 0, 'removed image file and row deleted');
   assert.equal(await dialog.getByRole('img', { name: /기본 카드 미리보기$/ }).count(), 1);
   await dialog.getByLabel('카드 이미지 파일').setInputFiles(images[1]); await dialog.getByRole('img', { name: /등록 미리보기$/ }).waitFor();
   added = readDb(userData, 'SELECT id, relative_path FROM assets ORDER BY id').filter(row => !before.some(old => old.id === row.id));
   const cancelledPath = join(userData, added[0].relative_path);
   await dialog.getByRole('button', { name: '취소', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
-  await until(async () => !(await exists(cancelledPath)), 'cancelled image file deleted');
+  await until(async () => !(await exists(cancelledPath)) && readDb(userData, 'SELECT id FROM assets').length === before.length, 'cancelled image file and row deleted');
   assert.deepEqual(readDb(userData, 'SELECT id, relative_path FROM assets ORDER BY id'), before);
   check('Picking an image copies it into assets; “이미지 빼기” and cancelling delete exactly that copy (row and file); other images untouched');
 

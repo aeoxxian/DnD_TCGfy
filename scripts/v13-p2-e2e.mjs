@@ -140,7 +140,8 @@ assert(counter, 'the hero has a counter resource for the template check');
   await form.getByRole('button', { name: '닫기', exact: true }).last().click(); await form.waitFor({ state: 'hidden' });
   const repeat = imported.find(a => !lib.cards.some(c => c.imageAssetId === a.id));
   assert(repeat, 'the excluded repeat was imported');
-  await until(async () => !(await exists(join(userData, repeat.relative_path))), 'excluded image deleted on close');
+  // The cleanup removes the file first and the database row right after it: wait for both.
+  await until(async () => !(await exists(join(userData, repeat.relative_path))) && readDb(userData, 'SELECT count(*) AS n FROM assets WHERE id=?', repeat.id)[0].n === 0, 'excluded image file and row deleted on close');
   for (const a of imported.filter(a => a.id !== repeat.id)) assert(await exists(join(userData, a.relative_path)), 'saved images kept');
   assert.equal(readDb(userData, 'SELECT count(*) AS n FROM assets WHERE id=?', repeat.id)[0].n, 0);
   check('Retry registers the failed card once (no duplicates); closing deletes only the excluded image, every saved image stays');

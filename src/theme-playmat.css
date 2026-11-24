@@ -312,8 +312,11 @@ html, body { background: #0b0807; }
 .app.playmat .board > .batch-tools > details > :is(fieldset, .batch-actions) { min-width: 0; margin: 0; }
 .app.playmat .board > .batch-tools > details > .batch-actions { align-self: start; }
 /* In selection mode the hand is where the work happens: the IN PLAY page gives up height first. */
-.app.playmat .board:has(> .batch-tools) > .detail-panel { flex-basis: clamp(150px, 24dvh, 240px); }
-.app.playmat .board:has(> .batch-tools > details[open]) > .detail-panel { flex-basis: 150px; }
+/* v1.3: the card page now sits in the centre column of the board grid. */
+.app.playmat .board:has(> .batch-tools) .board-center > .detail-panel { flex: 0 1 clamp(150px, 24dvh, 240px); height: auto; min-height: 96px; }
+/* Selection mode is about the hand: it keeps the same minimum as before, also on short windows. */
+.app.playmat .board:has(> .batch-tools) .board-center > .hand-row { min-height: 130px; }
+.app.playmat .board:has(> .batch-tools > details[open]) .board-center > .detail-panel { flex-basis: 150px; }
 /* The move to the trash lives inside the expanded bulk area, set apart in wax red. */
 .app.playmat .batch-tools .batch-trash { margin-top: 10px; padding: 6px 12px 10px; border: 1px solid rgba(122, 47, 35, .55); border-radius: 4px; background: rgba(122, 47, 35, .06); }
 .app.playmat .batch-tools .batch-trash legend { padding: 0 4px; font-weight: 700; color: var(--wax); }
@@ -340,7 +343,7 @@ html, body { background: #0b0807; }
   background: var(--bookmark) center top / 100% 100% no-repeat; filter: drop-shadow(1.4px 2px 1.4px rgba(40, 25, 10, .4)); }
 .app.playmat .codex-page > .panel-title { position: absolute; top: 8px; right: 12px; min-height: 0; z-index: 2; }
 .app.playmat .codex-close { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; font-size: 15px; color: var(--ink-mute); background: transparent; box-shadow: none; }
-.app.playmat .selected-card-summary { display: block; flex: none; margin: 0; padding-right: 60px; }
+.app.playmat .selected-card-summary { display: block; flex: none; margin: 0; padding-right: 86px; }
 .app.playmat .codex-kicker { font: 600 10px var(--display); letter-spacing: 3px; color: var(--page-kicker); }
 .app.playmat .selected-card-heading h2 { margin: 1px 0 0; font: 700 23px/1.25 var(--kserif); color: var(--ink-strong); -webkit-line-clamp: 1; }
 .app.playmat .selected-properties { margin-top: 4px; font: 700 12px var(--kserif); color: var(--page-label); }
@@ -891,3 +894,77 @@ html, body { background: #0b0807; }
 .app.playmat .modal .batch-result [role=status] { font-size: 13px; font-weight: 700; color: var(--ink); }
 .app.playmat .v13-editor.is-batch .batch-actions-bar { position: sticky; bottom: -20px; z-index: 4; margin: 16px -22px -20px; padding: 12px 22px 14px; background: var(--parchment) 0 0 / 420px, #e9e1cf; box-shadow: 0 -6px 12px rgba(60, 40, 20, .12); }
 @media (max-width: 760px) { .app.playmat .modal .batch-row { grid-template-columns: 20px 40px minmax(0, 1fr); } .app.playmat .modal .batch-actions { grid-column: 3; flex-direction: row; padding-top: 0; } }
+
+/* ---- v1.3 Phase 3 · UI-P0: the mat in three columns ----
+   left: IN PLAY (large card) over USED · centre: card page over HAND · right: ledger over DECK (user memo: deck right, used left).
+   The filter row stays across the whole mat. Each column splits its own height, so the large card uses the left column and
+   the hand gets the larger share of the centre. */
+.app.playmat .workspace, .app.playmat.resources-collapsed .workspace { grid-template-columns: minmax(0, 1fr); }
+.app.playmat .board-grid { flex: 1; min-height: 0; display: grid; gap: 16px;
+  grid-template-columns: clamp(190px, 21%, 340px) minmax(0, 1fr) clamp(220px, 21%, 330px); }
+.app.playmat.resources-collapsed .board-grid { grid-template-columns: clamp(190px, 21%, 340px) minmax(0, 1fr) 112px; }
+.app.playmat .board-column { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+/* Left: the IN PLAY slot takes the column; the card keeps its ratio inside it (size container). */
+.app.playmat .board-left > .in-play-slot { flex: 1; min-height: 0; container-type: size; padding: 0; }
+.app.playmat .board-left > .in-play-slot > .detail-card { width: min(calc(100cqw - 28px), calc((100cqh - 38px) / 1.458)); height: auto; max-width: none; aspect-ratio: 1 / 1.458; margin-top: 8px; }
+.app.playmat .in-play-slot > .zone-label { position: absolute; top: -9px; left: 50%; z-index: 2; transform: translateX(-50%); }
+/* The piles share one size and design on both sides. */
+.app.playmat .board-column > .mat-zone { flex: none; width: 100%; height: clamp(104px, 27%, 196px); margin: 0; padding: 13px 8px 5px; gap: 4px; }
+.app.playmat .board-column > .mat-zone .pile { width: auto; height: min(140px, calc(100% - 36px)); }
+.app.playmat .board-column > .mat-zone .zone-label { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); }
+.app.playmat .board-column > .mat-zone .zone-caption { max-width: calc(100% - 16px); }
+/* Centre: the card page over the hand. */
+.app.playmat .board-center > .detail-panel { margin: 0; }
+.app.playmat .board-center .selection { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.app.playmat .board-center > .hand-row { flex: 1; min-height: 130px; }
+/* Right: the ledger over the deck; collapsing it narrows the column and keeps the deck. */
+.app.playmat .board-right > .resource-panel { flex: 1; min-height: 0; }
+.app.playmat.resources-collapsed .board-right > .mat-zone .zone-caption { display: none; }
+@media (max-width: 1100px) {
+  .app.playmat .board-grid { gap: 12px; grid-template-columns: clamp(150px, 19%, 260px) minmax(0, 1fr) clamp(180px, 21%, 260px); }
+  .app.playmat.resources-collapsed .board-grid { grid-template-columns: clamp(150px, 19%, 260px) minmax(0, 1fr) 96px; }
+  .app.playmat .board-column > .mat-zone .pile { width: auto; }
+}
+/* On shorter windows the ledger's own heading (a second “자원 장부”) gives its room to the resources. */
+@media (max-height: 760px) { .app.playmat .board-right .ledger-heading { display: none; } }
+/* USED now lives in the left column, so the old narrow-window rule that hid it no longer applies. */
+@media (max-width: 900px) { .app.playmat .board-left > .used-pile { display: flex; } }
+/* Narrow windows (e.g. 1280×720 at 150% = 853 CSS px): the chip strip shows a thin scrollbar so hidden chips are
+   discoverable, and the character name in the nameplate is cut with an ellipsis instead of running into the deck. */
+@media (max-width: 1000px) {
+  .app.playmat .filter-strip { scrollbar-width: thin; scrollbar-color: #5a4236 transparent; }
+  .app.playmat .filter-strip::-webkit-scrollbar { display: block; height: 6px; }
+  .app.playmat .search-row { flex-basis: 170px; min-width: 112px; }
+  .app.playmat .nameplate-character select { max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+/* Short windows (≤ 560 CSS px tall): thinner chrome and a compact card page, so the Use seal, the recovery buttons and
+   both piles stay fully visible without hiding anything. */
+@media (max-height: 560px) {
+  .app.playmat .topbar { min-height: 46px; padding-top: 4px; padding-bottom: 4px; }
+  .app.playmat .workspace { padding: 6px 8px 2px; }
+  .app.playmat .board { gap: 6px; padding: 6px 12px 6px; border-width: 18px; border-image-width: 44px; }
+  .app.playmat .board-top { height: 32px; }
+  .app.playmat .board-grid { gap: 10px; }
+  .app.playmat .board-column { gap: 8px; }
+  .app.playmat .board-center > .detail-panel { flex: 0 0 auto; height: clamp(132px, 48%, 190px); min-height: 0; }
+  .app.playmat .codex-page { padding: 7px 14px 5px; gap: 2px; }
+  /* A shorter bookmark (same proportions) ends above the description on the compact page. */
+  .app.playmat .codex-page::before { width: 13px; height: 32px; right: 60px; }
+  .app.playmat .selected-card-heading h2 { font-size: 16px; }
+  .app.playmat .detail-tags { margin-top: 2px; max-height: 22px; }
+  .app.playmat .description-pane { min-height: 18px; }
+  .app.playmat .description-pane > summary { padding: 0; }
+  .app.playmat .card-use { min-height: 56px; max-height: 70px; padding-top: 3px; }
+  .app.playmat.p4-b .use-button { width: 58px; height: 58px; margin: -2px 0; padding: 0 10px; font-size: 11px; }
+  .app.playmat .board-center > .hand-row { min-height: 96px; }
+  .app.playmat .board-column > .mat-zone { height: clamp(78px, 30%, 120px); padding: 10px 6px 4px; }
+  .app.playmat .board-column > .mat-zone .pile { height: calc(100% - 18px); }
+  .app.playmat .board-column > .mat-zone .pile-count { width: 24px; height: 24px; font-size: 10px; right: -8px; bottom: -6px; }
+  .app.playmat .resource-panel { gap: 4px; padding: 8px 9px 6px; }
+  .app.playmat .resource-panel > .panel-title { min-height: 22px; }
+  .app.playmat .ledger-sheet { min-height: 64px; }
+  .app.playmat .ledger-page { padding: 8px 10px 4px; }
+  .app.playmat .coin { width: 30px; height: 30px; }
+  .app.playmat .rest-buttons button { gap: 1px; font-size: 10px; line-height: 1.15; }
+  .app.playmat .undo-button { padding: 0; font-size: 10px; }
+}
