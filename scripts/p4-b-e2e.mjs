@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { createServer } from 'vite';
 import sharp from 'sharp';
-import { openManagement, expandResource, openExtraFilters, closeExtraFilters } from './navigation-helpers.mjs';
+import { openManagement, expandResource, openExtraFilters, closeExtraFilters, registerBatch } from './navigation-helpers.mjs';
 
 const baseline=process.argv.includes('--baseline'),dev=process.argv.includes('--dev');
 const binary=process.env.DND_TCG_EXECUTABLE;assert(!(dev&&binary));
@@ -33,7 +33,7 @@ async function capture(name){await frame();const png=await app.evaluate(async({B
 async function cards(){const result=await page.evaluate(()=>window.desktop.getBootstrap());assert(result.ok,result.error);return result.value;}
 async function resourceState(id){const result=await page.evaluate(id=>window.desktop.getResources(id),id);assert(result.ok,result.error);return result.value;}
 async function seed(from,to){
-  for(let i=from;i<to;i+=20){await openManagement(page,'카드 등록');const form=page.getByRole('dialog',{name:'카드 등록',exact:true});await form.getByLabel('카드 이미지 파일').setInputFiles(inputs.slice(i,Math.min(i+20,to)));await form.getByRole('button',{name:'카드 저장',exact:true}).click();await form.waitFor({state:'hidden'});}
+  for(let i=from;i<to;i+=20){await openManagement(page,'카드 등록');const form=page.getByRole('dialog',{name:'카드 등록',exact:true});const chunk=inputs.slice(i,Math.min(i+20,to));await form.getByLabel('카드 이미지 파일').setInputFiles(chunk);if(chunk.length>1)await registerBatch(form,chunk.length);else{await form.getByRole('img',{name:/등록 미리보기$/}).waitFor();await form.getByRole('button',{name:'카드 저장',exact:true}).click();await form.waitFor({state:'hidden'});}}
   await page.evaluate(async()=>{const r=await window.desktop.getBootstrap();if(!r.ok)throw Error(r.error);for(let i=0;i<r.value.cards.length;i+=100){const cards=r.value.cards.slice(i,i+100).map(c=>({id:c.id,name:c.name,imageAssetId:c.imageAssetId,kind:c.kind,spellLevel:c.spellLevel,roles:c.name.startsWith('짝수')?['damage']:['utility'],actions:c.actions,range:c.range,tags:c.tags,description:c.description}));const saved=await window.desktop.saveCards({cards});if(!saved.ok)throw Error(saved.error);}});
 }
 async function measureFilter(query,expected){return page.evaluate(async({query,expected})=>{

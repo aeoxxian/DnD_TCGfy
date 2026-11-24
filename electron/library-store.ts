@@ -182,6 +182,12 @@ export class LibraryStore {
   getAsset(id: string): AssetRecord | undefined {
     return this.db.prepare('SELECT * FROM assets WHERE id=? AND NOT EXISTS(SELECT 1 FROM asset_cleanup WHERE asset_id=assets.id)').get(id) as unknown as AssetRecord | undefined;
   }
+  /** v1.3 Phase 2: existing cards (trash included) whose image has these exact bytes, for the duplicate-image warning. */
+  cardsWithImage(sha256: string, limit = 3): { name: string; trashed: boolean }[] {
+    return (this.db.prepare(`SELECT c.name, EXISTS(SELECT 1 FROM card_trash t WHERE t.card_id = c.id) AS trashed FROM card_definitions c
+      JOIN assets a ON a.id = c.image_asset_id WHERE a.sha256 = ? ORDER BY c.created_at, c.id LIMIT ?`).all(sha256, limit) as { name: string; trashed: number }[])
+      .map(row => ({ name: row.name, trashed: !!row.trashed }));
+  }
   /**
    * v1.3: queue images for deletion that a cancelled registration imported, but only while nothing uses them: no card
    * (active or in the trash), no card image history and no custom card back. Returns the queued ids.

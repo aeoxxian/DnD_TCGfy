@@ -1,6 +1,6 @@
 # v1.3 데이터 보충 계약
 
-SQLite 버전은 **v6 유지**. DDL·마이그레이션·새 `settings` 키는 없다(Phase 1 기준). 1.2.0과 v1.3 개발본은 같은 DB를 서로 열 수 있다.
+SQLite 버전은 **v6 유지**. DDL·마이그레이션은 없다. 새 `settings` 키는 Phase 2의 `registration_templates` 하나다. 1.2.0과 v1.3 개발본은 같은 DB를 서로 열 수 있다(1.2.0은 새 키를 읽지 않는다).
 
 ## 이미지 없는 카드 (Phase 1)
 
@@ -34,3 +34,38 @@ SQLite 버전은 **v6 유지**. DDL·마이그레이션·새 `settings` 키는 �
 - 한 ID는 한 번만 요청할 수 있다(요청하면 이번 실행 목록에서 빠진다).
 - 정리가 실패하면(파일 잠김 등) 기존처럼 대기열에 남아 다음 시작 때 다시 시도한다.
 - 앱이 등록 창을 연 채 종료되면 그 이미지는 남는다. 이전 실행에서 남은 이미지는 자동으로 지우지 않는다(사용자 데이터를 추측해 지우지 않는다).
+
+## `settings.registration_templates` (Phase 2)
+
+`Settings.registrationTemplates`, 등록 템플릿 배열(최대 20개). 다른 설정과 따로 저장해서 `preferences`는 바뀌지 않는다.
+
+```ts
+{
+  id: string; name: string;                       // 이름 1~40자, 같은 이름(공백·대소문자·NFKC 무시)과 같은 ID 금지
+  card: { kind; spellLevel?; roles; actions; range: { kind; feet? }; tags: string[] };   // 카드 정의와 같은 값 범위
+  rule: { kind: 'unconfigured' | 'none' | 'slots' | 'uses' | 'points'; scope: 'shared' | 'character';
+          family: 'standard' | 'pact'; homebrew: boolean; belowBase: boolean; minLevel?; maxLevel?;
+          resourceName?: string;                  // 자원은 캐릭터마다 ID가 달라 이름으로 저장
+          amount: number; variable: boolean; min: number; max: number; step: number };
+  addToDeck: boolean;
+}
+```
+
+- 카드 이름·이미지·설명은 저장하지 않는다. 여러 사용 방식 같은 고급 규칙은 템플릿에 넣지 않는다.
+- 적용할 때 `resourceName`을 현재 캐릭터의 횟수·포인트 자원에서 이름으로 찾는다. 없으면 비워 두고 알린다. 지워진 태그는 빼고 알린다. 캐릭터가 없으면 `scope: 'character'`를 공통으로 바꿔 알린다.
+- 템플릿을 지워도 이미 등록한 카드는 바뀌지 않는다.
+
+## 이미지 가져오기 결과 (`AssetPreview`, Phase 2)
+
+선택 필드 두 개가 늘었다. DB 변경은 없다(`assets.sha256`은 v1부터 있음).
+
+- `sha256`: 가져온 원본의 해시. 같은 일괄 등록 안에서 같은 이미지를 두 번 고른 것을 찾는 데 쓴다(두 번째부터 기본 제외).
+- `duplicates`: 같은 바이트의 이미지를 이미 쓰는 카드(휴지통 카드 포함, 최대 3장)의 `{ name, trashed }`. 경고만 하고 등록은 막지 않는다.
+
+## 여러 장 등록의 저장 단위 (Phase 2)
+
+새 IPC는 없다. 렌더러가 카드마다 `saveCards`를 한 번씩 부른다. 각 요청은 기존 등록 트랜잭션 하나이고 `initialRules.requestId`는 카드마다 다르다.
+
+- 같은 카드를 같은 내용으로 다시 보내면 같은 `requestId`를 쓴다. 이미 저장됐으면 기존 등록 영수증(`registration:<requestId>`)이 같은 결과를 돌려주므로 카드가 두 번 생기지 않는다.
+- 비용을 저장하면 캐릭터의 자원 revision이 올라가므로, `expectedRevision`은 카드마다 새로 읽는다.
+- 공통 규칙의 새 자원 초안은 그것을 쓰는 첫 카드의 `newResources`로 한 번만 보낸다. 뒤의 카드는 만들어진 자원 ID에 연결한다.

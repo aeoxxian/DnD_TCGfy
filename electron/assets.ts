@@ -98,10 +98,12 @@ export class AssetService {
     try { await target.writeFile(bytes); await target.sync(); } finally { await target.close(); }
     await this.ensureCacheRoot();
     await writeFile(this.cachePath(id), thumbnail, { flag: 'wx' });
-    this.library.addAsset({ id, relative_path: relativePath, sha256: createHash('sha256').update(bytes).digest('hex'),
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    this.library.addAsset({ id, relative_path: relativePath, sha256,
       mime_type: `image/${format}`, width, height, original_name: basename(path) });
     this.sessionImports.add(id);
-    return { id, name: basename(path, extname(path)), url: assetUrl(id), thumbnailUrl: assetUrl(id, true), width, height };
+    const duplicates = this.library.cardsWithImage(sha256);
+    return { id, name: basename(path, extname(path)), url: assetUrl(id), thumbnailUrl: assetUrl(id, true), width, height, sha256, ...(duplicates.length ? { duplicates } : {}) };
   }
   /** v1.3: the requested ids that were imported during this run, forgotten so they can be claimed only once. The renderer
    *  can never point the cleanup at an image from an earlier run, a backup or another card. */

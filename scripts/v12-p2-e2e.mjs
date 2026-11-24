@@ -90,7 +90,10 @@ assert(await maxScroll(page) > 300, 'the whole library overflows the hand');
   const fast = await flick(page, 0);
   assert(fast.travelled > 40, `fast drag keeps moving after release: ${JSON.stringify({ released: fast.released, final: fast.final })}`);
   assert(monotonic(fast.points, 1), 'glide keeps the drag direction and never bounces back');
-  assert(fast.points.some(p => p.gliding) && !fast.points.at(-1).gliding, 'glide starts and ends');
+  assert(fast.points.some(p => p.gliding), 'glide starts');
+  // The recording window is fixed; when Playwright delivers the moves late the glide can outlast it, so wait for its end.
+  if (fast.points.at(-1).gliding) await page.waitForFunction(() => document.querySelector('.cards-area')?.dataset.gliding !== 'true', null, { timeout: 3000 });
+  assert.equal(await gliding(page), false, 'glide ends');
   const speeds = fast.points.slice(1).map((p, i) => (p.x - fast.points[i].x) / Math.max(1, p.t - fast.points[i].t)).filter(v => v > 0);
   assert(speeds.length > 3 && speeds.at(-1) < speeds[0], `glide decelerates: ${speeds[0]?.toFixed(2)} → ${speeds.at(-1)?.toFixed(2)} px/ms`);
   await setScroll(page, 0);

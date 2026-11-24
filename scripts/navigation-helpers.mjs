@@ -37,3 +37,10 @@ export async function putInDeck(page,title,deckLabel){
   await page.getByRole('button',{name:'관리',exact:true}).click();const menu=page.getByRole('dialog',{name:'관리 메뉴',exact:true});
   await menu.getByRole('button',{name:`${deckLabel}에 넣기`,exact:true}).click();await menu.getByRole('button',{name:`${deckLabel}에서 빼기`,exact:true}).waitFor();await page.keyboard.press('Escape');
 }
+/** v1.3 Phase 2: register the cards of a multi-image form — “N장 등록” → final check → 등록 시작 → result → 닫기. */
+export async function registerBatch(form,count){
+  const start=form.getByRole('button',count?{name:`${count}장 등록`,exact:true}:{name:/^\d+장 등록$/});await start.click();
+  await form.getByRole('region',{name:'등록 전 최종 확인',exact:true}).waitFor();await form.getByRole('button',{name:'등록 시작',exact:true}).click();
+  await form.getByRole('region',{name:'등록 결과',exact:true}).getByRole('heading',{name:/장 등록 완료$/}).waitFor({timeout:120000});
+  await form.getByRole('button',{name:'닫기',exact:true}).last().click();await form.waitFor({state:'hidden'});
+}

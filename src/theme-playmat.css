@@ -461,7 +461,8 @@ html, body { background: #0b0807; }
 .app.playmat .modal button { color: var(--ink); background: rgba(255, 252, 244, .45); box-shadow: inset 0 0 0 1px #9c866a; }
 .app.playmat .modal button:hover:not(:disabled) { filter: none; background: rgba(255, 252, 244, .75); }
 .app.playmat .modal button.primary { color: var(--ink-l); background: var(--grain) 0 0 / 220px, linear-gradient(180deg, var(--bind-hi), var(--bind-lo)); box-shadow: inset 0 0 0 1px #000, 0 0 0 1px var(--m1), 0 2px 5px rgba(0, 0, 0, .4); }
-.app.playmat .modal button.primary:hover:not(:disabled) { filter: brightness(1.15); }
+/* v1.3: keep the primary material on hover (the generic dialog hover background used to win and left light text on light). */
+.app.playmat .modal button.primary:hover:not(:disabled) { filter: brightness(1.15); background: var(--grain) 0 0 / 220px, linear-gradient(180deg, var(--bind-hi), var(--bind-lo)); }
 .app.playmat :is(.modal, .board) button.danger { color: #fbeee2; background: linear-gradient(180deg, #8a3a30, #4e1a14); box-shadow: inset 0 1px 0 rgba(255, 190, 170, .25), 0 0 0 1px #000; }
 .app.playmat .modal :is(input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea) { color: var(--ink-strong); background: rgba(255, 252, 244, .55); box-shadow: inset 0 1px 3px rgba(95, 72, 48, .25), 0 0 0 1px #9c866a; }
 .app.playmat .modal input:is([type=checkbox], [type=radio]) { accent-color: var(--ribbon); }
@@ -838,3 +839,55 @@ html, body { background: #0b0807; }
   .app.playmat .v13-editor .editor-layout { grid-template-columns: 1fr; }
   .app.playmat .v13-editor .editor-preview-column { position: static; display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: start; }
 }
+
+/* ---- v1.3 Phase 2: registration templates and multi-image (batch) registration ---- */
+.app.playmat .modal .template-bar { margin: 0 0 14px; padding: 10px 12px 8px; border: 1px solid #b9a684; border-radius: 7px; background: rgba(255, 252, 244, .32); }
+.app.playmat .modal .template-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-bottom: 6px; }
+.app.playmat .modal .template-row .form-field { flex: 1 1 200px; margin: 0; }
+.app.playmat .modal .template-row > button, .app.playmat .modal .template-confirm button { padding: 7px 12px; font-size: 12px; }
+.app.playmat .modal .template-confirm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.app.playmat .modal .template-help { margin: 2px 0 0; font-size: 11px; }
+.app.playmat .modal .template-notes { margin: 6px 0 0; padding: 6px 10px; border-left: 2px solid var(--ribbon); font-size: 12px; line-height: 1.6; color: var(--ink); background: rgba(255, 252, 244, .38); }
+.app.playmat .modal .template-notes p { margin: 0; }
+.app.playmat .v13-editor .editor-plain { min-width: 0; margin: 0; padding: 0; border: 0; }
+.app.playmat .v13-editor .batch-common-title { margin: 4px 0 8px; font: 700 14px var(--kserif); }
+.app.playmat .modal .batch-warning { margin: 4px 0 0; font-size: 12px; line-height: 1.5; color: #7a4a12; }
+.app.playmat .modal .batch-list { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--ink-line); }
+.app.playmat .modal .batch-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 8px; }
+.app.playmat .modal .batch-head h3 { margin: 0; font: 700 14px var(--kserif); }
+.app.playmat .modal .batch-head > p { flex: 1 1 100%; margin: 0; font-size: 12px; line-height: 1.6; }
+.app.playmat .modal .batch-head > button { padding: 5px 12px; font-size: 12px; }
+.app.playmat .modal .batch-counts { font-weight: 700; color: var(--ink); }
+.app.playmat .modal .batch-rows { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.app.playmat .modal .batch-row { display: grid; grid-template-columns: 20px 46px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 8px 10px; border: 1px solid #c9b896; border-radius: 7px; background: rgba(255, 252, 244, .3); }
+.app.playmat .modal .batch-row.is-open { border-color: var(--ribbon); background: rgba(255, 252, 244, .55); }
+.app.playmat .modal .batch-row.is-excluded > :not(.batch-include):not(.batch-actions) { opacity: .5; }
+.app.playmat .modal .batch-row.status-saved { border-color: #6f8a5a; background: rgba(214, 232, 196, .35); }
+.app.playmat .modal .batch-row.status-failed { border-color: var(--wax); background: rgba(240, 205, 195, .35); }
+.app.playmat .modal .batch-include { padding-top: 22px; }
+.app.playmat .modal .batch-thumb { width: 46px; aspect-ratio: 1 / 1.458; object-fit: contain; border-radius: 4px; background: #1a120f; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); }
+.app.playmat .modal .batch-main { min-width: 0; }
+.app.playmat .modal .batch-name { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--ink-mute); }
+.app.playmat .modal .batch-name input { width: 100%; font-size: 13px; }
+.app.playmat .modal .batch-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0 0; }
+.app.playmat .modal .batch-chips > span { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 2px 8px 2px 3px; border-radius: 999px; font-size: 11px; line-height: 1.5; color: var(--ink); background: rgba(255, 252, 244, .6); box-shadow: inset 0 0 0 1px #c9b896; overflow-wrap: anywhere; }
+.app.playmat .modal .batch-chips b { padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; color: var(--ink-mute); background: rgba(95, 72, 48, .12); }
+.app.playmat .modal .batch-chips > span.is-custom { box-shadow: inset 0 0 0 1px var(--ribbon); }
+.app.playmat .modal .batch-chips > span.is-custom b { color: #fbeee2; background: var(--ribbon); }
+.app.playmat .modal .batch-problem { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: var(--wax); }
+.app.playmat .modal .batch-status { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: var(--ink-mute); }
+.app.playmat .modal .batch-status.status-saved { color: #3f5f2c; }
+.app.playmat .modal .batch-status.status-failed { color: var(--wax); }
+.app.playmat .modal .batch-actions { display: flex; flex-direction: column; gap: 4px; padding-top: 16px; }
+.app.playmat .modal .batch-actions button { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
+.app.playmat .modal .batch-editor { grid-column: 1 / -1; margin-top: 6px; padding: 10px 12px; border-left: 2px solid var(--ribbon); background: rgba(255, 252, 244, .45); }
+.app.playmat .modal .batch-editor .editor-checks { margin: 8px 0; }
+.app.playmat .modal .batch-editor .registration-rules { margin-top: 8px; padding-top: 8px; }
+.app.playmat .modal .batch-editor > button { margin-top: 8px; padding: 5px 12px; font-size: 12px; }
+.app.playmat .modal :is(.batch-confirm, .batch-result) { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--ribbon); border-radius: 7px; background: rgba(255, 252, 244, .55); }
+.app.playmat .modal :is(.batch-confirm, .batch-result) h3 { margin: 0 0 6px; font: 700 14px var(--kserif); }
+.app.playmat .modal .batch-confirm ul { margin: 0 0 8px; padding-left: 18px; font-size: 13px; line-height: 1.8; color: var(--ink); }
+.app.playmat .modal :is(.batch-confirm, .batch-result) p { margin: 4px 0 0; font-size: 12px; line-height: 1.6; }
+.app.playmat .modal .batch-result [role=status] { font-size: 13px; font-weight: 700; color: var(--ink); }
+.app.playmat .v13-editor.is-batch .batch-actions-bar { position: sticky; bottom: -20px; z-index: 4; margin: 16px -22px -20px; padding: 12px 22px 14px; background: var(--parchment) 0 0 / 420px, #e9e1cf; box-shadow: 0 -6px 12px rgba(60, 40, 20, .12); }
+@media (max-width: 760px) { .app.playmat .modal .batch-row { grid-template-columns: 20px 40px minmax(0, 1fr); } .app.playmat .modal .batch-actions { grid-column: 3; flex-direction: row; padding-top: 0; } }

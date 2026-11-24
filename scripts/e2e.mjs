@@ -1,4 +1,4 @@
-import { openManagement, expandResource, openExtraFilters, closeExtraFilters } from './navigation-helpers.mjs';
+import { openManagement, expandResource, openExtraFilters, closeExtraFilters, registerBatch } from './navigation-helpers.mjs';
 import { runTrash } from './trash-scenarios.mjs';
 import { runBulk } from './bulk-scenarios.mjs';
 import { openAdvancedRules } from './use-rule-helpers.mjs';
@@ -138,7 +138,7 @@ try {
   await dialog.getByLabel('거리 (ft, 선택)').fill('60'); await dialog.getByLabel('주문 레벨 (선택)').selectOption('1');
   await dialog.getByLabel('새 태그', { exact: true }).fill('검수 공통'); await dialog.getByRole('button', { name: '태그 추가', exact: true }).click();
   await dialog.getByRole('checkbox', { name: '검수 공통', exact: true }).waitFor();
-  await dialog.getByRole('button', { name: '20장 등록' }).click(); await dialog.waitFor({ state: 'hidden' }); await waitCount(21);
+  await registerBatch(dialog, 20); await waitCount(21);
   data = await state(); const importedCards = data.cards.filter(card => card.id !== 'p0-card');
   assert.equal(new Set(importedCards.map(card => card.id)).size, 20);
   assert(importedCards.every(card => card.imageAssetId && card.spellLevel === 1 && card.roles.includes('damage') && card.actions.includes('bonus_action')));

@@ -59,6 +59,36 @@ export const appearanceSchema = z.strictObject({
 export type Appearance = z.infer<typeof appearanceSchema>;
 export const DEFAULT_APPEARANCE: Appearance = { theme: 'oxblood', cardBack: { default: { type: 'builtin', id: 'dragon' }, decks: {} }, customBacks: [] };
 
+export const roleSchema = z.enum(['damage', 'heal', 'protect', 'buff', 'debuff', 'utility', 'revive', 'other']);
+export const actionSchema = z.enum(['action', 'bonus_action', 'reaction', 'no_action', 'passive', 'special']);
+export const kindSchema = z.enum(['spell', 'attack', 'feature', 'feat', 'item', 'other']);
+export const rangeSchema = z.enum(['self', 'touch', 'melee', 'ranged', 'special']);
+/**
+ * v1.3 Phase 2: a saved registration template (settings key `registration_templates`). Resources are kept by name because
+ * resource IDs differ per character; applying a template looks the name up in the current character's resources.
+ */
+export const registrationTemplateSchema = z.strictObject({
+  id: idSchema, name: z.string().trim().min(1).max(40),
+  card: z.strictObject({
+    kind: kindSchema, spellLevel: z.number().int().min(0).max(9).optional(),
+    roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
+    range: z.strictObject({ kind: rangeSchema, feet: z.number().int().min(0).max(100000).optional() }),
+    tags: z.array(idSchema).max(100),
+  }),
+  rule: z.strictObject({
+    kind: z.enum(['unconfigured', 'none', 'slots', 'uses', 'points']), scope: z.enum(['shared', 'character']),
+    family: z.enum(['standard', 'pact']), homebrew: z.boolean(), belowBase: z.boolean(),
+    minLevel: z.number().int().min(1).max(9).optional(), maxLevel: z.number().int().min(1).max(9).optional(),
+    resourceName: z.string().trim().min(1).max(60).optional(),
+    amount: z.number().int().min(0).max(1000000), variable: z.boolean(),
+    min: z.number().int().min(0).max(1000000), max: z.number().int().min(0).max(1000000), step: z.number().int().min(1).max(1000000),
+  }),
+  addToDeck: z.boolean(),
+});
+export type RegistrationTemplate = z.infer<typeof registrationTemplateSchema>;
+export const registrationTemplatesSchema = z.array(registrationTemplateSchema).max(20)
+  .refine(list => new Set(list.map(item => item.id)).size === list.length, '템플릿 ID가 중복됩니다.')
+  .refine(list => new Set(list.map(item => item.name.trim().normalize('NFKC').toLocaleLowerCase('ko'))).size === list.length, '같은 이름의 템플릿이 있습니다.');
 export const settingsSchema = z.strictObject({
   viewMode: z.enum(['hand', 'grid']),
   reducedMotion: z.boolean(),
@@ -69,13 +99,10 @@ export const settingsSchema = z.strictObject({
   effects: effectsSchema.optional(),
   slotColors: z.record(z.string().min(1).max(128), slotColorSetSchema).refine(value => Object.keys(value).length <= 200).optional(),
   handScroll: handScrollSchema.optional(),
+  registrationTemplates: registrationTemplatesSchema.optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };
-export const roleSchema = z.enum(['damage', 'heal', 'protect', 'buff', 'debuff', 'utility', 'revive', 'other']);
-export const actionSchema = z.enum(['action', 'bonus_action', 'reaction', 'no_action', 'passive', 'special']);
-export const kindSchema = z.enum(['spell', 'attack', 'feature', 'feat', 'item', 'other']);
-export const rangeSchema = z.enum(['self', 'touch', 'melee', 'ranged', 'special']);
 
 export const costSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('fixed'), costKey: z.string().min(1), amount: z.number().int().nonnegative(), slotLevel: z.number().int().min(1).max(9).optional() }),
@@ -137,7 +164,8 @@ export type LibraryState = z.infer<typeof libraryStateSchema>;
 export const DEFAULT_LIBRARY_STATE: LibraryState = { query: '', roles: [], actions: [], kinds: [], ranges: [], tagIds: [], viewScope: 'library' };
 export const tagMutationSchema = z.strictObject({ id: idSchema.optional(), name: z.string().trim().min(1).max(60) });
 export interface Tag { id: string; name: string; usageCount: number }
-export interface AssetPreview { id: string; name: string; url: string; thumbnailUrl: string; width: number; height: number }
+/** v1.3 Phase 2: `sha256` and `duplicates` (existing cards that already use the same image, trash included) warn about re-imports. */
+export interface AssetPreview { id: string; name: string; url: string; thumbnailUrl: string; width: number; height: number; sha256?: string; duplicates?: { name: string; trashed: boolean }[] }
 export interface ImportBatch { assets: AssetPreview[]; errors: { name: string; message: string }[] }
 export interface ProfileSummary { id: string; name: string; activeDeckId?: string; classId?: string; level?: number; ruleset?: 'dnd5e_2014'|'homebrew' }
 export interface Deck { id: string; characterId: string; name: string; cardIds: string[] }

@@ -89,17 +89,17 @@ export function App() {
     } catch { setError('변경을 저장하지 못했습니다. 기존 데이터는 유지됩니다.'); return false; }
     finally { setBusy(false); }
   }
-  async function updateSettings(patch: Partial<Settings>) {
-    if (!bootstrap || saving) return;
+  async function updateSettings(patch: Partial<Settings>): Promise<boolean> {
+    if (!bootstrap || saving) return false;
     const previous = bootstrap.settings;
     const next = { ...previous, ...patch };
     setBootstrap(current => current ? { ...current, settings: next } : current);
     setSaving(true); setStatus(''); setError('');
     try {
       const result = await window.desktop.saveSettings(next);
-      if (result.ok) { setBootstrap(current => current ? { ...current, settings: result.value } : current); setStatus('환경 설정 저장됨'); }
-      else { setBootstrap(current => current ? { ...current, settings: previous } : current); setError(result.error); }
-    } catch { setBootstrap(current => current ? { ...current, settings: previous } : current); setError('환경 설정을 저장하지 못했습니다. 다시 시도해 주세요.'); }
+      if (result.ok) { setBootstrap(current => current ? { ...current, settings: result.value } : current); setStatus('환경 설정 저장됨'); return true; }
+      setBootstrap(current => current ? { ...current, settings: previous } : current); setError(result.error); return false;
+    } catch { setBootstrap(current => current ? { ...current, settings: previous } : current); setError('환경 설정을 저장하지 못했습니다. 다시 시도해 주세요.'); return false; }
     finally { setSaving(false); }
   }
   const updateFilters = useCallback((patch: Partial<LibraryState>) => {
@@ -208,7 +208,7 @@ export function App() {
       </main>
     </div>
     <footer className="board-status">{lastTrashed.length>0&&<button disabled={busy} onClick={()=>void undoTrash()}>휴지통 이동 실행 취소 · {lastTrashed.length}장</button>}<span role="status" aria-live="polite">{saving ? '설정 저장 중…' : status || '로컬 카드 보드 준비됨'}</span><span className="navigation-hint" title="방향키 이동 · Enter/Space 선택 · Ctrl+F 검색">← → 이동 · Enter 선택 · Ctrl+F 검색</span><span>v{bootstrap.appVersion}</span></footer>
-    {(panel === 'new' || panel === 'edit') && <CardEditor key={panel === 'edit' ? selected?.id : 'new'} card={panel === 'edit' ? selected : undefined} initialAssets={panel === 'new' ? imported : undefined} registrationTarget={activeProfile && activeDeck ? { characterId: activeProfile.id, deckId: activeDeck.id } : null} targetLabel={activeProfile && activeDeck ? `${activeProfile.name} · ${activeDeck.name}` : undefined} tags={tags} onLibrary={library=>{applyLibrary(library);void resourceController.refresh();}} controller={resourceController} characterId={activeProfile?.id} characterName={activeProfile?.name} onClose={() => setPanel(undefined)} />}
+    {(panel === 'new' || panel === 'edit') && <CardEditor key={panel === 'edit' ? selected?.id : 'new'} card={panel === 'edit' ? selected : undefined} initialAssets={panel === 'new' ? imported : undefined} registrationTarget={activeProfile && activeDeck ? { characterId: activeProfile.id, deckId: activeDeck.id } : null} targetLabel={activeProfile && activeDeck ? `${activeProfile.name} · ${activeDeck.name}` : undefined} tags={tags} onLibrary={library=>{applyLibrary(library);void resourceController.refresh();}} controller={resourceController} characterId={activeProfile?.id} characterName={activeProfile?.name} templates={settings.registrationTemplates ?? []} onTemplates={list => updateSettings({ registrationTemplates: list })} onClose={() => setPanel(undefined)} />}
     {panel==='class'&&(resourceController.snapshot?<CharacterSettings key={resourceController.snapshot.characterId} controller={resourceController} onSaved={load} onClose={()=>setPanel(undefined)}/>:<Modal title="클래스·레벨 설정" onClose={()=>setPanel(undefined)}><p>{resourceController.error||'캐릭터와 자원 설정을 불러오는 중…'}</p></Modal>)}
     {panel === 'history'&&<EditHistory onClose={()=>setPanel(undefined)} onSaved={async()=>{await load();await resourceController.refresh();}}/>}
     {panel === 'resources' && <ResourceManager cards={cards} controller={resourceController} onClose={() => setPanel(undefined)} characterName={activeProfile?.name} slotColors={settings.slotColors?.[activeProfile?.id ?? '']} slotColorsBusy={saving} onSlotColors={next => { if (!activeProfile) return; const kept = Object.fromEntries(Object.entries(settings.slotColors ?? {}).filter(([id]) => id !== activeProfile.id && bootstrap.profiles.some(profile => profile.id === id))); void updateSettings({ slotColors: next ? { ...kept, [activeProfile.id]: next } : kept }); }} />}
