@@ -240,7 +240,7 @@ try {
   await page.evaluate(() => { const input = document.createElement('input'); input.type = 'file'; input.id = 'e2e-drop-source'; document.body.append(input); });
   await page.locator('#e2e-drop-source').setInputFiles(dropped);
   await page.evaluate(() => { const input = document.querySelector('#e2e-drop-source'); const transfer = new DataTransfer(); transfer.items.add(input.files[0]); document.querySelector('[aria-label="카드 보드"]').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: transfer })); input.remove(); });
-  dialog = page.getByRole('dialog', { name: '카드 등록', exact: true }); await dialog.getByLabel('카드 이름 1', { exact: true }).waitFor();
+  dialog = page.getByRole('dialog', { name: '카드 등록', exact: true }); await dialog.getByLabel('카드 이름', { exact: true }).waitFor(); assert.equal(await dialog.getByRole('img', { name: /등록 미리보기$/ }).count(), 1);
   await dialog.getByRole('button', { name: '카드 저장' }).click(); await dialog.waitFor({ state: 'hidden' }); await waitCount(22);
   recordCheck('Disk-backed File drag-and-drop follows the secure preload import pipeline');
 

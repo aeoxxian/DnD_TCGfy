@@ -69,7 +69,7 @@ export class LibraryStore {
     return { cards, tags, profiles, decks, libraryState: this.getState(), warnings };
   }
   saveCards(input: unknown, withinTransaction = false): Library {
-    const { cards: drafts, registrationTarget, initialRules } = saveCardsSchema.parse(input);
+    const { cards: drafts, registrationTarget, addToDeck, initialRules } = saveCardsSchema.parse(input);
     if (initialRules) throw new UserInputError('초기 사용 규칙은 통합 등록 경로에서 저장해 주세요.');
     const ids = drafts.flatMap(card => card.id ? [card.id] : []);
     if (new Set(ids).size !== ids.length) throw new UserInputError('같은 카드를 한 번에 두 번 수정할 수 없습니다.');
@@ -101,7 +101,7 @@ export class LibraryStore {
         this.db.prepare('DELETE FROM card_tags WHERE card_id=?').run(id);
         const insertTag = this.db.prepare('INSERT INTO card_tags(card_id,tag_id) VALUES (?,?)');
         for (const tagId of card.tags) insertTag.run(id, tagId);
-        if (!existing && target) this.db.prepare('INSERT INTO deck_cards(deck_id,card_id,position) VALUES (?,?,(SELECT COALESCE(MAX(position),-1)+1 FROM deck_cards WHERE deck_id=?))').run(target.deckId, id, target.deckId);
+        if (!existing && target && addToDeck !== false) this.db.prepare('INSERT INTO deck_cards(deck_id,card_id,position) VALUES (?,?,(SELECT COALESCE(MAX(position),-1)+1 FROM deck_cards WHERE deck_id=?))').run(target.deckId, id, target.deckId);
       }
     };
     if (withinTransaction) execute(); else transaction(this.db, execute);
@@ -181,6 +181,33 @@ export class LibraryStore {
   }
   getAsset(id: string): AssetRecord | undefined {
     return this.db.prepare('SELECT * FROM assets WHERE id=? AND NOT EXISTS(SELECT 1 FROM asset_cleanup WHERE asset_id=assets.id)').get(id) as unknown as AssetRecord | undefined;
+  }
+  /**
+   * v1.3: queue images for deletion that a cancelled registration imported, but only while nothing uses them: no card
+   * (active or in the trash), no card image history and no custom card back. Returns the queued ids.
+   */
+  queueUnusedImports(ids: readonly string[]): string[] {
+    if (!ids.length) return [];
+    return transaction(this.db, () => {
+      const row = this.db.prepare("SELECT value_json FROM settings WHERE key='appearance'").get() as { value_json: string } | undefined;
+      // Unreadable card-back settings: keep every image rather than risk deleting a card back.
+      let backs = new Set<unknown>();
+      if (row) {
+        try {
+          const value = JSON.parse(row.value_json) as { customBacks?: unknown };
+          if (!value || typeof value !== 'object' || !Array.isArray(value.customBacks)) return [];
+          backs = new Set(value.customBacks.map(back => (back as { assetId?: unknown } | null)?.assetId));
+        } catch { return []; }
+      }
+      const used = this.db.prepare('SELECT 1 FROM card_definitions WHERE image_asset_id=? UNION ALL SELECT 1 FROM card_asset_history WHERE asset_id=? LIMIT 1');
+      const queue = this.db.prepare('INSERT OR IGNORE INTO asset_cleanup(asset_id,queued_at) VALUES (?,?)');
+      const now = new Date().toISOString(); const queued: string[] = [];
+      for (const id of ids) {
+        if (!this.getAsset(id) || backs.has(id) || used.get(id, id)) continue;
+        queue.run(id, now); queued.push(id);
+      }
+      return queued;
+    });
   }
   addAsset(asset: AssetRecord): void {
     transaction(this.db, () => this.db.prepare('INSERT INTO assets(id,relative_path,sha256,mime_type,width,height,original_name) VALUES (?,?,?,?,?,?,?)')

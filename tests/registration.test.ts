@@ -126,3 +126,17 @@ describe('v1.2 Phase 1 · new resource created inside the registration transacti
     expect(library.getLibrary().cards).toEqual([]);store.close();f.store.close();
   });
 });
+
+describe('v1.3 Phase 1 · library-only registration while a deck is active',()=>{
+  it('addToDeck:false keeps the card out of the deck but still rejects a target that changed meanwhile',()=>{
+    const f=fixture(),target={characterId:f.a.id,deckId:f.a.activeDeckId!};
+    const plain=f.library.saveCards({cards:[draft('라이브러리 전용')],registrationTarget:target,addToDeck:false}).cards.find(c=>c.name==='라이브러리 전용')!;
+    const ruled=f.registration.save({cards:[draft('규칙 있는 라이브러리 카드')],registrationTarget:target,addToDeck:false,initialRules:rules(f,{configured:false})}).cards.find(c=>c.name==='규칙 있는 라이브러리 카드')!;
+    const linked=f.registration.save({cards:[draft('덱 카드')],registrationTarget:target,initialRules:rules(f,{configured:false})}).cards.find(c=>c.name==='덱 카드')!;
+    expect(f.library.getLibrary().decks.find(d=>d.id===target.deckId)!.cardIds).toEqual([linked.id]);
+    expect(f.library.getLibrary().cards.map(c=>c.id)).toEqual(expect.arrayContaining([plain.id,ruled.id,linked.id]));
+    f.library.createProfile({name:'B'});const b=f.library.getLibrary().profiles.find(p=>p.name==='B')!;f.library.saveState({...f.library.getState(),activeCharacterId:b.id});
+    expect(()=>f.library.saveCards({cards:[draft('늦은 등록')],registrationTarget:target,addToDeck:false})).toThrow('바뀌었습니다');
+    expect(f.library.getLibrary().cards.some(c=>c.name==='늦은 등록')).toBe(false);f.store.close();
+  });
+});

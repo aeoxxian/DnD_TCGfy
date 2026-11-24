@@ -16,9 +16,10 @@ const CardTile = memo(function CardTile({ card, selected, checked, selectionMode
     {selectionMode && <label className="card-batch-check" onPointerDown={event => event.stopPropagation()}><input type="checkbox" aria-label={`${card.name} 일괄 선택`} checked={checked} onChange={event => onCheck(card.id, event.target.checked)}/><span>선택</span></label>}
     <button className={`card-button ${selected ? 'selected' : ''}`} tabIndex={-1} aria-label={`${card.name} 카드 선택`} aria-pressed={selected} aria-description={blocked ? `사용 불가 · ${USABILITY_NOTES[usability]}` : undefined}
       onClick={event => {
-        // Click selects; clicking the selected card again (mouse, Enter or Space) opens the enlargement. Never spends resources.
+        // Click selects; clicking the selected card again (mouse, Enter or Space) opens the enlargement — the image, or the
+        // default face of a card without one (v1.3). Never spends resources.
         if (!selected) onSelect(card.id, event.currentTarget);
-        else if (card.imageAssetId) onPreview(card.id, event.currentTarget);
+        else onPreview(card.id, event.currentTarget);
       }}>
       <CardFace key={`${card.id}-${card.imageAssetId}`} card={card} overlay={overlay}/>
       <span className="card-caption"><strong title={card.name}>{card.name}</strong><span>{card.roles.map(role => ROLE_NAMES[role]).join(' · ') || KIND_NAMES[card.kind]}</span>{note && <small className="card-resource-note">{note}</small>}</span>

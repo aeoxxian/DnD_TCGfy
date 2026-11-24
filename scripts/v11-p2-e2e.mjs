@@ -85,7 +85,7 @@ check('main-screen 카드 등록 opens the existing registration form; cancellin
 const NEW = 'P2 메인 등록 검수';
 await register.click(); form = page.getByRole('dialog', { name: '카드 등록', exact: true });
 await form.getByLabel('카드 이미지 파일').setInputFiles(imagePath);
-await form.getByLabel('카드 이름 1', { exact: true }).fill(NEW);
+await form.getByLabel('카드 이름', { exact: true }).fill(NEW);
 const advanced = form.locator('details.editor-advanced');
 if (!await advanced.evaluate(el => el.open)) await advanced.locator(':scope > summary').click();
 const tagBox = form.getByRole('group', { name: '카드 태그', exact: true }).getByRole('checkbox').first();

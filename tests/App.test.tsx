@@ -16,6 +16,7 @@ beforeEach(() => {
     saveSettings: vi.fn().mockImplementation(async settings => ({ ok: true, value: settings })),
     saveLibraryState: vi.fn().mockImplementation(async state => ({ ok: true, value: state })),
     importImages: vi.fn().mockResolvedValue({ ok: true, value: { assets: [], errors: [] } }),
+    discardImports: vi.fn().mockResolvedValue({ ok: true, value: { discarded: 0 } }),
     saveCards: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     archiveCard: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     saveTag: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),

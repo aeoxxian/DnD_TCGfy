@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useId, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import type { CardDefinition } from '../shared/contracts';
-import { imageUrl } from './CardFace';
+import { DefaultCard, imageUrl, kindLine } from './CardFace';
 
 const DURATION = 220;
 const MAX_TILT = 6;
@@ -47,17 +47,21 @@ function placeOver(from: DOMRect, to: DOMRect): string {
 export function ImageLightbox({ card, onClose, label, origin, tilt = false }: { card: CardDefinition; onClose: () => void; label?: string; origin?: Element | null; tilt?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const frame = useRef<HTMLDivElement>(null);
-  const image = useRef<HTMLImageElement>(null);
+  /** What leans: the image, or the default card face of a card without one (v1.3). */
+  const image = useRef<HTMLElement>(null);
   const outside = useRef(false);
   const state = useRef<{ played: boolean; settled: boolean; closing: boolean; animate: boolean }>({ played: false, settled: false, closing: false, animate: false });
   const help = useId();
   const [failed, setFailed] = useState(false);
+  const drawn = !card.imageAssetId || failed;
   useEffect(() => {
     const previous = document.activeElement;
     const dialog = ref.current!;
     state.current.animate = motionAllowed();
     dialog.showModal(); dialog.focus({ preventScroll: true });
-    if (image.current?.complete && image.current.naturalWidth) open();
+    const img = image.current;
+    // A default face has nothing to load, so it opens straight away; an image waits for onLoad.
+    if (!(img instanceof HTMLImageElement) || (img.complete && img.naturalWidth)) open();
     return () => {
       dialog.close();
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
@@ -65,6 +69,8 @@ export function ImageLightbox({ card, onClose, label, origin, tilt = false }: { 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per opening
   }, []);
+  // An image that fails to load is replaced by the default face, which then opens like any other card.
+  useEffect(() => { if (failed) open(); }, [failed]); // eslint-disable-line react-hooks/exhaustive-deps -- open reads refs only
   function originRect(): DOMRect | undefined {
     if (!origin?.isConnected) return undefined;
     const r = origin.getBoundingClientRect();
@@ -112,10 +118,10 @@ export function ImageLightbox({ card, onClose, label, origin, tilt = false }: { 
     onPointerMove={lean} onPointerLeave={resetTilt}
     onClick={event => { if (event.target === event.currentTarget && (event.detail === 0 || outside.current)) close(); }}>
     <p id={help} className="sr-only">{card.name} 확대 화면. 카드 밖을 클릭하거나 Escape를 눌러 돌아갑니다.</p>
-    {card.imageAssetId && !failed
-      ? <div ref={frame} className={`lightbox-card ${tilt ? 'can-tilt' : ''}`}>
-          <img ref={image} src={imageUrl(card.imageAssetId)} alt={`${card.name} 원본 확대`} draggable={false} onLoad={open} onError={() => { setFailed(true); state.current.settled = true; }}/>
-        </div>
-      : <p role="alert">원본 이미지를 읽을 수 없습니다. 카드 정보는 보존됩니다. ESC로 돌아가세요.</p>}
+    <div ref={frame} className={`lightbox-card ${tilt ? 'can-tilt' : ''} ${drawn ? 'is-default' : ''}`}>
+      {drawn
+        ? <div ref={image as RefObject<HTMLDivElement | null>} className="card-face default-face lightbox-default" role="img" aria-label={`${card.name} 기본 카드 확대 · ${kindLine(card)}`}><DefaultCard card={card} broken={failed}/></div>
+        : <img ref={image as RefObject<HTMLImageElement | null>} src={imageUrl(card.imageAssetId!)} alt={`${card.name} 원본 확대`} draggable={false} onLoad={open} onError={() => { setFailed(true); state.current.played = false; }}/>}
+    </div>
   </dialog>;
 }

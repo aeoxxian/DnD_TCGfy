@@ -126,7 +126,8 @@ export const initialRulesSchema = z.strictObject({
   newResources: z.array(z.strictObject({ draftId: idSchema, template: z.record(z.string(), z.unknown()) })).max(4).optional(),
 });
 export type InitialRules = z.infer<typeof initialRulesSchema>;
-export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional(), initialRules: initialRulesSchema.optional() });
+// v1.3: `addToDeck: false` registers into the library only while still checking `registrationTarget` (the deck the form showed).
+export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional(), addToDeck: z.boolean().optional(), initialRules: initialRulesSchema.optional() });
 export const libraryStateSchema = z.strictObject({
   query: z.string().max(200), roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
   kinds: z.array(kindSchema).max(6), ranges: z.array(rangeSchema).max(5), tagIds: z.array(idSchema).max(100),
@@ -145,6 +146,8 @@ export const createDeckSchema = z.strictObject({ characterId: idSchema, name: z.
 export const selectDeckSchema = z.strictObject({ characterId: idSchema, deckId: idSchema });
 export const deckCardsSchema = z.strictObject({ deckId: idSchema, cardIds: z.array(idSchema).max(5000) });
 export const importPathsSchema = z.array(z.string().min(1).max(32767)).min(1).max(100);
+/** v1.3: images picked in a registration that was cancelled or removed from its list (see AssetService.takeSessionImports). */
+export const discardImportsSchema = z.array(idSchema).max(200);
 
 export interface Library {
   cards: CardDefinition[]; tags: Tag[]; profiles: ProfileSummary[]; decks: Deck[];
@@ -165,6 +168,7 @@ export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge, 
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   saveLibraryState(state: LibraryState): Promise<Result<LibraryState>>;
   importImages(files: File[]): Promise<Result<ImportBatch>>;
+  discardImports(assetIds: string[]): Promise<Result<{ discarded: number }>>;
   saveCards(input: z.infer<typeof saveCardsSchema>): Promise<Result<Library>>;
   archiveCard(id: string): Promise<Result<Library>>;
   saveTag(input: z.infer<typeof tagMutationSchema>): Promise<Result<Library>>;
@@ -178,7 +182,7 @@ export const IPC = {
   getTrash:'trash:get', previewTrash:'trash:preview', changeTrash:'trash:change', retryImageCleanup:'trash:cleanup', getUseHistory:'resources:history',
   previewEdit: 'edits:preview', applyEdit: 'edits:apply', getEditHistory: 'edits:history',
   getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save', saveLibraryState: 'library:state',
-  importImages: 'assets:import', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
+  importImages: 'assets:import', discardImports: 'assets:discard', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
   createProfile: 'profiles:create', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
   previewClass: 'classes:preview', getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
   exportBackup: 'backup:export', inspectBackup: 'backup:inspect', applyBackup: 'backup:apply', discardBackup: 'backup:discard', getBackupStatus: 'backup:status',

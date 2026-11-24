@@ -772,3 +772,69 @@ html, body { background: #0b0807; }
 .app.playmat.reduced-motion .coin { transition: none; }
 .app.playmat.reduced-motion .rest-buttons button .coin { transform: none !important; }
 @media (prefers-reduced-motion: reduce) { .app.playmat .rest-buttons button .coin { transform: none !important; } }
+
+/* ---- v1.3 Phase 1: default face of a card without an image, and the single-card registration form ---- */
+/* Everything inside the default face is sized in container units, so it scales like an image from the hand to the
+   enlargement. The trim comes from the theme (gold / silver / matte bronze / sky light in 아케인 블루, no metal there). */
+.app.playmat .card-face.default-face { padding: 0; background: var(--bind-lo); container-type: inline-size; overflow: hidden; }
+.app.playmat .default-face-art { flex: 1; width: 100%; height: 100%; min-height: 0; }
+.app.playmat .default-card { position: relative; box-sizing: border-box; width: 100%; height: 100%; padding: 4.2cqi; overflow: hidden;
+  color: var(--ink-l); font-family: var(--kserif); line-height: 1.22; text-align: center;
+  background: var(--grain) 0 0 / 170px, radial-gradient(ellipse 95% 72% at 50% 44%, var(--bind-hi), var(--bind) 58%, var(--bind-lo)); }
+.app.playmat .dc-frame { position: relative; box-sizing: border-box; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  border: max(1px, .9cqi) solid var(--m3); border-radius: 3.2cqi; box-shadow: inset 0 0 0 max(1px, .6cqi) rgba(0, 0, 0, .55), 0 0 0 max(1px, .5cqi) rgba(0, 0, 0, .5); }
+.app.playmat .dc-frame::before { content: ''; position: absolute; inset: 2.4cqi; border: max(.5px, .45cqi) solid var(--m5); border-radius: 1.6cqi; pointer-events: none; opacity: .9; }
+.app.playmat .dc-name { position: relative; display: grid; place-items: center; min-height: 19cqi; padding: 5cqi 7cqi 4.2cqi;
+  border-bottom: max(1px, .6cqi) solid var(--m3); background: linear-gradient(180deg, rgba(0, 0, 0, .38), rgba(0, 0, 0, .12)); }
+.app.playmat .dc-name span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: max(7px, 10.5cqi); font-weight: 700; color: var(--ink-l); overflow-wrap: anywhere; word-break: keep-all; text-shadow: 0 1px 0 rgba(0, 0, 0, .7); }
+.app.playmat .dc-emblem { position: relative; display: grid; place-items: center; min-height: 0; padding: 3cqi 0; }
+.app.playmat .dc-emblem svg { box-sizing: border-box; width: min(58cqi, 100%); height: auto; aspect-ratio: 1; padding: 12cqi; color: var(--m1);
+  border: max(1px, .75cqi) solid var(--m5); border-radius: 50%; overflow: visible;
+  background: radial-gradient(circle, color-mix(in srgb, var(--m1) 16%, transparent), transparent 68%);
+  box-shadow: inset 0 0 0 max(1px, 1.6cqi) rgba(0, 0, 0, .28), 0 0 6cqi var(--glow); filter: drop-shadow(0 0 1.5cqi var(--glow)); }
+.app.playmat .dc-type { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1.4cqi; padding: 4.2cqi 6cqi 5.5cqi;
+  border-top: max(1px, .6cqi) solid var(--m3); background: linear-gradient(0deg, rgba(0, 0, 0, .36), rgba(0, 0, 0, .1)); }
+.app.playmat .dc-kind { font-size: max(6.5px, 8.2cqi); font-weight: 700; letter-spacing: .06em; color: var(--m0); }
+.app.playmat .dc-actions { font: max(6px, 6.8cqi) var(--sans); color: var(--mute-l); }
+.app.playmat .dc-broken { position: absolute; left: 4.2cqi; right: 4.2cqi; bottom: 4.2cqi; z-index: 1; margin: 0; padding: 2cqi 3cqi;
+  border-radius: 0 0 3cqi 3cqi; color: #ffe2d8; background: rgba(92, 20, 12, .9); font: 700 max(6px, 6.6cqi) / 1.3 var(--sans); }
+.app.playmat .default-card.is-placeholder .dc-name span { opacity: .5; font-weight: 400; }
+/* Selected hand card: the same trim glow as image cards; the face itself stays as drawn. */
+.app.playmat .card-item.is-selected .default-card .dc-frame { border-color: var(--m1); }
+/* Enlargement of a card without an image: a large default face that leans like an image. */
+.app.playmat .image-lightbox .lightbox-card.is-default > .lightbox-default { width: min(calc(100vw - 32px), calc((100dvh - 32px) / 1.458), 560px); height: auto;
+  aspect-ratio: 1 / 1.458; border-radius: 12px; line-height: 1.22; transform-origin: center; transition: transform 160ms ease-out; user-select: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .8), 0 24px 60px rgba(0, 0, 0, .7); }
+@media (max-height: 600px) { .app.playmat .image-lightbox .lightbox-card.is-default > .lightbox-default { width: min(calc(100vw - 16px), calc((100dvh - 16px) / 1.458), 560px); } }
+
+/* Registration form: live card preview + image controls on the left, the fields on the right; one column when narrow. */
+.app.playmat .v13-editor .editor-layout { display: grid; grid-template-columns: minmax(170px, 210px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.app.playmat .v13-editor .editor-preview-column { position: sticky; top: 64px; display: flex; flex-direction: column; gap: 12px; }
+.app.playmat .v13-editor .editor-preview { display: grid; place-items: center; }
+.app.playmat .v13-editor .editor-preview > img { display: block; width: 100%; aspect-ratio: 1 / 1.458; object-fit: contain; border-radius: 8px; background: #1a120f;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 8px 18px rgba(40, 25, 10, .35); }
+.app.playmat .v13-editor .editor-preview > .card-face { width: 100%; border-radius: 8px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 8px 18px rgba(40, 25, 10, .35); }
+.app.playmat .v13-editor .editor-preview-stack { position: relative; width: 100%; aspect-ratio: 1 / 1.458; }
+.app.playmat .v13-editor .editor-preview-stack img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 8px; background: #1a120f;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 6px 14px rgba(40, 25, 10, .35); }
+.app.playmat .v13-editor .editor-preview-stack img:nth-child(2) { transform: rotate(-4deg) translate(-6px, 4px); z-index: -1; }
+.app.playmat .v13-editor .editor-preview-stack img:nth-child(3) { transform: rotate(4deg) translate(6px, 6px); z-index: -2; }
+.app.playmat .v13-editor .drop-zone { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; text-align: center; }
+.app.playmat .v13-editor .drop-zone .file-button { justify-content: center; }
+.app.playmat .v13-editor .drop-zone > button { padding: 6px 12px; font-size: 12px; }
+.app.playmat .v13-editor .drop-zone p { margin: 0; font-size: 11px; line-height: 1.6; color: var(--ink-mute); }
+.app.playmat .v13-editor .editor-section { padding-bottom: 4px; border-bottom: 1px solid var(--ink-line); margin-bottom: 14px; }
+.app.playmat .v13-editor .editor-section .editor-checks { margin: 12px 0; }
+.app.playmat .v13-editor .editor-section .inline-form { margin: 0 0 14px; }
+/* The use rule and the folded details draw their own top rule, so the tag section needs none below it. */
+.app.playmat .v13-editor .editor-section.editor-tags { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.app.playmat .v13-editor .editor-hint { margin: -4px 0 10px; font-size: 11px; }
+.app.playmat .v13-editor .form-columns { align-items: end; }
+.app.playmat .v13-editor .editor-advanced { margin-top: 14px; }
+.app.playmat .v13-editor .editor-actions { align-items: center; }
+.app.playmat .v13-editor .deck-link { margin: 0 auto 0 0; font-size: 12px; }
+@media (max-width: 760px) {
+  .app.playmat .v13-editor .editor-layout { grid-template-columns: 1fr; }
+  .app.playmat .v13-editor .editor-preview-column { position: static; display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: start; }
+}

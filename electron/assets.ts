@@ -40,6 +40,8 @@ export class AssetService {
   private readonly activeReads = new Map<string,Set<Promise<unknown>>>();
   async waitForReads(id:string){await Promise.allSettled([...(this.activeReads.get(id)??[])]);}
   private readonly pendingThumbnails = new Map<string, Promise<Buffer>>();
+  /** v1.3: images imported during this run that have not been claimed yet. Only these can be discarded on request. */
+  private readonly sessionImports = new Set<string>();
   constructor(readonly userData: string, readonly library: LibraryStore) {}
   private cachePath(id: string): string { return join(this.userData, 'cache', 'thumbnails', `${createHash('sha256').update(id).digest('hex')}.webp`); }
   private async ensureCacheRoot(): Promise<string> {
@@ -98,7 +100,13 @@ export class AssetService {
     await writeFile(this.cachePath(id), thumbnail, { flag: 'wx' });
     this.library.addAsset({ id, relative_path: relativePath, sha256: createHash('sha256').update(bytes).digest('hex'),
       mime_type: `image/${format}`, width, height, original_name: basename(path) });
+    this.sessionImports.add(id);
     return { id, name: basename(path, extname(path)), url: assetUrl(id), thumbnailUrl: assetUrl(id, true), width, height };
+  }
+  /** v1.3: the requested ids that were imported during this run, forgotten so they can be claimed only once. The renderer
+   *  can never point the cleanup at an image from an earlier run, a backup or another card. */
+  takeSessionImports(ids: readonly string[]): string[] {
+    return [...new Set(ids)].filter(id => this.sessionImports.delete(id));
   }
   async readAsset(url: string): Promise<{ bytes: Buffer; mime: string } | undefined> {
     const parsed = new URL(url);

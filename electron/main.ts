@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { AppStore } from './store';
 import { SCHEMA_VERSION } from './migrations';
 import { APP_URL, DEV_URL, PRODUCTION_CSP, isAllowedRequest, isTrustedPage, resolveBundleAsset } from './security';
-import { IPC, settingsSchema, type Result } from '../src/shared/contracts';
+import { IPC, discardImportsSchema, settingsSchema, type Result } from '../src/shared/contracts';
 import { LibraryStore } from './library-store';
 import { AssetService } from './assets';
 import { UserInputError } from './errors';
@@ -115,6 +115,11 @@ else {
     safeHandler(IPC.saveSettings, input => store!.saveSettings(settingsSchema.parse(input)));
     safeHandler(IPC.saveLibraryState, input => library.saveState(input));
     safeHandler(IPC.importImages, input => assets.importPaths(input));
+    safeHandler(IPC.discardImports, async input => {
+      const queued = library.queueUnusedImports(assets.takeSessionImports(discardImportsSchema.parse(input)));
+      if (queued.length) await cleanup.run();
+      return { discarded: queued.length };
+    });
     safeHandler(IPC.saveCards, input => registration.save(input));
     safeHandler(IPC.archiveCard, input => library.archiveCard(input));
     safeHandler(IPC.saveTag, input => library.saveTag(input));

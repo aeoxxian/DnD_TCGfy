@@ -24,6 +24,7 @@ const bridge: DesktopBridge = {
       return await ipcRenderer.invoke(IPC.importImages, files.map(file => webUtils.getPathForFile(file)));
     } catch { return { ok: false, error: '로컬 이미지 파일을 선택해 주세요.' }; }
   },
+  discardImports: assetIds => ipcRenderer.invoke(IPC.discardImports, assetIds),
   saveCards: input => ipcRenderer.invoke(IPC.saveCards, input),
   archiveCard: id => ipcRenderer.invoke(IPC.archiveCard, id),
   saveTag: input => ipcRenderer.invoke(IPC.saveTag, input),
