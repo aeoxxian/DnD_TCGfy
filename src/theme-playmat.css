@@ -949,7 +949,7 @@ html, body { background: #0b0807; }
   .app.playmat .board-center > .detail-panel { flex: 0 0 auto; height: clamp(132px, 48%, 190px); min-height: 0; }
   .app.playmat .codex-page { padding: 7px 14px 5px; gap: 2px; }
   /* A shorter bookmark (same proportions) ends above the description on the compact page. */
-  .app.playmat .codex-page::before { width: 13px; height: 32px; right: 60px; }
+  .app.playmat .codex-page::before { width: 9px; height: 22px; right: 60px; }
   .app.playmat .selected-card-heading h2 { font-size: 16px; }
   .app.playmat .detail-tags { margin-top: 2px; max-height: 22px; }
   .app.playmat .description-pane { min-height: 18px; }
@@ -968,3 +968,103 @@ html, body { background: #0b0807; }
   .app.playmat .rest-buttons button { gap: 1px; font-size: 10px; line-height: 1.15; }
   .app.playmat .undo-button { padding: 0; font-size: 10px; }
 }
+
+/* ---- v1.3 Phase 3 · UI-P1: the card area ---- */
+/* Hand: a card is the smaller of what the hand's height allows and 1/5.6 of its width, so a usual window shows about
+   five to seven cards (more only when the hand is short). The card page gives the hand a bit more height. */
+.app.playmat.p4-b .hand .card-item { --hand-width: clamp(76px, min(calc(100cqw / 5.6), calc((100cqh - 80px) / 1.458)), 250px); }
+.app.playmat.p4-b .batch-selection .hand .card-item { --hand-width: clamp(56px, min(calc(100cqw / 5.6), calc((100cqh - 84px) / 1.458)), 250px); }
+.app.playmat .board-center > .detail-panel { flex-basis: clamp(200px, 34dvh, 330px); }
+@media (max-height: 720px) { .app.playmat .board-center > .detail-panel { flex-basis: clamp(180px, 33dvh, 240px); } }
+
+/* DECK and USED: one zone design — name plate on the border, the pile (a button) filling the zone's height on the left,
+   name / count / small actions on the right; narrow zones (collapsed ledger) stack the pile over the name. */
+.app.playmat .board-column > .mat-zone { container-type: inline-size; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+  align-items: center; gap: 0 14px; padding: 14px 14px 10px; text-align: left; }
+.app.playmat .mat-zone > .pile-button { height: 100%; min-height: 0; display: grid; place-items: center; padding: 2px 10px 6px 2px; border: 0; border-radius: 8px; background: transparent; box-shadow: none; }
+.app.playmat .mat-zone > .pile-button:hover:not(:disabled) { filter: brightness(1.08); background: transparent; }
+.app.playmat .mat-zone > .pile-button:focus-visible { outline: 2px solid var(--m1); outline-offset: 2px; }
+.app.playmat .board-column > .mat-zone .pile { width: auto; height: min(150px, 100%); }
+.app.playmat .zone-info { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.app.playmat .board-column > .mat-zone .zone-caption { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 13px var(--kserif); color: var(--ink-l); }
+.app.playmat .zone-meta { font: 700 11px var(--sans); color: var(--mute-l); }
+.app.playmat .zone-hint { font: 400 10.5px var(--sans); color: var(--mute-l); opacity: .85; }
+.app.playmat .zone-action { margin-top: 3px; padding: 3px 11px 4px; border: 0; border-radius: 999px; font: 700 11px var(--kserif); color: var(--ink-l);
+  background: rgba(0, 0, 0, .28); box-shadow: inset 0 0 0 1px var(--m2); }
+.app.playmat .zone-action:hover:not(:disabled) { filter: none; box-shadow: inset 0 0 0 1px var(--m1); color: #fff; }
+@container (max-width: 180px) {
+  .app.playmat .board-column > .mat-zone { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; justify-items: center; gap: 2px; padding: 13px 6px 6px; text-align: center; }
+  .app.playmat .zone-info { align-items: center; }
+  .app.playmat .zone-meta, .app.playmat .zone-hint { display: none; }
+  .app.playmat .board-column > .mat-zone .zone-caption { font-size: 11px; }
+}
+@media (max-height: 560px) {
+  .app.playmat .board-column > .mat-zone { padding: 11px 10px 5px; }
+  .app.playmat .zone-hint { display: none; }
+}
+/* Shuffle (memo 4): the top cards swing apart and back; nothing moves with reduced motion. */
+@keyframes deck-shuffle-a { 0%, 100% { transform: none; } 35% { transform: translateX(-14px) rotate(-8deg); } 70% { transform: translateX(9px) rotate(5deg); } }
+@keyframes deck-shuffle-b { 0%, 100% { transform: none; } 35% { transform: translateX(14px) rotate(8deg); } 70% { transform: translateX(-9px) rotate(-5deg); } }
+.app.playmat .pile:is(.is-shuffling-0, .is-shuffling-1) > img:nth-child(3) { animation: deck-shuffle-a 420ms ease-in-out; }
+.app.playmat .pile:is(.is-shuffling-0, .is-shuffling-1) > img:nth-child(2) { animation: deck-shuffle-b 420ms ease-in-out; }
+.app.playmat .pile.is-shuffling-1 > img:nth-child(3) { animation-name: deck-shuffle-b; }
+.app.playmat .pile.is-shuffling-1 > img:nth-child(2) { animation-name: deck-shuffle-a; }
+.app.playmat.reduced-motion .pile > img { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .app.playmat .pile > img { animation: none !important; } }
+
+/* Transparent PNG cards (memo 1): no dark backing; the shadow and the selection glow follow the image's own shape. */
+.app.playmat .card-face.image-face { background: transparent; }
+.app.playmat .card-face.image-face.has-alpha { box-shadow: none; }
+.app.playmat .card-face.has-alpha > img { filter: drop-shadow(0 0 1px rgba(0, 0, 0, .85)) drop-shadow(0 8px 9px rgba(0, 0, 0, .6)); }
+.app.playmat.p4-b .card-item.is-selected .card-face.has-alpha { outline: 0; box-shadow: none; }
+.app.playmat.p4-b .card-item.is-selected .card-face.has-alpha > img { filter: drop-shadow(0 0 .8px var(--m1)) drop-shadow(0 0 .8px var(--m1)) drop-shadow(0 0 1.2px var(--m1)) drop-shadow(0 0 14px var(--glow)); }
+.app.playmat .detail-card .card-face.has-alpha { box-shadow: none; }
+.app.playmat .detail-card .card-face.has-alpha > img { filter: drop-shadow(0 0 1px var(--m1)) drop-shadow(0 0 22px var(--glow)) drop-shadow(0 16px 20px rgba(0, 0, 0, .7)); }
+.app.playmat .used-card:has(.has-alpha) { box-shadow: none; }
+.app.playmat .modal .card-back-entry { display: flex; align-items: center; gap: 16px; margin: 0 0 16px; padding: 10px 12px; border: 1px solid #b9a684; border-radius: 7px; background: rgba(255, 252, 244, .35); }
+.app.playmat .modal .card-back-entry img { width: 58px; aspect-ratio: 1 / 1.458; object-fit: contain; border-radius: 5px; background: #1a120f; box-shadow: 0 2px 6px rgba(40, 25, 10, .45); }
+.app.playmat .modal .card-back-entry h3 { margin: 0 0 2px; font: 700 14px var(--kserif); }
+.app.playmat .modal .card-back-entry p { margin: 0 0 8px; font-size: 12px; }
+/* Short windows: whole hand cards stay visible — a fixed compact card page, a slimmer hand header and less room
+   reserved above the cards. */
+@media (max-height: 560px) {
+  .app.playmat .board-center > .detail-panel { flex: 0 0 132px; height: auto; }
+  .app.playmat .hand-header { height: 24px; min-height: 0; }
+  .app.playmat.p4-b .cards-area.hand { padding-top: 18px; padding-bottom: 2px; }
+  .app.playmat.p4-b .card-item.is-selected .card-button, .app.playmat.p4-b .card-button:hover:not(:disabled) { transform: translateY(-6px); }
+  .app.playmat.p4-b .hand .card-item { --hand-width: clamp(56px, min(calc(100cqw / 5.6), calc((100cqh - 62px) / 1.458)), 250px); }
+}
+/* The app's minimum window (860×440): an even more compact card page so whole hand cards and their names still fit. */
+@media (max-height: 460px) {
+  .app.playmat .board-center > .detail-panel { flex: 0 0 110px; }
+  .app.playmat .codex-page { padding: 5px 12px 4px; }
+  .app.playmat .selected-card-heading h2 { font-size: 15px; }
+  .app.playmat .detail-tags { max-height: 18px; margin-top: 1px; }
+  .app.playmat .detail-tags span { padding: 0 8px; font-size: 10px; }
+  .app.playmat .description-pane { min-height: 14px; }
+  .app.playmat .card-use { min-height: 48px; max-height: 56px; padding-top: 2px; }
+  .app.playmat.p4-b .use-button { width: 48px; height: 48px; font-size: 10px; padding: 0 8px; }
+  .app.playmat.p4-b .cards-area.hand { padding-top: 14px; }
+  .app.playmat.p4-b .card-item.is-selected .card-button, .app.playmat.p4-b .card-button:hover:not(:disabled) { transform: translateY(-4px); }
+  .app.playmat.p4-b .hand .card-item { --hand-width: clamp(48px, min(calc(100cqw / 5.6), calc((100cqh - 64px) / 1.458)), 250px); }
+}
+/* Short windows: the tag chips in the card page header repeat the tag line in the description, so they give their row
+   to the description (which keeps scrolling); selection mode with the bulk tools open keeps whole hand cards. */
+@media (max-height: 560px) { .app.playmat .board-center .detail-tags { display: none; } }
+.app.playmat.p4-b .board:has(> .batch-tools > details[open]) .batch-selection .hand .card-item { --hand-width: clamp(48px, min(calc(100cqw / 5.6), calc((100cqh - 84px) / 1.458)), 250px); }
+
+/* ---- v1.3 Phase 3 · UI-P2: the card page and the ledger ---- */
+/* Card page: less parchment margin and a slightly smaller name; the description scrolls and the Use seal stays pinned. */
+@media (min-height: 561px) {
+  .app.playmat .board-center .codex-page { padding: 12px 20px 12px; gap: 4px; }
+  .app.playmat .board-center .selected-card-heading h2 { font-size: 21px; }
+}
+.app.playmat .board-center .description-content p:not(.detail-description) { margin-bottom: 2px; font-size: 11.5px; line-height: 1.6; color: var(--page-mute); }
+.app.playmat .board-center .card-use { margin-top: auto; }
+/* Ledger: as tall as its resources (scrolling inside when the column is full); the deck stays at the bottom. */
+.app.playmat .board-right > .resource-panel { flex: 0 1 auto; max-height: 100%; }
+.app.playmat .board-right > .deck-pile { margin-top: auto; }
+/* Recovery buttons read as the ledger's own footer: an engraved heading between rules, close to the page. */
+.app.playmat .rest-heading { display: flex; align-items: center; gap: 8px; margin: 2px 0 3px; font: 700 9.5px var(--display); letter-spacing: 3px; color: var(--mute-l); }
+.app.playmat .rest-heading::before, .app.playmat .rest-heading::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--m2), transparent); }
+@media (max-height: 560px) { .app.playmat .rest-heading { display: none; } }

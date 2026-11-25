@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { cloneElement, isValidElement, useEffect, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import type { CardDefinition } from '../shared/contracts';
 import { ACTION_NAMES, KIND_NAMES } from '../shared/library';
 
@@ -42,14 +42,48 @@ export function DefaultCard({ card, broken = false, placeholder = false }: { car
   </div>;
 }
 
+/**
+ * v1.3 (memo 1): whether an image has see-through pixels. The main process checks the thumbnail once (the page cannot
+ * read pixels of app://assets images); requests made in the same tick go out together. Only such cards draw their
+ * shadow and selection glow along the image and mask the card-back overlay; opaque cards keep the cheaper box shadow.
+ */
+const alphaCache = new Map<string, boolean>();
+const alphaWaiting = new Map<string, ((value: boolean) => void)[]>();
+let alphaFlush: ReturnType<typeof setTimeout> | undefined;
+export function requestAlpha(id: string): Promise<boolean> {
+  const known = alphaCache.get(id); if (known !== undefined) return Promise.resolve(known);
+  return new Promise(resolve => {
+    alphaWaiting.set(id, [...(alphaWaiting.get(id) ?? []), resolve]);
+    alphaFlush ??= setTimeout(() => {
+      alphaFlush = undefined; const batch = new Map(alphaWaiting); alphaWaiting.clear();
+      const settle = (values: Record<string, boolean>) => { for (const [key, callbacks] of batch) { const value = !!values[key]; alphaCache.set(key, value); for (const done of callbacks) done(value); } };
+      const ids = [...batch.keys()];
+      const chunks = Array.from({ length: Math.ceil(ids.length / 500) }, (_, i) => ids.slice(i * 500, i * 500 + 500));
+      Promise.all(chunks.map(chunk => Promise.resolve(window.desktop?.assetAlpha?.(chunk)).then(result => result?.ok ? result.value : {}, () => ({}))))
+        .then(parts => settle(Object.assign({}, ...parts)), () => settle({}));
+    }, 0);
+  });
+}
+
 export function CardFace({ card, original = false, overlay }: { card: CardDefinition; original?: boolean; overlay?: ReactNode }) {
   const [failed, setFailed] = useState(false);
+  const [alpha, setAlpha] = useState(() => !!card.imageAssetId && alphaCache.get(card.imageAssetId) === true);
   const showImage = !!card.imageAssetId && !failed;
-  return <div className={`card-face ${showImage ? 'image-face' : 'default-face'} role-${card.roles[0] ?? 'other'}`}>
+  useEffect(() => {
+    if (!card.imageAssetId || alphaCache.has(card.imageAssetId)) return;
+    let live = true; void requestAlpha(card.imageAssetId).then(value => { if (live && value) setAlpha(true); });
+    return () => { live = false; };
+  }, [card.imageAssetId]);
+  const src = showImage ? imageUrl(card.imageAssetId!, !original) : '';
+  // The card back over an unusable card only covers the image's own shape.
+  const mask: CSSProperties | undefined = alpha && showImage ? { maskImage: `url("${src}")`, maskSize: 'contain', maskPosition: 'center', maskRepeat: 'no-repeat' } : undefined;
+  const shownOverlay = mask && isValidElement(overlay) ? cloneElement(overlay as ReactElement<{ style?: CSSProperties }>, { style: mask }) : overlay;
+  return <div className={`card-face ${showImage ? 'image-face' : 'default-face'} ${alpha && showImage ? 'has-alpha' : ''} role-${card.roles[0] ?? 'other'}`}>
     {showImage
-      ? <img src={imageUrl(card.imageAssetId!, !original)} alt={`${card.name} 카드 이미지`} loading={original ? 'eager' : 'lazy'} decoding="async" draggable={false} onError={() => setFailed(true)} />
+      ? <img src={src} alt={`${card.name} 카드 이미지`} loading={original ? 'eager' : 'lazy'} decoding="async" draggable={false} onError={() => setFailed(true)}
+ />
       : <div className="default-face-art" role="img" aria-label={`${card.name} 기본 카드 · ${kindLine(card)}${failed ? ' · 이미지 파일을 읽을 수 없음' : ''}`}><DefaultCard card={card} broken={failed}/></div>}
-    {overlay}
+    {shownOverlay}
   </div>;
 }
 

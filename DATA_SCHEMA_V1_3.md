@@ -1,6 +1,6 @@
 # v1.3 데이터 보충 계약
 
-SQLite 버전은 **v6 유지**. DDL·마이그레이션은 없다. 새 `settings` 키는 Phase 2의 `registration_templates` 하나다. 1.2.0과 v1.3 개발본은 같은 DB를 서로 열 수 있다(1.2.0은 새 키를 읽지 않는다).
+SQLite 버전은 **v6 유지**. DDL·마이그레이션은 없다. 새 `settings` 키는 Phase 2의 `registration_templates`와 Phase 3의 `used_view` 두 개다. 1.2.0과 v1.3 개발본은 같은 DB를 서로 열 수 있다(1.2.0은 새 키를 읽지 않는다).
 
 ## 이미지 없는 카드 (Phase 1)
 
@@ -69,3 +69,22 @@ SQLite 버전은 **v6 유지**. DDL·마이그레이션은 없다. 새 `settings
 - 같은 카드를 같은 내용으로 다시 보내면 같은 `requestId`를 쓴다. 이미 저장됐으면 기존 등록 영수증(`registration:<requestId>`)이 같은 결과를 돌려주므로 카드가 두 번 생기지 않는다.
 - 비용을 저장하면 캐릭터의 자원 revision이 올라가므로, `expectedRevision`은 카드마다 새로 읽는다.
 - 공통 규칙의 새 자원 초안은 그것을 쓰는 첫 카드의 `newResources`로 한 번만 보낸다. 뒤의 카드는 만들어진 자원 ID에 연결한다.
+
+## `settings.used_view` (Phase 3 UI-P1, 메모 3)
+
+`Settings.usedViews`, 캐릭터 ID → `{ clearedEventId, clearedAt }`(v1.1 `history_view`와 같은 모양, 최대 200개).
+
+- USED 더미의 “비우기”가 남기는 **표시용** 표시다. 더미는 이 표시보다 새 카드 사용 이벤트만 보여 준다.
+- `play_events`, 자원, Undo, 전체 카드 사용 기록은 바뀌지 않는다. “되돌리기”는 이전 표시로 되돌린다(없었으면 키를 지운다).
+- 1.2.0은 이 키를 읽지 않는다.
+
+## 손패 섞기 (Phase 3 UI-P1, 메모 4)
+
+저장하는 것이 없다. DECK 더미를 누르면 렌더러가 지금 범위 카드 ID의 무작위 순서를 메모리에 둔다. `deck_cards.position`, 카드, 설정은 바뀌지 않으며, 다시 실행하면 등록 순서로 돌아온다.
+
+## `assets:alpha` IPC (`assetAlpha`, Phase 3 UI-P1, 메모 1)
+
+입력은 이미지 ID 배열(1~500개), 결과는 `{ [id]: boolean }`(투명한 픽셀이 있으면 `true`).
+
+- 메인 프로세스가 썸네일을 sharp `stats().isOpaque`로 검사하고 실행 중에 기억한다. JPEG와 없는 ID는 `false`다. 파일은 읽기만 한다.
+- 렌더러는 같은 순간의 요청을 한 번에 보낸다. 페이지(`app://bundle`)가 `app://assets` 이미지의 픽셀을 직접 읽을 수 없어서(다른 출처) 이 경로를 쓴다.

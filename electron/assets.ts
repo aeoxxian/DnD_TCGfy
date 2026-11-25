@@ -40,6 +40,8 @@ export class AssetService {
   private readonly activeReads = new Map<string,Set<Promise<unknown>>>();
   async waitForReads(id:string){await Promise.allSettled([...(this.activeReads.get(id)??[])]);}
   private readonly pendingThumbnails = new Map<string, Promise<Buffer>>();
+  /** v1.3 (memo 1): whether an image has see-through pixels, computed once per image from its thumbnail. */
+  private readonly alpha = new Map<string, boolean>();
   /** v1.3: images imported during this run that have not been claimed yet. Only these can be discarded on request. */
   private readonly sessionImports = new Set<string>();
   constructor(readonly userData: string, readonly library: LibraryStore) {}
@@ -131,6 +133,23 @@ export class AssetService {
     const bytes = await readBounded(path);
     if (createHash('sha256').update(bytes).digest('hex') !== asset.sha256) return;
     return { bytes, mime: asset.mime_type };
+  }
+  /** v1.3 (memo 1): see-through pixels per image (read only; unknown or unreadable images count as opaque). */
+  async alphaOf(ids: readonly string[]): Promise<Record<string, boolean>> {
+    const out: Record<string, boolean> = {};
+    for (const id of new Set(ids)) {
+      const known = this.alpha.get(id);
+      if (known !== undefined) { out[id] = known; continue; }
+      let value = false;
+      const asset = this.library.getAsset(id);
+      if (asset && asset.mime_type !== 'image/jpeg') {
+        try { value = !(await sharp(await this.readThumbnail(asset, await this.managedPath(asset.relative_path)), { failOn: 'none' }).stats()).isOpaque; }
+        catch { value = false; }
+      }
+      if (asset) this.alpha.set(id, value);
+      out[id] = value;
+    }
+    return out;
   }
   private async readThumbnail(asset: AssetRecord, path: string): Promise<Buffer> {
     const cached = this.cachePath(asset.id);

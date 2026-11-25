@@ -61,7 +61,8 @@ export class AppStore {
     const slotColors = this.db.prepare("SELECT value_json FROM settings WHERE key = 'slot_colors'").get() as { value_json: string } | undefined;
     const handScroll = this.db.prepare("SELECT value_json FROM settings WHERE key = 'hand_scroll'").get() as { value_json: string } | undefined;
     const templates = this.db.prepare("SELECT value_json FROM settings WHERE key = 'registration_templates'").get() as { value_json: string } | undefined;
-    return settingsSchema.parse({ ...(row ? JSON.parse(row.value_json) : DEFAULT_SETTINGS), ...(display ? { resourceViews: JSON.parse(display.value_json) } : {}), ...(appearance ? { appearance: JSON.parse(appearance.value_json) } : {}), ...(history ? { historyViews: JSON.parse(history.value_json) } : {}), ...(effects ? { effects: JSON.parse(effects.value_json) } : {}), ...(slotColors ? { slotColors: JSON.parse(slotColors.value_json) } : {}), ...(handScroll ? { handScroll: JSON.parse(handScroll.value_json) } : {}), ...(templates ? { registrationTemplates: JSON.parse(templates.value_json) } : {}) });
+    const used = this.db.prepare("SELECT value_json FROM settings WHERE key = 'used_view'").get() as { value_json: string } | undefined;
+    return settingsSchema.parse({ ...(row ? JSON.parse(row.value_json) : DEFAULT_SETTINGS), ...(display ? { resourceViews: JSON.parse(display.value_json) } : {}), ...(appearance ? { appearance: JSON.parse(appearance.value_json) } : {}), ...(history ? { historyViews: JSON.parse(history.value_json) } : {}), ...(effects ? { effects: JSON.parse(effects.value_json) } : {}), ...(slotColors ? { slotColors: JSON.parse(slotColors.value_json) } : {}), ...(handScroll ? { handScroll: JSON.parse(handScroll.value_json) } : {}), ...(templates ? { registrationTemplates: JSON.parse(templates.value_json) } : {}), ...(used ? { usedViews: JSON.parse(used.value_json) } : {}) });
   }
   saveSettings(input: unknown): Settings {
     const settings = settingsSchema.parse(input);
@@ -72,7 +73,7 @@ export class AppStore {
       // Visual effects (`effects`, e.g. the enlarged-card tilt) and spell slot colours (`slot_colors`) have their own keys as well.
       // v1.2: hand scrolling (`hand_scroll`, momentum on/off) is separate too, so 1.1.0 can still read `effects`.
       // v1.3: saved registration templates (`registration_templates`) are their own key as well.
-      const { resourceViews, appearance, historyViews, effects, slotColors, handScroll, registrationTemplates, ...preferences } = settings;
+      const { resourceViews, appearance, historyViews, effects, slotColors, handScroll, registrationTemplates, usedViews, ...preferences } = settings;
       if (appearance) for (const back of appearance.customBacks)
         if (!this.db.prepare('SELECT 1 FROM assets WHERE id = ?').get(back.assetId)) throw new UserInputError('카드 뒷면 이미지를 찾을 수 없습니다. 이미지를 다시 선택해 주세요.');
       this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('preferences', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(preferences));
@@ -83,6 +84,7 @@ export class AppStore {
       if (slotColors !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('slot_colors', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(slotColors));
       if (handScroll !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('hand_scroll', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(handScroll));
       if (registrationTemplates !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('registration_templates', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(registrationTemplates));
+      if (usedViews !== undefined) this.db.prepare("INSERT INTO settings(key, value_json) VALUES ('used_view', ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json").run(JSON.stringify(usedViews));
     });
     return this.getSettings();
   }

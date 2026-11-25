@@ -1,10 +1,12 @@
 import { InPlaySlot, SelectedCardPanel } from './components/SelectedCardPanel';
+import { orderCards, shuffleIds } from './shared/hand-order';
+import { historyMark, visibleHistory } from './shared/history-view';
 import { TrashManager, TrashReview } from './components/TrashManager';
 import type { TrashResult } from './shared/trash';
 import { CardBatchTools } from './components/CardBatchTools';
 import { EditHistory } from './components/BatchEdits';
 import { useEffect, useRef, useState, useMemo, useCallback, type DragEvent } from 'react';
-import { DEFAULT_APPEARANCE, type Appearance, type Bootstrap, type Library, type LibraryState, type Settings, type AssetPreview, type Result } from './shared/contracts';
+import { DEFAULT_APPEARANCE, type Appearance, type Bootstrap, type Library, type LibraryState, type Settings, type AssetPreview, type Result, type HistoryView } from './shared/contracts';
 import { cardBackFor } from './shared/appearance';
 import { CLASS_NAMES } from './shared/class-contracts';
 import { CardBackDialog, DeckPile, Icon, ThemeMenu, UsedPile, cardBackSource } from './components/Appearance';
@@ -40,6 +42,10 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [backsOpen, setBacksOpen] = useState(false);
+  // v1.3 (memo 4): a shuffled display order for the current scope, kept for this run only (never saved).
+  const [handOrder, setHandOrder] = useState<{ scope: string; ids: string[] }>();
+  // v1.3 (memo 3): the USED mark before the last “비우기”, so it can be undone right away.
+  const [usedUndo, setUsedUndo] = useState<{ characterId: string; previous?: HistoryView; eventCount: number }>();
   const [usedOpen, setUsedOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>();
   const [imported, setImported] = useState<AssetPreview[]>([]);
@@ -135,7 +141,9 @@ export function App() {
   // its active deck, 전체 라이브러리 shows every card. Older saved "character + library" states are read
   // as the deck view; the stored value is left as it is.
   const viewScope: LibraryState['viewScope'] = activeProfile && activeDeck ? 'deck' : 'library';
-  const visibleCards = useMemo(() => libraryCards && filterState ? filterCards(libraryCards, { ...filterState, viewScope }, deckCardIds) : [], [libraryCards, filterState, deckCardIds, viewScope]);
+  const orderScope = activeDeck?.id ?? 'library';
+  const shuffled = handOrder?.scope === orderScope ? handOrder.ids : undefined;
+  const visibleCards = useMemo(() => libraryCards && filterState ? orderCards(filterCards(libraryCards, { ...filterState, viewScope }, deckCardIds), shuffled) : [], [libraryCards, filterState, deckCardIds, viewScope, shuffled]);
   const filterCardsSource = useMemo(() => viewScope === 'deck' ? (libraryCards ?? []).filter(card => deckCardIds?.includes(card.id)) : libraryCards ?? [], [libraryCards, viewScope, deckCardIds]);
   const selectCard = useCallback((id: string, button: HTMLButtonElement) => { selectedButton.current = button; setSelectedId(id); }, []);
   const previewCard = useCallback((id: string, button: HTMLButtonElement) => { selectedButton.current = button; previewOrigin.current = button.querySelector('.card-face'); setSelectedId(id); setPanel('preview'); }, []);
@@ -174,6 +182,26 @@ export function App() {
   const inertiaOn = (settings.handScroll?.inertia ?? true) && !settings.reducedMotion;
   const classLine = resourceController.snapshot?.profile ? `${CLASS_NAMES[resourceController.snapshot.profile.classId as keyof typeof CLASS_NAMES] ?? '홈브루'} · ${resourceController.snapshot.profile.level}레벨` : '';
   const deckCount = activeDeck ? activeDeck.cardIds.filter(id => cards.some(card => card.id === id)).length : cards.length;
+  /** v1.3 (memo 4): shuffle the display order of the current scope (deck or whole library); the deck itself is unchanged. */
+  function shuffleHand() {
+    setHandOrder({ scope: orderScope, ids: shuffleIds(filterCardsSource.map(card => card.id)) });
+    setStatus('손패 순서를 섞었습니다');
+    requestAnimationFrame(() => { const hand = document.querySelector('.cards-area'); if (hand) hand.scrollLeft = 0; });
+  }
+  const usedView = activeProfile ? settings.usedViews?.[activeProfile.id] : undefined;
+  const usedEvents = visibleHistory(resourceController.snapshot?.events ?? [], usedView);
+  /** v1.3 (memo 3): hide the uses shown now from the USED pile (display only; play events and Undo stay). */
+  function clearUsed() {
+    const events = resourceController.snapshot?.events ?? []; const mark = historyMark(events);
+    if (!activeProfile || !mark) return;
+    setUsedUndo({ characterId: activeProfile.id, previous: usedView, eventCount: events.length });
+    void updateSettings({ usedViews: { ...settings.usedViews, [activeProfile.id]: mark } });
+  }
+  function restoreUsed() {
+    if (!activeProfile || !usedUndo) return;
+    const next = { ...settings.usedViews }; if (usedUndo.previous) next[activeProfile.id] = usedUndo.previous; else delete next[activeProfile.id];
+    setUsedUndo(undefined); void updateSettings({ usedViews: next });
+  }
   return <div className={`app p4-a p4-b playmat ${settings.reducedMotion ? 'reduced-motion' : ''} ${settings.resourcePanelCollapsed ? 'resources-collapsed' : ''} ${settings.effects?.systemCursor ? '' : 'custom-cursor'}`} data-theme={appearance.theme}>
     <header className="topbar">
       <div className="brand"><span className="brand-logo" aria-hidden="true"/><div><h1>DnD <span>TCG-fy</span></h1><p className="brand-tagline">THE ADVENTURER&apos;S TABLE</p></div></div>
@@ -198,7 +226,7 @@ export function App() {
         <div className="board-grid">
           <div className="board-column board-left">
             <InPlaySlot card={selected} onPreview={()=>{ previewOrigin.current = document.querySelector('.in-play-slot .card-face'); setPanel('preview'); }}/>
-            <UsedPile events={resourceController.snapshot?.events ?? []} cards={cards} disabled={!activeProfile || !resourceController.snapshot} onOpen={()=>setUsedOpen(true)}/>
+            <UsedPile events={usedEvents} cards={cards} disabled={!activeProfile || !resourceController.snapshot} cleared={!!usedView} onOpen={()=>setUsedOpen(true)} onClear={activeProfile && resourceController.snapshot ? clearUsed : undefined} onRestore={usedUndo && usedUndo.characterId === activeProfile?.id && usedUndo.eventCount === (resourceController.snapshot?.events.length ?? 0) ? restoreUsed : undefined}/>
           </div>
           <div className="board-column board-center">
             <SelectedCardPanel card={selected} tags={tags} controller={resourceController} onClose={closeSelection} closeRef={closeButton}/>
@@ -211,7 +239,7 @@ export function App() {
           </div>
           <div className="board-column board-right">
             <aside className="resource-panel" aria-label="자원 패널"><div className="panel-title"><h2>{settings.resourcePanelCollapsed ? '자원' : '자원 장부'}</h2><button className="collapse-button" aria-label={settings.resourcePanelCollapsed ? '자원 패널 펼치기' : '자원 패널 접기'} disabled={saving} onClick={() => void updateSettings({ resourcePanelCollapsed: !settings.resourcePanelCollapsed })}>{settings.resourcePanelCollapsed ? '›' : '‹'}</button></div>{!settings.resourcePanelCollapsed && <ResourcePanel key={activeProfile?.id} controller={resourceController} display={settings.resourceViews?.[activeProfile?.id ?? '']} displayBusy={saving} onDisplayChange={display => { if (activeProfile) void updateSettings({ resourceViews: { ...settings.resourceViews, [activeProfile.id]: display } }); }} slotColors={settings.slotColors?.[activeProfile?.id ?? '']} history={settings.historyViews?.[activeProfile?.id ?? '']} onHistoryChange={view => { if (!activeProfile) return; const kept = Object.fromEntries(Object.entries(settings.historyViews ?? {}).filter(([id]) => id !== activeProfile.id && bootstrap.profiles.some(profile => profile.id === id))); void updateSettings({ historyViews: view ? { ...kept, [activeProfile.id]: view } : kept }); }}/>}</aside>
-            <DeckPile src={deckBack} deckName={activeDeck?.name ?? '전체 라이브러리'} count={deckCount} onOpen={()=>setBacksOpen(true)}/>
+            <DeckPile src={deckBack} deckName={activeDeck?.name ?? '전체 라이브러리'} count={deckCount} shuffled={!!shuffled} onShuffle={shuffleHand} onUnshuffle={()=>{ setHandOrder(undefined); setStatus('손패를 등록 순서로 되돌렸습니다'); }}/>
           </div>
         </div>
         {error && <p className="error-banner" role="alert">{error}</p>}{bootstrap.warnings.map((warning, i) => <p className="error-banner" role="alert" key={i}>{warning}</p>)}
@@ -224,7 +252,7 @@ export function App() {
     {panel === 'resources' && <ResourceManager cards={cards} controller={resourceController} onClose={() => setPanel(undefined)} characterName={activeProfile?.name} slotColors={settings.slotColors?.[activeProfile?.id ?? '']} slotColorsBusy={saving} onSlotColors={next => { if (!activeProfile) return; const kept = Object.fromEntries(Object.entries(settings.slotColors ?? {}).filter(([id]) => id !== activeProfile.id && bootstrap.profiles.some(profile => profile.id === id))); void updateSettings({ slotColors: next ? { ...kept, [activeProfile.id]: next } : kept }); }} />}
     {panel === 'costs' && selected && resourceController.snapshot && <CardCostEditor card={selected} controller={resourceController} onSaved={load} onClose={() => setPanel(undefined)} />}
     {panel === 'tags' && <TagManager library={bootstrap} onLibrary={applyLibrary} onClose={() => setPanel(undefined)} />}
-    {panel === 'profiles' && <ProfileManager onClass={()=>setPanel('class')} library={bootstrap} onLibrary={applyLibrary} onClose={() => setPanel(undefined)} />}
+    {panel === 'profiles' && <ProfileManager onClass={()=>setPanel('class')} library={bootstrap} onLibrary={applyLibrary} onClose={() => setPanel(undefined)} cardBack={{ src: deckBack, deckName: activeDeck?.name, onOpen: () => { setPanel(undefined); setBacksOpen(true); } }} />}
     {panel === 'preview' && selected && <ImageLightbox card={selected} origin={previewOrigin.current} tilt={tiltOn} onClose={()=>setPanel(undefined)}/>}
     {panel==='management'&&<Modal title="관리 메뉴" wide onClose={()=>setPanel(undefined)}><p className="manager-help">관리창을 닫으면 선택한 카드와 검색 조건을 유지한 채 플레이로 돌아갑니다.</p><div className="management-sections"><section><h3>카드·라이브러리</h3><button disabled={busy} onClick={openNew}>카드 등록</button><button onClick={()=>setPanel('libraryMenu')}>라이브러리 관리</button><button onClick={()=>setPanel('backup')}>백업·복원</button><button onClick={()=>{setSelectionMode(true);setSelectedCards([]);setPanel(undefined);}}>선택 관리</button></section><section><h3>캐릭터·자원</h3><button onClick={()=>setPanel('profiles')}>캐릭터·덱</button><button onClick={()=>setPanel('resources')}>자원 관리</button><button onClick={()=>setPanel('history')}>일괄 편집 복원</button></section><section><h3>선택 카드{selected?` · ${selected.name}`:''}</h3><button disabled={!selected} onClick={()=>setPanel('edit')}>정보 수정</button><button disabled={!selected||!resourceController.snapshot} onClick={()=>setPanel('costs')}>카드 사용 규칙</button>{activeDeck&&selected&&<button disabled={busy} onClick={async()=>{if(await mutate(()=>window.desktop.setDeckCards({deckId:activeDeck.id,cardIds:activeDeck.cardIds.includes(selected.id)?activeDeck.cardIds.filter(id=>id!==selected.id):[...activeDeck.cardIds,selected.id]})))setPanel(undefined);}}>{activeDeck.cardIds.includes(selected.id)?'활성 덱에서 빼기':'활성 덱에 추가'}</button>}{!activeDeck&&selected&&<DeckMembership card={selected} decks={bootstrap.decks} profiles={bootstrap.profiles} busy={busy} onToggle={deck=>toggleDeck(deck.id,selected.id)}/>}<button className="trash-move" disabled={!selected} onClick={()=>setPanel('archive')}>휴지통으로 이동</button></section></div></Modal>}
     {panel==='libraryMenu'&&<Modal title="라이브러리 관리" onClose={()=>setPanel(undefined)}><p>공통 태그와 삭제된 카드를 관리합니다.</p><div className="batch-actions"><button onClick={()=>setPanel('tags')}>태그 관리</button><button onClick={()=>setPanel('trash')}>휴지통</button></div></Modal>}

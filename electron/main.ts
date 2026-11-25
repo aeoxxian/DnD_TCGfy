@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { AppStore } from './store';
 import { SCHEMA_VERSION } from './migrations';
 import { APP_URL, DEV_URL, PRODUCTION_CSP, isAllowedRequest, isTrustedPage, resolveBundleAsset } from './security';
-import { IPC, discardImportsSchema, settingsSchema, type Result } from '../src/shared/contracts';
+import { IPC, assetAlphaSchema, discardImportsSchema, settingsSchema, type Result } from '../src/shared/contracts';
 import { LibraryStore } from './library-store';
 import { AssetService } from './assets';
 import { UserInputError } from './errors';
@@ -115,6 +115,7 @@ else {
     safeHandler(IPC.saveSettings, input => store!.saveSettings(settingsSchema.parse(input)));
     safeHandler(IPC.saveLibraryState, input => library.saveState(input));
     safeHandler(IPC.importImages, input => assets.importPaths(input));
+    safeHandler(IPC.assetAlpha, input => assets.alphaOf(assetAlphaSchema.parse(input)));
     safeHandler(IPC.discardImports, async input => {
       const queued = library.queueUnusedImports(assets.takeSessionImports(discardImportsSchema.parse(input)));
       if (queued.length) await cleanup.run();

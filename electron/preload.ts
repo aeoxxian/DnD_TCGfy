@@ -25,6 +25,7 @@ const bridge: DesktopBridge = {
     } catch { return { ok: false, error: '로컬 이미지 파일을 선택해 주세요.' }; }
   },
   discardImports: assetIds => ipcRenderer.invoke(IPC.discardImports, assetIds),
+  assetAlpha: assetIds => ipcRenderer.invoke(IPC.assetAlpha, assetIds),
   saveCards: input => ipcRenderer.invoke(IPC.saveCards, input),
   archiveCard: id => ipcRenderer.invoke(IPC.archiveCard, id),
   saveTag: input => ipcRenderer.invoke(IPC.saveTag, input),

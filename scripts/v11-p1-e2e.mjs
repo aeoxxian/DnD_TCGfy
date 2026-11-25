@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { cp, mkdtemp, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createServer } from 'vite';
+import { showWholeLibrary } from './navigation-helpers.mjs';
 
 const dev = process.argv.includes('--dev');
 const binary = process.env.DND_TCG_EXECUTABLE;
@@ -122,8 +123,10 @@ check('quick 행동/보너스 행동 and the extra action-economy filter are one
 await app.close();
 
 // 3. Hand scroll position, in a window where the hand overflows well past its width (1366x768 at 150%).
+// v1.3: whole (smaller) cards fit more of the 9-card deck there, so this check uses the whole library to overflow.
 {
   const { app, page } = await launch(1.5);
+  await showWholeLibrary(page);
   const hand = page.locator('.cards-area');
   const scrollState = () => hand.evaluate(el => ({ left: Math.round(el.scrollLeft), max: el.scrollWidth - el.clientWidth }));
   const reset = async () => { await page.getByRole('button', { name: '필터 초기화' }).click(); await page.waitForTimeout(250); };

@@ -121,26 +121,47 @@ export function CardBackDialog({ appearance, deck, busy, onSave, onClose }: {
   </Modal>;
 }
 
-export function DeckPile({ src, deckName, count, onOpen }: { src: string; deckName: string; count: number; onOpen: () => void }) {
-  return <button type="button" className="mat-zone deck-pile" aria-haspopup="dialog" aria-label={`카드 뒷면 바꾸기 · ${deckName} ${count}장`} onClick={onOpen}>
+/**
+ * v1.3 Phase 3 (UI-P1): DECK and USED share one zone — the name plate on the border, the stacked pile (a button) on the
+ * left and the name, count and small actions on the right. DECK shuffles the hand's display order (memo 4; card backs
+ * moved to 관리 → 캐릭터·덱, memo 6); USED opens the full use history and can be cleared for display only (memo 3).
+ */
+export function DeckPile({ src, deckName, count, shuffled, onShuffle, onUnshuffle }: { src: string; deckName: string; count: number; shuffled: boolean; onShuffle: () => void; onUnshuffle: () => void }) {
+  const [spin, setSpin] = useState(0);
+  return <section className="mat-zone deck-pile" aria-label={`덱 · ${deckName}`}>
     <span className="zone-label" aria-hidden="true">DECK</span>
-    <span className="pile" aria-hidden="true">
-      <img src={src} alt="" draggable={false}/><img src={src} alt="" draggable={false}/><img src={src} alt="" draggable={false}/>
-      <span className="pile-count">{count}</span>
-    </span>
-    <span className="zone-caption">{deckName}</span>
-  </button>;
+    <button type="button" className="pile-button" aria-label={`${deckName} ${count}장 · 눌러서 손패 순서 섞기`} onClick={() => { setSpin(value => value + 1); onShuffle(); }}>
+      <span className={`pile ${spin ? `is-shuffling-${spin % 2}` : ''}`} aria-hidden="true">
+        <img src={src} alt="" draggable={false}/><img src={src} alt="" draggable={false}/><img src={src} alt="" draggable={false}/>
+        <span className="pile-count">{count}</span>
+      </span>
+    </button>
+    <div className="zone-info">
+      <strong className="zone-caption" title={deckName}>{deckName}</strong>
+      <span className="zone-meta">{count}장 · {shuffled ? '섞인 순서' : '등록 순서'}</span>
+      <span className="zone-hint">더미를 누르면 섞습니다</span>
+      {shuffled && <button type="button" className="zone-action" onClick={onUnshuffle}>원래 순서</button>}
+    </div>
+  </section>;
 }
 
-export function UsedPile({ events, cards, disabled, onOpen }: { events: ResourceEvent[]; cards: CardDefinition[]; disabled: boolean; onOpen: () => void }) {
+export function UsedPile({ events, cards, disabled, cleared, onOpen, onClear, onRestore }: { events: ResourceEvent[]; cards: CardDefinition[]; disabled: boolean; cleared: boolean; onOpen: () => void; onClear?: () => void; onRestore?: () => void }) {
   const used = events.filter(event => event.type === 'card_used');
   const top = used.slice(0, 2).map(event => cards.find(card => card.id === event.cardId)).filter((card): card is CardDefinition => !!card).reverse();
-  return <button type="button" className="mat-zone used-pile" aria-haspopup="dialog" disabled={disabled} aria-label={`사용한 카드 더미 · 최근 ${used.length}건 · 전체 카드 사용 기록 열기`} onClick={onOpen}>
+  return <section className="mat-zone used-pile" aria-label="최근 사용">
     <span className="zone-label" aria-hidden="true">USED</span>
-    <span className="pile" aria-hidden="true">
-      {top.length ? top.map((card, index) => <span className="used-card" key={`${card.id}-${index}`}><CardFace card={card}/></span>) : <span className="pile-empty"/>}
-      <span className="pile-count">{used.length}</span>
-    </span>
-    <span className="zone-caption">최근 사용</span>
-  </button>;
+    <button type="button" className="pile-button" aria-haspopup="dialog" disabled={disabled} aria-label={`사용한 카드 더미 · 최근 ${used.length}건 · 전체 카드 사용 기록 열기`} onClick={onOpen}>
+      <span className="pile" aria-hidden="true">
+        {top.length ? top.map((card, index) => <span className="used-card" key={`${card.id}-${index}`}><CardFace card={card}/></span>) : <span className="pile-empty"/>}
+        <span className="pile-count">{used.length}</span>
+      </span>
+    </button>
+    <div className="zone-info">
+      <strong className="zone-caption">최근 사용</strong>
+      <span className="zone-meta">{used.length}건{cleared ? ' · 비운 뒤' : ''}</span>
+      <span className="zone-hint">더미를 누르면 전체 기록</span>
+      {onRestore ? <button type="button" className="zone-action" onClick={onRestore}>되돌리기</button>
+        : onClear && used.length > 0 && <button type="button" className="zone-action" aria-label="최근 사용 더미 비우기" onClick={onClear}>비우기</button>}
+    </div>
+  </section>;
 }

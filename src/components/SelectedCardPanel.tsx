@@ -25,11 +25,13 @@ export function InPlaySlot({ card, onPreview }: { card?: CardDefinition; onPrevi
  */
 export function SelectedCardPanel({card,tags,controller,onClose,closeRef}:{card?:CardDefinition;tags:Tag[];controller:ResourceController;onClose:()=>void;closeRef:RefObject<HTMLButtonElement|null>}) {
   const properties=card?`${KIND_NAMES[card.kind]} · ${card.actions.map(a=>ACTION_NAMES[a]).join(' · ')} · ${RANGE_NAMES[card.range.kind]}${card.range.feet!==undefined?` ${card.range.feet} ft`:''}${card.spellLevel!==undefined?` · 주문 ${card.spellLevel}레벨`:''}`:'';
+  // v1.3 UI-P2: the header line under the name leaves the kind and level to the kicker above it (no repeat).
+  const headline=card?`${card.actions.map(a=>ACTION_NAMES[a]).join(' · ')} · ${RANGE_NAMES[card.range.kind]}${card.range.feet!==undefined?` ${card.range.feet} ft`:''}`:'';
   const kicker=card?`${KIND_NAMES[card.kind]}${card.spellLevel!==undefined?` · ${card.spellLevel===0?'소마법':`${ROMAN[card.spellLevel]} 레벨`}`:''}`:'';
   return <aside className="detail-panel" aria-label="선택 카드 상세">{card?<div className="selection" key={card.id}>
     <div className="codex"><article className="codex-page">
       <div className="panel-title"><h2 className="sr-only">카드 살펴보기</h2><button ref={closeRef} className="codex-close" aria-label="카드 선택 닫기" onClick={onClose}><span aria-hidden="true">✕</span></button></div>
-      <section className="selected-card-summary" aria-label="선택 카드 정보"><div className="selected-card-heading"><span className="codex-kicker">{kicker}</span><h2 title={card.name}>{card.name}</h2><p className="selected-properties" title={properties}>{properties}</p><div className="detail-tags">{card.roles.map(role=><span key={role}>{ROLE_NAMES[role]}</span>)}{card.tags.map(id=><span key={id}>{tags.find(t=>t.id===id)?.name??id}</span>)}</div></div></section>
+      <section className="selected-card-summary" aria-label="선택 카드 정보"><div className="selected-card-heading"><span className="codex-kicker">{kicker}</span><h2 title={card.name}>{card.name}</h2><p className="selected-properties" title={properties}>{headline}</p><div className="detail-tags">{card.roles.map(role=><span key={role}>{ROLE_NAMES[role]}</span>)}{card.tags.map(id=><span key={id}>{tags.find(t=>t.id===id)?.name??id}</span>)}</div></div></section>
       <details open className="description-pane"><summary>설명·추가 정보</summary><div className="description-content" aria-label="카드 설명 스크롤" tabIndex={0}><p className="detail-description">{card.description||(card.imageAssetId?'보조 설명이 없습니다. 이미지를 클릭하면 원본을 크게 볼 수 있습니다.':'보조 설명이 없습니다. 카드를 클릭하면 크게 볼 수 있습니다.')}</p><p>{properties}</p><p>{card.tags.map(id=>tags.find(t=>t.id===id)?.name??id).join(' · ')}</p></div></details>
       <CardUsage key={`${controller.snapshot?.characterId}-${card.id}-${card.updatedAt}`} card={card} controller={controller}/>
     </article></div>

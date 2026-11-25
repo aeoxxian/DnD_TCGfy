@@ -100,6 +100,8 @@ export const settingsSchema = z.strictObject({
   slotColors: z.record(z.string().min(1).max(128), slotColorSetSchema).refine(value => Object.keys(value).length <= 200).optional(),
   handScroll: handScrollSchema.optional(),
   registrationTemplates: registrationTemplatesSchema.optional(),
+  // v1.3 (memo 3): per-character “USED pile cleared through” mark, display only (key `used_view`).
+  usedViews: z.record(z.string().min(1).max(128), historyViewSchema).refine(value => Object.keys(value).length <= 200).optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };
@@ -176,6 +178,8 @@ export const deckCardsSchema = z.strictObject({ deckId: idSchema, cardIds: z.arr
 export const importPathsSchema = z.array(z.string().min(1).max(32767)).min(1).max(100);
 /** v1.3: images picked in a registration that was cancelled or removed from its list (see AssetService.takeSessionImports). */
 export const discardImportsSchema = z.array(idSchema).max(200);
+/** v1.3 (memo 1): which images have see-through pixels (main process, sharp stats on the thumbnail). */
+export const assetAlphaSchema = z.array(idSchema).min(1).max(500);
 
 export interface Library {
   cards: CardDefinition[]; tags: Tag[]; profiles: ProfileSummary[]; decks: Deck[];
@@ -197,6 +201,7 @@ export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge, 
   saveLibraryState(state: LibraryState): Promise<Result<LibraryState>>;
   importImages(files: File[]): Promise<Result<ImportBatch>>;
   discardImports(assetIds: string[]): Promise<Result<{ discarded: number }>>;
+  assetAlpha(assetIds: string[]): Promise<Result<Record<string, boolean>>>;
   saveCards(input: z.infer<typeof saveCardsSchema>): Promise<Result<Library>>;
   archiveCard(id: string): Promise<Result<Library>>;
   saveTag(input: z.infer<typeof tagMutationSchema>): Promise<Result<Library>>;
@@ -210,7 +215,7 @@ export const IPC = {
   getTrash:'trash:get', previewTrash:'trash:preview', changeTrash:'trash:change', retryImageCleanup:'trash:cleanup', getUseHistory:'resources:history',
   previewEdit: 'edits:preview', applyEdit: 'edits:apply', getEditHistory: 'edits:history',
   getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save', saveLibraryState: 'library:state',
-  importImages: 'assets:import', discardImports: 'assets:discard', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
+  importImages: 'assets:import', discardImports: 'assets:discard', assetAlpha: 'assets:alpha', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
   createProfile: 'profiles:create', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
   previewClass: 'classes:preview', getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
   exportBackup: 'backup:export', inspectBackup: 'backup:inspect', applyBackup: 'backup:apply', discardBackup: 'backup:discard', getBackupStatus: 'backup:status',

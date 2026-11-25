@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { DEFAULT_LIBRARY_STATE, DEFAULT_SETTINGS, type Bootstrap, type DesktopBridge } from '../src/shared/contracts';
@@ -47,8 +47,10 @@ describe('play-mat appearance', () => {
     expect([...view.container.querySelectorAll('.resource-panel, .board, .detail-panel, .hand-row')].length).toBe(zonesBefore);
     expect(screen.getByRole('menuitemradio', { name: /흑단과 은/, hidden: true }).getAttribute('aria-checked')).toBe('true');
   });
-  it('opens the card-back chooser from the deck pile and applies a back to this deck only', async () => {
+  it('opens the card-back chooser from 관리 → 캐릭터·덱 (v1.3: the deck pile shuffles) and applies a back to this deck only', async () => {
     render(<App/>);
+    fireEvent.click(await screen.findByRole('button', { name: '관리' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: '관리 메뉴' })).getByRole('button', { name: '캐릭터·덱' }));
     fireEvent.click(await screen.findByRole('button', { name: /카드 뒷면 바꾸기 · 주문서 덱/ }));
     const dialog = await screen.findByRole('dialog', { name: '카드 뒷면 · 슬리브' });
     expect(dialog).toBeDefined();
