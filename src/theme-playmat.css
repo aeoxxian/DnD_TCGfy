@@ -1044,7 +1044,7 @@ html, body { background: #0b0807; }
   .app.playmat .description-pane { min-height: 14px; }
   .app.playmat .card-use { min-height: 48px; max-height: 56px; padding-top: 2px; }
   .app.playmat.p4-b .use-button { width: 48px; height: 48px; font-size: 10px; padding: 0 8px; }
-  .app.playmat.p4-b .cards-area.hand { padding-top: 14px; }
+  .app.playmat.p4-b .cards-area.hand { padding-top: 12px; } /* UI-P4: room for the 4 px lift; a scrolling hand still fits whole cards */
   .app.playmat.p4-b .card-item.is-selected .card-button, .app.playmat.p4-b .card-button:hover:not(:disabled) { transform: translateY(-4px); }
   .app.playmat.p4-b .hand .card-item { --hand-width: clamp(48px, min(calc(100cqw / 5.6), calc((100cqh - 64px) / 1.458)), 250px); }
 }
@@ -1094,3 +1094,48 @@ html, body { background: #0b0807; }
 .app.playmat .detail-tags span { font-family: var(--sans); font-size: 10.5px; }
 .app.playmat .resource-status-row strong { font-family: var(--sans); font-size: 13px; }
 .app.playmat .rest-buttons button { font-family: var(--sans); font-weight: 700; }
+
+/* ---- v1.3 Phase 3 · UI-P4: play checks ---- */
+/* 561–680 CSS px tall (1366×768 or 1280×720 at 125%): a selected card's page left the hand so little height that its
+   cards fell to the smallest size and still overflowed (names cut by the scrollbar, the raised card clipped), and the
+   ledger showed one row. This band takes the thinner chrome of the short-window rules (the board frame keeps its
+   ornament), slightly lower DECK / USED zones, a tighter ledger and recovery row (so a slot row shows), the compact seal, and the hand reserves less room above the cards. */
+@media (min-height: 561px) and (max-height: 680px) {
+  .app.playmat .topbar { min-height: 46px; padding-top: 4px; padding-bottom: 4px; }
+  .app.playmat .workspace { padding: 6px 8px 2px; }
+  .app.playmat .board { gap: 6px; padding-top: 6px; padding-bottom: 6px; }
+  .app.playmat .board-top { height: 32px; }
+  .app.playmat .board-grid { gap: 10px; }
+  .app.playmat .board-column { gap: 8px; }
+  .app.playmat .board-column > .mat-zone { height: clamp(96px, 26%, 124px); }
+  .app.playmat .resource-panel { gap: 4px; padding: 8px 9px 6px; }
+  .app.playmat .resource-panel > .panel-title { min-height: 24px; }
+  .app.playmat .ledger-page { padding: 8px 10px 4px; }
+  .app.playmat .class-summary { margin: 0 0 3px; }
+  .app.playmat .rest-heading { margin: 0 0 1px; }
+  .app.playmat .coin { width: 32px; height: 32px; }
+  .app.playmat .rest-buttons { gap: 6px; }
+  .app.playmat .rest-buttons button { gap: 1px; font-size: 10px; line-height: 1.15; }
+  .app.playmat .undo-button { padding: 0; font-size: 10.5px; }
+  .app.playmat .board-center > .detail-panel { flex-basis: clamp(170px, 31dvh, 200px); }
+  .app.playmat .card-use { min-height: 58px; max-height: 74px; padding-top: 3px; }
+  .app.playmat.p4-b .use-button { width: 60px; height: 60px; margin: -2px 0; padding: 0 10px; font-size: 11.5px; }
+  .app.playmat.p4-b .cards-area.hand { padding-top: 18px; }
+  .app.playmat.p4-b .card-item.is-selected .card-button, .app.playmat.p4-b .card-button:hover:not(:disabled) { transform: translateY(-6px); }
+  .app.playmat.p4-b .hand .card-item { --hand-width: clamp(64px, min(calc(100cqw / 5.6), calc((100cqh - 48px) / 1.458)), 250px); }
+}
+/* In the hand, the “자원 부족 / 비용 미설정 / 비용 연결 확인” note sits on the card (a small label over the card-back
+   overlay) instead of adding a line under the name, so a card that runs out never changes the hand's height. The grid
+   view keeps the note under the name. */
+.app.playmat .hand .card-caption { position: relative; }
+.app.playmat .hand .card-resource-note { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); max-width: calc(100% - 4px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 8px 2px; border-radius: 999px; font: 700 10px/1.35 var(--sans);
+  color: #f6dccf; background: rgba(18, 9, 7, .88); box-shadow: inset 0 0 0 1px var(--m2), 0 1px 4px rgba(0, 0, 0, .6); pointer-events: none; z-index: 4; }
+/* Short windows (≤ 560 CSS px, e.g. 1366×768 or 1280×720 at 150%): the ledger list was down to one cut line. The class
+   line now scrolls with the list (ResourcePanel), DECK and USED are a little lower and the recovery row is tighter. */
+@media (max-height: 560px) {
+  .app.playmat .board-column > .mat-zone { height: clamp(70px, 24%, 104px); }
+  .app.playmat .coin { width: 28px; height: 28px; }
+  .app.playmat .rest-buttons { margin: 0; }
+  .app.playmat .rest-buttons button { padding: 0; font-size: 9.5px; line-height: 1.1; }
+}

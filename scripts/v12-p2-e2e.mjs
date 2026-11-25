@@ -44,28 +44,31 @@ async function drag(page, { from = .75, to = .45, steps = 4, pause = 0, hold = 0
   const box = await hand(page).boundingBox(); const y = box.y + Math.min(110, box.height / 2);
   const fromX = box.x + box.width * from, toX = box.x + box.width * to;
   // Also note when the page saw the last move and the release: a gap means the harness, not the user, paused.
-  await hand(page).evaluate(el => { window.__released = undefined; window.__moves = []; const move = event => window.__moves.push(event.timeStamp); el.addEventListener('pointermove', move, { capture: true }); el.addEventListener('pointerup', event => { window.__released = el.scrollLeft; window.__up = event.timeStamp; el.removeEventListener('pointermove', move, { capture: true }); }, { once: true, capture: true }); });
+  await hand(page).evaluate(el => { window.__released = undefined; window.__moves = []; const move = event => window.__moves.push({ t: event.timeStamp, x: event.clientX }); el.addEventListener('pointermove', move, { capture: true }); el.addEventListener('pointerup', event => { window.__released = el.scrollLeft; window.__up = event.timeStamp; el.removeEventListener('pointermove', move, { capture: true }); }, { once: true, capture: true }); });
   const frames = record ? recordFrames(page, record + steps * pause + hold) : undefined;
   await page.mouse.move(fromX, y); await page.mouse.down();
   for (let i = 1; i <= steps; i++) { await page.mouse.move(fromX + (toX - fromX) * i / steps, y); if (pause) await page.waitForTimeout(pause); }
   if (hold) await page.waitForTimeout(hold);
   await page.mouse.up();
   const points = frames ? await frames : [];
-  const { released, gap } = await page.evaluate(() => ({ released: window.__released, gap: window.__up - window.__moves.at(-1) }));
+  // `speed`: the pointer speed (px/ms) the app sees at release, over its 100 ms sample window (hand-inertia.ts).
+  const { released, gap, speed } = await page.evaluate(() => { const moves = window.__moves, last = moves.at(-1); const first = moves.find(m => last.t - m.t <= 100) ?? last; const from = first === last ? moves.at(-2) ?? last : first;
+    return { released: window.__released, gap: window.__up - last.t, speed: last.t > from.t ? Math.abs(last.x - from.x) / (last.t - from.t) : 0 }; });
   const final = points.length ? points.at(-1).x : await scroll(page);
-  return { released, final, gap, travelled: final - released, points: points.filter(p => p.x !== undefined) };
+  return { released, final, gap, speed, travelled: final - released, points: points.filter(p => p.x !== undefined) };
 }
-/** A quick flick from scroll position `start`. Playwright sometimes delivers moves late while the page is busy
- *  (e.g. loading thumbnails); then the app rightly sees a paused pointer. Such attempts are repeated, so every
- *  "fast" case really is a fast release (last move < 50 ms before the release, app threshold 80 ms). */
+/** A quick flick from scroll position `start`. Playwright sometimes delivers moves late or spread out while the page is
+ *  busy (e.g. loading 200 thumbnails); then the app rightly sees a paused or slow pointer. Such attempts are repeated,
+ *  so every "fast" case really is a fast release: last move < 50 ms before the release (app threshold 80 ms) and a
+ *  pointer speed ≥ 0.5 px/ms over the app's 100 ms window (app threshold 0.35 px/ms). */
 async function flick(page, start, options = {}) {
   for (let attempt = 1; attempt <= 4; attempt++) {
     await setScroll(page, start);
     const result = await drag(page, { from: .7, to: .55, steps: 3, ...options });
-    if (result.gap < 50) return { ...result, attempt };
+    if (result.gap < 50 && result.speed >= 0.5) return { ...result, attempt };
     await page.waitForTimeout(400);
   }
-  throw new Error('the test harness could not deliver a fast flick (last move ≥ 50 ms before release)');
+  throw new Error('the test harness could not deliver a fast flick (last move ≥ 50 ms before release, or slower than 0.5 px/ms)');
 }
 async function warmUp(page) { await page.waitForTimeout(800); await drag(page, { record: 0 }); await setScroll(page, 0); }
 const monotonic = (points, sign) => points.every((p, i) => i === 0 || sign * (p.x - points[i - 1].x) >= -0.5);
