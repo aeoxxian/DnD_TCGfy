@@ -6,6 +6,7 @@
 //   frame-felt.png    darker felt binding with a running stitch, matte bronze oak-leaf corners held by tacks
 //   frame-ebony.png   polished silver hairlines inlaid flush in the wood, fine filigree corners with an onyx dot
 //   frame-oxblood.png leather binding with saddle stitching, heavy hammered L corner guards with domed rivets
+//                     (v1.3: a single stitch row, no rivets along the edges)
 // Panel corners for the ledger and the card page (160-unit 9-slice → 320 px, 40-unit corners):
 //   panel-<theme>.png
 // The edges only hold lines and periodic details (period divides the 120/80-unit edge), so `round` tiles them
@@ -259,10 +260,10 @@ function boardOxblood() {
   const S = 240, B = 24;
   const band = `M1 1 H${S - 1} V${S - 1} H1 Z M${B} ${B} V${S - B} H${S - B} V${B} Z`;
   const guard = `M1 1 H44 Q46 1 46 3 V9 Q46 11 44 12 L22 17 Q18 18 17.5 22 L12 44 Q11 46 9 46 H3 Q1 46 1 44 Z`;
-  const stitches = (from, to) => `${dashes(4.2, from, to, 7.5, 4, 1.15, '#000', 0.45).replace('<path ', '<path transform="translate(0.4 0.6)" ')}${dashes(4.2, from, to, 7.5, 4, 1.05, '#c8b083', 0.9)}
-    ${dashes(20.2, from, to, 7.5, 4, 1.15, '#000', 0.45).replace('<path ', '<path transform="translate(0.4 0.6)" ')}${dashes(20.2, from, to, 7.5, 4, 1.05, '#c8b083', 0.9)}`;
-  const edge = `${stitches(45, S - 45)}<path d="M45 ${B + 0.4} H${S - 45}" stroke="#000" stroke-opacity="0.5" stroke-width="1.2"/><path d="M45 ${B - 0.8} H${S - 45}" stroke="#ffe7c4" stroke-opacity="0.08" stroke-width="0.9"/>
-    ${rivet(120, 12, 2.2)}`;
+  // v1.3 UI-P3: one saddle-stitch row in the middle of the band and no rivets along the edges (they repeated every
+  // segment); the hammered corner guards keep their rivets.
+  const stitches = (from, to) => `${dashes(12.2, from, to, 7.5, 4, 1.15, '#000', 0.45).replace('<path ', '<path transform="translate(0.4 0.6)" ')}${dashes(12.2, from, to, 7.5, 4, 1.05, '#c8b083', 0.8)}`;
+  const edge = `${stitches(45, S - 45)}<path d="M45 ${B + 0.4} H${S - 45}" stroke="#000" stroke-opacity="0.5" stroke-width="1.2"/><path d="M45 ${B - 0.8} H${S - 45}" stroke="#ffe7c4" stroke-opacity="0.08" stroke-width="0.9"/>`;
   const defs = BRASS + `<radialGradient id="rivetG" cx="38%" cy="34%" r="70%"><stop offset="0" stop-color="#fff3cf"/><stop offset="0.35" stop-color="#c9ad6e"/><stop offset="0.8" stop-color="#5e4a24"/><stop offset="1" stop-color="#2b2010"/></radialGradient>`
     + metalFilter('hammered', { bevel: 1.2, scale: 4.6, spec: 0.85, exp: 12, mix: 0.75, mul: 1.05, base: 0.12, noise: { type: 'turbulence', freq: 0.26, amp: 0.85, seed: 4, octaves: 2 }, shadow: { blur: 1.8, dx: 1.4, dy: 2.2, op: 0.8 } })
     + reliefFilter('soft', { blur: 2.2, scale: 2.4, light: 0.14, dark: 0.35 });
@@ -286,5 +287,7 @@ const jobs = [
   ['frame-arcane.png', 240, boardArcane(), 480], ['frame-felt.png', 240, boardFelt(), 480], ['frame-ebony.png', 240, boardEbony(), 480], ['frame-oxblood.png', 240, boardOxblood(), 480],
   ['panel-arcane.png', 160, panelArcane(), 320], ['panel-felt.png', 160, panelFelt(), 320], ['panel-ebony.png', 160, panelEbony(), 320], ['panel-oxblood.png', 160, panelOxblood(), 320],
 ];
-for (const [name, size, markup, px] of jobs) await raster(name, size, markup, px);
+// FRAMES_ONLY=frame-oxblood.png (comma-separated) regenerates only those files.
+const only = process.env.FRAMES_ONLY?.split(',');
+for (const [name, size, markup, px] of jobs) if (!only || only.includes(name)) await raster(name, size, markup, px);
 console.log(jobs.map(([name]) => name).join(' '));

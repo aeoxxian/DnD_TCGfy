@@ -1068,3 +1068,29 @@ html, body { background: #0b0807; }
 .app.playmat .rest-heading { display: flex; align-items: center; gap: 8px; margin: 2px 0 3px; font: 700 9.5px var(--display); letter-spacing: 3px; color: var(--mute-l); }
 .app.playmat .rest-heading::before, .app.playmat .rest-heading::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--m2), transparent); }
 @media (max-height: 560px) { .app.playmat .rest-heading { display: none; } }
+
+/* ---- v1.3 Phase 3 · UI-P3: visual finish ---- */
+/* The Use seal per theme (memo 5). 적갈 가죽 keeps its red wax; the others are drawn by scripts/design/seals_v13.mjs. */
+.app.playmat { --seal-ink: #fbeee2; --seal-ink-shadow: 0 1px 0 #3a0c07, 0 -1px 0 rgba(255, 190, 170, .3); --seal-hover: drop-shadow(0 6px 7px rgba(40, 14, 8, .7)) brightness(1.08); }
+.app.playmat[data-theme=ebony] { --seal: url('./assets/playmat/seal-ebony.svg'); --seal-ink: #f1f3f6; --seal-ink-shadow: 0 1px 1px #000, 0 0 5px rgba(0, 0, 0, .8);
+  --seal-hover: drop-shadow(0 6px 7px rgba(0, 0, 0, .75)) drop-shadow(0 0 5px rgba(235, 240, 248, .28)) brightness(1.06); }
+.app.playmat[data-theme=verdant] { --seal: url('./assets/playmat/seal-felt.svg'); --seal-ink: #f3eed8; --seal-ink-shadow: 0 1px 0 #0d1a0b, 0 0 4px rgba(10, 20, 8, .7);
+  --seal-hover: drop-shadow(0 6px 7px rgba(8, 16, 6, .7)) brightness(1.08) saturate(1.08); }
+.app.playmat[data-theme=abyss] { --seal: url('./assets/playmat/seal-arcane.svg'); --seal-ink: #e4f7ff; --seal-ink-shadow: 0 0 6px rgba(127, 207, 255, .95), 0 1px 0 #000;
+  --seal-hover: drop-shadow(0 4px 5px rgba(0, 0, 0, .7)) drop-shadow(0 0 9px rgba(127, 207, 255, .6)); }
+.app.playmat.p4-b .use-button:not(:disabled) { color: var(--seal-ink); text-shadow: var(--seal-ink-shadow); }
+.app.playmat.p4-b .use-button:hover:not(:disabled) { filter: var(--seal-hover); }
+.app.playmat[data-theme=abyss].p4-b .use-button:disabled { filter: saturate(0) brightness(.55); }
+
+/* One quiet frame around the large card: a single trim line on the slot and a soft glow on the card (no stacked rings). */
+.app.playmat .board-left > .in-play-slot { box-shadow: inset 0 0 0 1px var(--m2), inset 0 0 34px rgba(0, 0, 0, .38); }
+.app.playmat .board-left .detail-card .card-face:not(.has-alpha) { box-shadow: 0 0 20px var(--glow), 0 14px 28px rgba(0, 0, 0, .7); }
+/* The ledger binding loses its dashed stitch (적갈 가죽); the other themes keep their own line. */
+.app.playmat:not([data-theme]) .board-right > .resource-panel::before, .app.playmat[data-theme=oxblood] .board-right > .resource-panel::before { border: 1px solid rgba(210, 190, 160, .16); }
+/* Typography: decorative serif for titles and names (card name, ledger, DECK/USED, headers); the plain sans for
+   functional text — filters, toggles, small buttons, costs, numbers and secondary lines. */
+.app.playmat :is(.role-filter > button, .role-filter .chips button, .quick-actions button, .view-switch button, .zone-action) { font-family: var(--sans); font-size: 12px; }
+.app.playmat :is(.selected-properties, .card-use .cost-preview, .card-use .form-field, .exception-button) { font-family: var(--sans); }
+.app.playmat .detail-tags span { font-family: var(--sans); font-size: 10.5px; }
+.app.playmat .resource-status-row strong { font-family: var(--sans); font-size: 13px; }
+.app.playmat .rest-buttons button { font-family: var(--sans); font-weight: 700; }

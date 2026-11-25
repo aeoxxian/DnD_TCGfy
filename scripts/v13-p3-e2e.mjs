@@ -123,12 +123,19 @@ check('Three columns at 1920×1080, 1366×768, 1280×720 × 100/125/150% and the
   assertLayout(await measure(page), 'expanded again');
   check('Collapsing the ledger narrows the right column but keeps the deck; expanding restores the layout');
 
+  const seals = {};
   for (const theme of ['oxblood', 'ebony', 'verdant', 'abyss']) {
     await page.evaluate(async theme => { const s = (await window.desktop.getBootstrap()).value.settings; const r = await window.desktop.saveSettings({ ...s, appearance: { ...(s.appearance ?? { cardBack: { default: { type: 'builtin', id: 'dragon' }, decks: {} }, customBacks: [] }), theme } }); if (!r.ok) throw new Error(r.error); }, theme);
     await page.reload(); await page.waitForSelector('.board'); await page.waitForTimeout(400); await selectCard(page);
     assertLayout(await measure(page), `theme ${theme}`);
+    // UI-P3 (memo 5): each theme draws its own Use seal, and it loads.
+    const seal = await page.locator('.use-button').evaluate(el => getComputedStyle(el).backgroundImage);
+    seals[theme] = seal.includes('seal-ebony') ? 'ebony' : seal.includes('seal-felt') ? 'felt' : seal.includes('seal-arcane') ? 'arcane' : seal.includes('wax-seal') || seal.includes('data:image/png') ? 'wax' : seal;
+    const loaded = await page.evaluate(src => new Promise(done => { const img = new Image(); img.onload = () => done(img.naturalWidth > 0); img.onerror = () => done(false); img.src = src; }), seal.match(/url\(\s*["']?(.+?)["']?\s*\)$/)[1]);
+    assert(loaded, `${theme} seal loads`);
   }
-  check('All four themes share the same three-column layout without overlap or clipping');
+  assert.deepEqual(seals, { oxblood: 'wax', ebony: 'ebony', verdant: 'felt', abyss: 'arcane' });
+  check('All four themes share the same three-column layout without overlap or clipping; each draws its own Use seal (wax · ebony · felt · arcane) and it loads', seals);
   assert.deepEqual(errors, []); await app.close();
 }
 
