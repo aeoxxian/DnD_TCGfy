@@ -87,7 +87,7 @@ describe('v1.3 Phase 2 · registering several images at once', () => {
     await screen.findByText('3장 등록 완료', {}, { timeout: 5000 });
     expect(desktop.saveCards).toHaveBeenCalledTimes(4);
     expect(desktop.saveCards.mock.calls[3][0]).toMatchObject({ cards: [{ imageAssetId: 'b' }], initialRules: { requestId: failedRequest } });
-  });
+  }, 15000); // two waits of up to 5 s each: the test itself needs more than the 5 s default under a busy parallel run
 
   it('stops after three failures in a row and leaves the rest unprocessed', async () => {
     const desktop = bridge(() => ({ ok: false, error: '디스크 오류' }));
@@ -98,7 +98,7 @@ describe('v1.3 Phase 2 · registering several images at once', () => {
     expect(desktop.saveCards).toHaveBeenCalledTimes(3);
     expect(screen.getByText(/연속으로 3장이 실패해 나머지는 등록하지 않았습니다/)).toBeDefined();
     expect(within(row(5, 'file-5')).getByText('미처리')).toBeDefined();
-  });
+  }, 15000);
 
   it('a card that needs fixing blocks the final check and is opened for editing', () => {
     const desktop = bridge();
