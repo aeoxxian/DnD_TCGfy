@@ -14,6 +14,8 @@ import { LibraryStore } from '../electron/library-store';
 import { migrations } from '../electron/migrations';
 import { ResourceStore } from '../electron/resource-store';
 import { TrashStore } from '../electron/trash-store';
+import { ProfilePurge } from '../electron/profile-purge';
+import { EditStore } from '../electron/edit-store';
 import { AppStore } from '../electron/store';
 import { planUse } from '../src/shared/resource-engine';
 import type { CastOption } from '../src/shared/contracts';
@@ -230,7 +232,7 @@ describe('v1.4 P4 deck JSON', () => {
       unlinkSync(join(other.path,imagePath));
       const restore=new BackupService(other.store,'1.4.3');
       const backupPreview=await restore.inspect(backupFile);
-      expect(await restore.recoverImages(backupPreview.token,other.assets)).toEqual({recovered:2,remaining:0});
+      expect(await restore.recoverImages(backupPreview.token,other.assets)).toEqual({recovered:1,remaining:0});
       expect((await other.assets.readAsset(`app://assets/${other.library.getLibrary().cards.find(item=>item.id===card.id)!.imageAssetId}`))?.bytes).toEqual(png);
     } finally { source.store.close(); other.store.close(); }
   });
@@ -363,14 +365,102 @@ describe('v1.4 P4 deck JSON', () => {
       const result = await f.exchange.apply({ token: preview.token, characterId: s.id });
       expect(result.library.decks[0]).toEqual(previous);
       expect(result.library.cards.find(card => card.id === 'card1')?.name).toBe('기존 충돌 카드');
-      const copyId = result.library.decks.find(deck => deck.id === result.deckId)!.cardIds[1];
-      expect(copyId).not.toBe(s.c.id);
-      expect(result.library.cards.find(card => card.id === copyId)).toMatchObject({ tags: s.tags, imageAssetId: 'source-image', imageMode: 'illustration' });
+      const linkedId = result.library.decks.find(deck => deck.id === result.deckId)!.cardIds[1];
+      expect(linkedId).toBe(s.c.id);
+      expect(result.library.cards.find(card => card.id === linkedId)).toMatchObject({ tags: s.tags, imageAssetId: 'source-image', imageMode: 'illustration' });
       expect(readFileSync(join(f.path, 'assets', 'managed.png'))).toEqual(s.image);
       expect(f.resources.snapshot(s.id).resources.find(resource => resource.overrides.ownerCardId === s.c.id)?.remaining).toBe(5);
-      const ownCopy = f.resources.snapshot(s.id).resources.find(resource => resource.overrides.ownerCardId === copyId);
-      expect(ownCopy?.remaining).toBe(7);
+      expect(f.resources.snapshot(s.id).resources.filter(resource=>resource.ownedDefinitionId)).toHaveLength(1);
     } finally { f.store.close(); }
+  });
+
+  it.each(['json','zip'] as const)('restores any matching %s deck, supports explicit creation, and removes only the purged receipt',async format=>{
+    const f=fixture();
+    try {
+      const s=seed(f);
+      const path=join(f.path,`reimport.${format}`);
+      await f.exchange.export(s.deckId,path,format);
+      const inspect=()=>f.exchange.inspect(s.id,path);
+      const apply=(token:string,extra:Record<string,unknown>={})=>f.exchange.apply({token,characterId:s.id,...extra});
+      const move=(id:string)=>f.library.changeProfileTrash({kind:'deck',id,restore:false});
+      const first=await apply((await inspect()).token);
+      const repeated=await inspect();
+      expect(repeated.existing).toBe(true);
+      expect((await apply(repeated.token)).deckId).toBe(first.deckId);
+      const optional=await inspect();
+      expect(optional.alternativeNew?.reusedCardCount).toBe(2);
+      const second=await apply(optional.token,{createAnother:true});
+      expect(second.deckId).not.toBe(first.deckId);
+      move(first.deckId);move(second.deckId);
+      move(s.deckId);
+      expect(f.library.getLibrary().profiles[0].activeDeckId).toBeUndefined();
+      const updated:CastOption[]=[{id:'local-review',label:'가져온 뒤 편집한 비용',costs:[]}];
+      change(f,s.id,{type:'save_costs',scope:'character',cardId:s.c.id,castOptions:updated,bindings:[]});
+      const archived=()=>f.store.db.prepare('SELECT * FROM deck_trash ORDER BY deck_id').all();
+      const saved=archived();
+      const preview=await inspect();
+      expect(preview.archivedDecks?.map(deck=>deck.id)).toEqual(expect.arrayContaining([first.deckId,second.deckId]));
+      expect(archived()).toEqual(saved);
+      const third=await apply(preview.token);
+      expect(third.summary?.created).toEqual([]);
+      expect(third.library.profiles[0].activeDeckId).toBe(third.deckId);
+      expect(f.resources.snapshot(s.id).costOverrides?.find(item=>item.cardId===s.c.id)?.castOptions).toEqual(updated);
+      expect(archived()).toEqual(saved);
+      const recover=await inspect();
+      await expect(apply(recover.token,{restoreDeckId:s.deckId})).rejects.toThrow(/복원할 덱/);
+      const restored=await apply(recover.token,{restoreDeckId:first.deckId});
+      expect(restored).toMatchObject({restoredDeck:true,deckId:first.deckId});
+      expect(restored.library.decks.find(deck=>deck.id===first.deckId)?.cardIds).toEqual(first.library.decks.find(deck=>deck.id===first.deckId)?.cardIds);
+      expect(f.resources.snapshot(s.id).resources.find(resource=>resource.ownedDefinitionId)?.remaining).toBe(5);
+      expect(f.resources.snapshot(s.id).events.some(event=>event.type==='card_used')).toBe(true);
+      const purge=new ProfilePurge(f.store.db);
+      const target={kind:'deck',id:second.deckId};
+      const stale=await inspect();
+      purge.apply({target,quote:purge.preview(target).quote,phrase:'영구 삭제'});
+      await expect(apply(stale.token,{restoreDeckId:second.deckId})).rejects.toThrow(/변경/);
+      expect((await inspect()).archivedDecks??[]).not.toContainEqual(expect.objectContaining({id:second.deckId}));
+      expect(f.store.db.prepare('SELECT * FROM deck_exchange_imports WHERE deck_id=?').get(second.deckId)).toBeUndefined();
+      expect(f.library.getLibrary().cards).toEqual(first.library.cards);
+    } finally {f.store.close();}
+  });
+
+  it('purges only confirmed trash, rolls back on failure, and keeps shared cards, images, and the other character intact',()=>{
+    const f=fixture();
+    try {
+      const s=seed(f);
+      const other=newProfile(f,'유지할 캐릭터');
+      const another=newProfile(f,'두 번째 휴지통 캐릭터');
+      f.library.setDeckCards({deckId:other.activeDeckId,cardIds:[s.c.id],operation:'add'});
+      const independent=f.resources.snapshot(other.id);
+      const shared=f.library.getLibrary().cards;
+      const purge=new ProfilePurge(f.store.db);
+      const trash=(kind:'profile'|'deck',id:string)=>f.library.changeProfileTrash({kind,id,restore:false});
+      const empty={kind:'empty'};
+      expect(()=>purge.preview({kind:'deck',id:other.activeDeckId})).toThrow(/휴지통/);
+      trash('deck',s.deckId);
+      expect(()=>new EditStore(f.store).preview({type:'deck_cards',deckId:s.deckId,operation:'add',cardIds:[s.c.id]})).toThrow(/휴지통/);
+      const stale=purge.preview(empty);
+      trash('profile',s.id);
+      trash('profile',another.id);
+      expect(()=>purge.apply({target:empty,quote:stale.quote,phrase:'영구 삭제'})).toThrow(/변경/);
+      const owner={kind:'profile',id:s.id};
+      const preview=purge.preview(owner);
+      expect(preview).toMatchObject({characters:['보내는 캐릭터'],decks:['보내는 캐릭터 · 교환 덱'],cards:2,resources:3});
+      expect(preview.events).toBeGreaterThan(0);
+      f.store.db.exec("CREATE TRIGGER representative_failure BEFORE DELETE ON character_profiles BEGIN SELECT RAISE(ABORT,'fixture rollback'); END");
+      expect(()=>purge.apply({target:owner,quote:preview.quote,phrase:'영구 삭제'})).toThrow('fixture rollback');
+      expect(purge.preview(owner)).toEqual(preview);
+      f.store.db.exec('DROP TRIGGER representative_failure');
+      purge.apply({target:owner,quote:preview.quote,phrase:'영구 삭제'});
+      expect(f.library.getLibrary().profileTrash?.map(item=>item.id)).toEqual([another.id]);
+      purge.apply({target:empty,quote:purge.preview(empty).quote,phrase:'영구 삭제'});
+      expect(f.library.getLibrary().profiles.map(profile=>profile.id)).toEqual([other.id]);
+      expect(f.library.getLibrary().cards).toEqual(shared);
+      expect(f.resources.snapshot(other.id)).toEqual({...independent,sharedCostUsers:{}});
+      expect(f.store.db.prepare('SELECT 1 FROM assets WHERE id=?').get('source-image')).toBeTruthy();
+      expect(f.store.db.prepare('SELECT 1 FROM play_events WHERE character_id=?').get(s.id)).toBeUndefined();
+      expect(f.store.db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+    } finally {f.store.close();}
   });
 
   it('rejects unexpected paths, bad references, duplicate aliases and unsupported versions before writing; rolls back a late insert failure', async () => {
@@ -424,7 +514,7 @@ describe('v1.4 P4 deck JSON', () => {
     try {
       expect(f.library.getLibrary().profiles[0]).toMatchObject({ id: 'old', level: 5 });
       const migrationBackup = readdirSync(join(path, 'backups'));
-      expect(migrationBackup).toEqual([expect.stringMatching(/^before-v8-to-v11-/)]);
+      expect(migrationBackup).toEqual([expect.stringMatching(/^before-v8-to-v12-/)]);
       const backupDb = new DatabaseSync(join(path, 'backups', migrationBackup[0]), { readOnly: true });
       expect(backupDb.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 8 });
       backupDb.close();

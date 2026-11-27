@@ -48,7 +48,7 @@ try {
   await app.evaluate(({ BrowserWindow })=>BrowserWindow.getAllWindows()[0].setContentSize(1366,850));
   await page.locator('.board').waitFor();
   assert.equal((await boot()).appVersion,JSON.parse(await readFile('package.json','utf8')).version);
-  assert.equal((await boot()).schemaVersion,11);
+  assert.equal((await boot()).schemaVersion,12);
   assert.equal((await boot()).profiles.length,0);
 
   let form=await register('범위 검증 주문');
@@ -162,7 +162,7 @@ try {
   await confirmDeck.waitFor({state:'hidden'});
   assert((await boot()).cards.some(card=>card.name==='외부 불씨'));
   assert.equal((await boot()).decks.length,0);
-  await profiles.getByText(/캐릭터·덱 휴지통/).click();
+  await profiles.getByText(/^캐릭터·덱 휴지통 \(/).click();
   await button(profiles,'기본 덱 복원').click();
   await button(profiles,'기본 덱 삭제').waitFor();
   await button(profiles,'캐릭터 삭제').click();
@@ -171,7 +171,7 @@ try {
   await button(confirmProfile,'휴지통으로 이동').click();
   await confirmProfile.waitFor({state:'hidden'});
   assert.equal((await boot()).profiles.length,0);
-  await profiles.getByText(/캐릭터·덱 휴지통/).click();
+  await profiles.getByText(/^캐릭터·덱 휴지통 \(/).click();
   await button(profiles,'패치 검증 복원').click();
   await button(profiles,'캐릭터 삭제').waitFor();
   const recipient=await create('깨끗한 대상');

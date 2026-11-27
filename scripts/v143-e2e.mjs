@@ -38,7 +38,7 @@ async function launch(name) {
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1424,890));
   await page.locator('.board').waitFor();
   assert.equal(await app.evaluate(({app})=>app.getPath('userData')),profile);
-  assert.equal((await boot()).appVersion,'1.4.3');
+  assert.equal((await boot()).appVersion,JSON.parse(await readFile('package.json','utf8')).version);
 }
 async function selectFile(path) {
   await app.evaluate(({dialog},path)=>{

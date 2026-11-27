@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import type { Library, Tag, Result, ProfileTrashEntry } from '../shared/contracts';
+import type { Library, Tag, Result, ProfileTrashEntry, ProfilePurgePreview, Settings } from '../shared/contracts';
 import { Modal } from './Modal';
 
 function TagRow({ tag, onLibrary }: { tag: Tag; onLibrary: (value: Library) => void }) {
@@ -26,14 +26,17 @@ export function TagManager({ library, onLibrary, onClose }: { library: Library; 
   }
   return <Modal title="공통 태그 관리" onClose={onClose}><p className="manager-help">이름 수정과 삭제는 이 태그를 연결한 모든 카드에 적용됩니다. 한 카드의 태그만 바꾸려면 카드 정보 수정을 이용하세요.</p><form className="inline-form" onSubmit={event => void create(event)}><label>새 공통 태그<input maxLength={60} required value={name} onChange={event => setName(event.target.value)} /></label><button disabled={busy}>추가</button></form>{error && <p role="alert" className="error-banner">{error}</p>}<div className="tag-list">{library.tags.map(tag => <TagRow key={tag.id} tag={tag} onLibrary={onLibrary} />)}</div></Modal>;
 }
-export function ProfileManager({library,onLibrary,onClose,onClass,cardBack}: {
+export function ProfileManager({library,onLibrary,onClose,onClass,cardBack,onPurged}: {
   library:Library; onLibrary:(value:Library)=>void; onClose:()=>void; onClass?:()=>void;
   cardBack?:{src:string;deckName?:string;onOpen:()=>void};
+  onPurged:(library:Library,settings:Settings)=>void;
 }) {
   const [characterName,setCharacterName]=useState('');
   const [deckName,setDeckName]=useState('');
   const [managedId,setManagedId]=useState('');
   const [deletion,setDeletion]=useState<ProfileTrashEntry>();
+  const [purge,setPurge]=useState<{target:{kind:'empty'}|{kind:'profile'|'deck';id:string};preview:ProfilePurgePreview}>();
+  const [phrase,setPhrase]=useState('');
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const active=library.libraryState.activeCharacterId;
@@ -51,6 +54,26 @@ export function ProfileManager({library,onLibrary,onClose,onClass,cardBack}: {
   function changeTrash(item:ProfileTrashEntry,restore:boolean) {
     void perform(()=>window.desktop.changeProfileTrash({kind:item.kind,id:item.id,restore}),()=>setDeletion(undefined));
   }
+  async function reviewPurge(item?:ProfileTrashEntry) {
+    const target=item?{kind:item.kind,id:item.id}:{kind:'empty' as const};
+    setBusy(true);setError('');setPhrase('');
+    try {
+      const result=await window.desktop.previewProfilePurge(target);
+      if (result.ok) setPurge({target,preview:result.value});
+      else setError(result.error);
+    } catch { setError('영구 삭제 범위를 확인하지 못했습니다.'); }
+    finally { setBusy(false); }
+  }
+  async function confirmPurge() {
+    if (!purge || busy || phrase!=='영구 삭제') return;
+    setBusy(true);setError('');
+    try {
+      const result=await window.desktop.purgeProfiles({target:purge.target,quote:purge.preview.quote,phrase});
+      if (!result.ok) setError(result.error);
+      else { onPurged(result.value.library,result.value.settings);setPurge(undefined); }
+    } catch { setError('영구 삭제 결과를 확인하지 못했습니다.'); }
+    finally { setBusy(false); }
+  }
   return <Modal title="캐릭터와 덱" onClose={onClose}>
     <form className="inline-form" onSubmit={event=>{event.preventDefault();void perform(()=>window.desktop.createProfile({name:characterName}),()=>{setCharacterName('');setManagedId('');});}}>
       <label>새 캐릭터 이름<input required maxLength={100} value={characterName} disabled={busy} onChange={event=>setCharacterName(event.target.value)}/></label><button disabled={busy}>캐릭터 만들기</button>
@@ -67,12 +90,15 @@ export function ProfileManager({library,onLibrary,onClose,onClass,cardBack}: {
         <label>새 덱 이름<input required maxLength={100} value={deckName} disabled={busy} onChange={event=>setDeckName(event.target.value)}/></label><button disabled={busy}>덱 만들기</button>
       </form>
     </>}
-    {trash.length>0&&<details><summary>캐릭터·덱 휴지통 ({trash.length})</summary><ul className="deck-list">{trash.map(item=><li key={item.id}>
+    {trash.length>0&&<details><summary>캐릭터·덱 휴지통 ({trash.length})</summary>
+      <button className="danger" disabled={busy} onClick={()=>void reviewPurge()}>캐릭터·덱 휴지통 비우기</button>
+      <ul className="deck-list">{trash.map(item=><li key={item.id}>
       <span>{item.characterName ? `${item.characterName} · ` : ''}{item.name} · {item.kind==='deck'?'덱':'캐릭터'}</span>
-      <button disabled={busy} aria-label={`${item.name} 복원`} onClick={()=>changeTrash(item,true)}>복원</button></li>)}</ul></details>}
+      <button disabled={busy} aria-label={`${item.name} 복원`} onClick={()=>changeTrash(item,true)}>복원</button>
+      <button className="danger" disabled={busy} aria-label={`${item.characterName?`${item.characterName} · `:''}${item.name} 영구 삭제`} onClick={()=>void reviewPurge(item)}>영구 삭제</button></li>)}</ul></details>}
     {cardBack&&<section className="card-back-entry" aria-label="카드 뒷면"><img src={cardBack.src} alt="" draggable={false}/>
       <div><h3>카드 뒷면</h3><button type="button" disabled={busy} aria-label={`카드 뒷면 바꾸기 · ${cardBack.deckName??'모든 덱 기본값'}`} onClick={cardBack.onOpen}>카드 뒷면 바꾸기</button></div></section>}
-    {error&&!deletion&&<p role="alert" className="error-banner">{error}</p>}
+    {error&&!deletion&&!purge&&<p role="alert" className="error-banner">{error}</p>}
     {deletion&&<Modal title={deletion.kind==='deck'?'덱 삭제 확인':'캐릭터 삭제 확인'} onClose={()=>{if(!busy)setDeletion(undefined);}}>
       <p>{deletion.name}을(를) 휴지통으로 이동합니다.</p>
       <p>{deletion.kind==='deck'?'이 덱은 플레이 목록에서 숨겨집니다. 카드 원본과 다른 덱은 유지되고, 카드 구성과 순서는 복원할 수 있습니다.':
@@ -80,6 +106,18 @@ export function ProfileManager({library,onLibrary,onClose,onClass,cardBack}: {
       {error&&<p role="alert" className="error-banner">{error}</p>}
       <div className="modal-actions"><button disabled={busy} onClick={()=>setDeletion(undefined)}>취소</button>
         <button className="danger" disabled={busy} onClick={()=>changeTrash(deletion,false)}>휴지통으로 이동</button></div>
+    </Modal>}
+    {purge&&<Modal title="캐릭터·덱 영구 삭제 확인" onClose={()=>{if(!busy)setPurge(undefined);}}>
+      <p>{purge.target.kind==='empty'?'캐릭터·덱 휴지통 전체를 비웁니다.':'선택한 항목을 영구 삭제합니다.'} 삭제 후 복원할 수 없습니다.</p>
+      {purge.preview.characters.length>0&&<><h3>삭제할 캐릭터</h3><ul>{purge.preview.characters.map((name,index)=><li key={index}>{name}</li>)}</ul>
+        <p>해당 캐릭터의 자원 {purge.preview.resources}개, 사용·변경 기록 {purge.preview.events}건, 캐릭터별 비용 설정이 삭제됩니다.</p></>}
+      {purge.preview.decks.length>0&&<><h3>삭제할 덱</h3><ul>{purge.preview.decks.map((name,index)=><li key={index}>{name}</li>)}</ul>
+        <p>덱의 카드 연결이 삭제됩니다. 연결된 카드 원본 {purge.preview.cards}장과 이미지는 공용 라이브러리에 보존됩니다.</p></>}
+      <p>목록 밖의 캐릭터와 덱, 공용 라이브러리, 카드 휴지통은 유지됩니다.</p>
+      <label className="form-field">확인하려면 <strong>영구 삭제</strong>를 입력하세요<input aria-label="영구 삭제 확인 문구" value={phrase} disabled={busy} onChange={event=>setPhrase(event.target.value)}/></label>
+      {error&&<p role="alert" className="error-banner">{error}</p>}
+      <div className="modal-actions"><button disabled={busy} onClick={()=>setPurge(undefined)}>취소</button>
+        <button className="danger" disabled={busy||phrase!=='영구 삭제'} onClick={()=>void confirmPurge()}>영구 삭제 확정</button></div>
     </Modal>}
   </Modal>;
 }

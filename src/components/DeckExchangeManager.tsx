@@ -16,8 +16,11 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
   const [characterId, setCharacterId] = useState(library.libraryState.activeCharacterId ?? library.profiles[0]?.id ?? '');
   const [mode, setMode] = useState<'new'|'append'>('new');
   const [targetId, setTargetId] = useState('');
-  const [preview, setPreview] = useState<DeckPreview>();
+  const [review, setPreview] = useState<DeckPreview>();
+  const [createAnother,setCreateAnother] = useState(false);
+  const preview = createAnother&&review?.alternativeNew ? {...review.alternativeNew,token:review.token} : review;
   const [choices,setChoices] = useState<Record<string,string>>({});
+  const [restoreDeckId,setRestoreDeckId] = useState('');
   const [complete, setComplete] = useState<{ text: string; notices: DeckNotice[]; warnings?: string[]; summary?: DeckImportResult['summary'] }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -56,18 +59,20 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
       } else if (action === 'inspect') {
         const result = await window.desktop.inspectDeck(destination);
         if (!result.ok) { setError(result.error); return; }
-        if (!('canceled' in result.value)) { setChoices({}); setPreview(result.value); }
+        if (!('canceled' in result.value)) { setChoices({}); setRestoreDeckId(''); setCreateAnother(false); setPreview(result.value); }
       } else if (preview) {
         const decisions = Object.fromEntries(Object.entries(choices).map(([ref,value]) => [ref,
           value.startsWith('restore:')?{mode:'restore' as const,cardId:value.slice(8)}
             :value==='restore'?{mode:'restore' as const}:value==='copy'?{mode:'copy' as const}:value==='skip'?{mode:'skip' as const}:{mode:'link' as const,cardId:value.slice(5)}]));
-        const result = await window.desktop.importDeck({ token: preview.token, ...destination, decisions });
+        const result = await window.desktop.importDeck({ token: preview.token, ...destination,
+          ...(restoreDeckId ? {restoreDeckId} : {decisions,...(createAnother?{createAnother:true as const}:{})}) });
         if (!result.ok) { setError(result.error); return; }
         setPreview(undefined);
         onLibrary(result.value.library);
         const summary = result.value.summary;
         const counts = `기존 연결 ${summary?.linked.length??0}장, 신규 등록 ${summary?.created.length??0}장, 휴지통 복원 ${summary?.restored?.length??0}장 · 중복 ${summary?.duplicates.length??0}장, 휴지통에 남긴 카드 ${summary?.trashed.length??0}장, 건너뛴 충돌 ${summary?.skipped.length??0}장.`;
-        const text = preview.append ? `‘${result.value.name}’ 덱에 카드 ${result.value.added}장을 추가했습니다. ${counts}`
+        const text = result.value.restoredDeck ? `‘${result.value.name}’ 덱을 휴지통에서 복원했습니다.`
+          : preview.append ? `‘${result.value.name}’ 덱에 카드 ${result.value.added}장을 추가했습니다. ${counts}`
           : `‘${result.value.name}’ 덱을 추가했습니다. 상단에서 캐릭터와 새 덱을 선택하세요. ${counts}`;
         setComplete({ text, notices: result.value.notices, summary, warnings:result.value.warnings });
       }
@@ -100,6 +105,18 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
     </section>
     {preview && <section className="registration-summary" aria-label="덱 불러오기 미리보기">
       <h3>{preview.characterName} · {preview.name}</h3>
+      {review?.alternativeNew&&<button disabled={busy} onClick={()=>{setCreateAnother(!createAnother);setChoices({});}}>
+        {createAnother?'기존 가져온 덱 확인':'같은 파일로 새 덱 만들기'}
+      </button>}
+      {!!preview.archivedDecks?.length&&<label className="form-field">같은 파일로 가져왔던 덱이 휴지통에 있습니다.
+        <select aria-label="새 덱 생성 또는 기존 덱 복원" value={restoreDeckId} disabled={busy} onChange={event=>setRestoreDeckId(event.target.value)}>
+          <option value="">새 덱 생성 · {preview.name}</option>
+          {preview.archivedDecks.map(deck=><option key={deck.id} value={deck.id}>
+            {deck.name} 복원 · 카드 {deck.cards}장 · {new Date(deck.deletedAt).toLocaleString('ko-KR')}
+          </option>)}
+        </select>
+      </label>}
+      {restoreDeckId ? <p>선택한 덱의 카드 구성과 순서를 휴지통에 넣었을 때 상태로 되돌립니다.</p> : <>
       {preview.append ? <>
         <p>{mode==='new'?'이 파일로 만든 기존 덱을 확인합니다. ':''}현재 덱에 빠진 카드만 추가합니다.</p>
         <h4>추가 예정 {plannedAdded}장</h4>
@@ -117,7 +134,7 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
           </select></label>}
           {ref&&choices[ref]==='copy'&&<Notices notices={copyNotices??[]}/>}
         </li>)}</ul>}
-      </> : <p>{preview.existing ? '이 캐릭터가 이미 가져온 파일입니다. 기존 덱과 잔여량을 그대로 사용합니다.' : `카드 ${preview.cards.length-(preview.restorable??[]).filter(item=>choices[item.ref]==='skip').length-disputed.filter(item=>!choices[item.ref]||choices[item.ref]==='skip').length}장을 새 덱으로 추가합니다.`}</p>}
+      </> : <p>{preview.existing ? '이 캐릭터가 이미 가져온 파일입니다. 기존 덱과 잔여량을 그대로 사용합니다.' : `카드 ${(preview.newDeckCardCount??preview.cards.length)-(preview.restorable??[]).filter(item=>choices[item.ref]==='skip').length-disputed.filter(item=>!choices[item.ref]||choices[item.ref]==='skip').length}장을 새 덱으로 추가합니다.`}</p>}
       {!!preview.restorable?.length&&<fieldset><legend>휴지통 카드 {preview.restorable.length}장</legend>
         <p>선택한 원본은 가져오기를 확정할 때 복원됩니다. 이전에 연결되어 있던 덱에도 다시 추가됩니다.</p>
         {preview.restorable.map(item=><div key={item.ref}><label className="checkbox-line">
@@ -136,12 +153,15 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
         </label>)}
       </fieldset>}
       {preview.renamed && <p>같은 이름의 덱이 있어 새 이름을 붙였습니다.</p>}
-      {!preview.append && !preview.existing && preview.duplicateCardNames > 0 && <p>라이브러리에 이름이 같은 카드 {preview.duplicateCardNames}장이 있습니다. 새 카드로 등록합니다.</p>}
+      {!!preview.reusedCardCount&&<p>라이브러리의 기존 카드 {preview.reusedCardCount}장을 연결합니다.</p>}
+      {!!preview.newDeckDuplicates?.length&&<p>파일 내 동일 카드 {preview.newDeckDuplicates.length}장을 건너뜁니다.</p>}
+      {!preview.append && !preview.existing && preview.duplicateCardNames > (preview.reusedCardCount??0) && <p>라이브러리에 이름이 같은 카드 {preview.duplicateCardNames}장이 있습니다. 일치하는 카드를 연결하고 정의나 비용이 다른 카드는 별도로 등록합니다.</p>}
       {preview.cards.length > 0 && <details><summary>카드 순서 보기</summary><ol>{preview.cards.map((card, index) => <li key={index}>{card}</li>)}</ol></details>}
       <Notices notices={preview.notices}/>
+      </>}
       <div className="modal-actions">
         <button disabled={busy} onClick={() => setPreview(undefined)}>미리보기 닫기</button>
-        <button className="primary" disabled={busy} onClick={() => void run('apply')}>{preview.append
+        <button className="primary" disabled={busy} onClick={() => void run('apply')}>{restoreDeckId ? '기존 덱 복원 확정' : preview.append
           ? plannedAdded ? '기존 덱에 추가 확정' : '기존 덱 확인'
           : '새 덱 불러오기 확정'}</button>
       </div>

@@ -63,6 +63,7 @@ export class EditStore {
     const patches: Patch[] = JSON.parse(batch.patches_json); const summary: EditSummary = JSON.parse(batch.summary_json);
     // Compare every row first. Later edits/spending must never be overwritten.
     for (const patch of patches) {
+      if (patch.table==='deck_cards') this.activeDeck(String(patch.key.deck_id));
       const row = this.db.prepare(`SELECT * FROM ${patch.table} WHERE ${Object.keys(patch.key).map(k => `${k}=?`).join(' AND ')}`).get(...Object.values(patch.key)) ?? null;
       if (json(row) !== json(patch.after)) throw new UserInputError('이후 변경과 충돌하여 복원하지 않았습니다. 최신 일괄 작업부터 복원하거나 항목을 수동으로 확인해 주세요.');
       if (patch.table === 'resource_instances' && patch.before) {
@@ -92,6 +93,10 @@ export class EditStore {
     if (action.type === 'costs' || action.type === 'disconnect_resources') this.barrier(action.characterId, `${batch.label} · 일괄 편집 복원`);
     this.db.prepare('UPDATE edit_batches SET restored_at=? WHERE id=?').run(new Date().toISOString(),id);
     return {...summary,label:`복원: ${batch.label}`,details:[...summary.details,'변경 전 상태로 복원합니다. 자원 사용 Undo와 별도입니다.']};
+  }
+  private activeDeck(id:string) {
+    return requireValue(this.db.prepare(`SELECT * FROM decks WHERE id=? AND id NOT IN (SELECT deck_id FROM deck_trash)
+      AND character_id NOT IN (SELECT profile_id FROM profile_trash)`).get(id),'덱이 휴지통에 있거나 삭제되었습니다. 휴지통에 있으면 먼저 복원해 주세요.');
   }
   private execute(action: EditAction): EditSummary {
     const details: string[] = []; let characters: string[] = []; let targets: string[] = []; let label = ''; let requiresImpact = false;
@@ -146,7 +151,7 @@ export class EditStore {
       characters = this.names(this.cardUsers(changedIds)); requiresImpact = characters.length>0;
       details.push(`선택 ${targets.length}장 중 실제 변경 ${changedIds.length}장 · 태그 ${action.addTagIds.length}개 추가 / ${action.removeTagIds.length}개 제거`, '공통 카드 정의에 적용 · 카드 ID·이미지·사용 기록 보존');
     } else {
-      const deck = requireValue(this.db.prepare('SELECT * FROM decks WHERE id=?').get(action.deckId),'덱이 없습니다.'); characters = this.names([String(deck.character_id)]);
+      const deck = this.activeDeck(action.deckId); characters = this.names([String(deck.character_id)]);
       const before = (this.db.prepare('SELECT card_id FROM deck_cards WHERE deck_id=? ORDER BY position').all(action.deckId) as {card_id:string}[]).map(r=>r.card_id);
       for (const id of action.cardIds) targets.push(String(this.card(id).name));
       const next = action.operation === 'add' ? [...new Set([...before,...action.cardIds])] : before.filter(id=>!action.cardIds.includes(id));

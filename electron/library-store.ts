@@ -204,8 +204,7 @@ export class LibraryStore {
         WHERE d.id=? AND p.id NOT IN (SELECT profile_id FROM profile_trash)`).get(id) as { character_id: string; active_deck_id: string | null } | undefined;
       if (!deck) throw new UserInputError('덱을 찾을 수 없습니다. 휴지통의 캐릭터는 먼저 복원해 주세요.');
       if (restore) {
-        this.db.prepare('DELETE FROM deck_trash WHERE deck_id=?').run(id);
-        if (!deck.active_deck_id) this.db.prepare('UPDATE character_profiles SET active_deck_id=? WHERE id=?').run(id, deck.character_id);
+        this.restoreDeck(id,deck.character_id);
       } else {
         this.db.prepare('INSERT OR IGNORE INTO deck_trash VALUES (?,?)').run(id, new Date().toISOString());
         if (deck.active_deck_id === id) {
@@ -215,6 +214,13 @@ export class LibraryStore {
       }
     });
     return this.getLibrary();
+  }
+  restoreDeck(id: string, characterId: string) {
+    const restored = this.db.prepare(`DELETE FROM deck_trash WHERE deck_id=? AND EXISTS(
+      SELECT 1 FROM decks WHERE id=? AND character_id=? AND character_id NOT IN (SELECT profile_id FROM profile_trash))`)
+      .run(id,id,characterId);
+    if (!restored.changes) throw new UserInputError('복원할 덱이 휴지통에 없습니다. 다시 확인해 주세요.');
+    this.db.prepare('UPDATE character_profiles SET active_deck_id=? WHERE id=? AND active_deck_id IS NULL').run(id,characterId);
   }
   createDeck(input: unknown): Library {
     const { characterId, name } = createDeckSchema.parse(input);

@@ -2,6 +2,7 @@ import { RegistrationStore } from './registration-store';
 import { TrashStore } from './trash-store';
 import { AssetCleanup } from './asset-cleanup';
 import { EditStore } from './edit-store';
+import { ProfilePurge } from './profile-purge';
 import { app, BrowserWindow, dialog, ipcMain, protocol, session } from 'electron';
 import { readFile } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
@@ -145,6 +146,12 @@ else {
     safeHandler(IPC.deleteTag, input => library.deleteTag(input));
     safeHandler(IPC.createProfile, input => library.createProfile(input));
     safeHandler(IPC.changeProfileTrash, input => library.changeProfileTrash(input));
+    const profilePurge = new ProfilePurge(library.db);
+    safeHandler(IPC.previewProfilePurge, input => profilePurge.preview(input));
+    safeHandler(IPC.purgeProfiles, input => {
+      profilePurge.apply(input);
+      return {library:library.getLibrary(),settings:store!.getSettings()};
+    });
     safeHandler(IPC.createDeck, input => library.createDeck(input));
     safeHandler(IPC.selectDeck, input => library.selectDeck(input));
     safeHandler(IPC.setDeckCards, input => library.setDeckCards(input));

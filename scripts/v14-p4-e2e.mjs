@@ -210,7 +210,7 @@ try {
   await manager().getByRole('status').filter({ hasText: /기본 덱 \(2\).*덱을 추가했습니다/ }).waitFor();
   await manager().getByRole('button', { name: '덱 JSON·ZIP 교환 닫기', exact: true }).click();
   const received = await boot();
-  assert.equal(received.schemaVersion, 11);
+  assert.equal(received.schemaVersion, 12);
   const deck = received.decks.find(item => item.name === '기본 덱 (2)');
   const card = received.cards.find(item => item.name === cardName);
   assert.equal(received.decks.find(item => item.id === target.activeDeckId).cardIds.length, 0);

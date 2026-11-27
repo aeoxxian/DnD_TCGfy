@@ -41,6 +41,8 @@ export type DeckDocument = z.infer<typeof deckDocumentSchema>;
 export const deckSelectionSchema = z.strictObject({ deckId: idSchema, format:z.enum(['json','zip']).optional() });
 export const deckTargetSchema = z.strictObject({ characterId: idSchema, deckId: idSchema.optional() });
 export const deckApplySchema = deckTargetSchema.extend({
+  restoreDeckId: idSchema.optional(),
+  createAnother: z.literal(true).optional(),
   token: z.uuid(), decisions: z.record(alias, z.strictObject({ mode: z.enum(['skip','link','copy','restore']), cardId: idSchema.optional() })).optional(),
 });
 
@@ -54,9 +56,15 @@ export interface DeckPreview {
   restorable?: {ref:string; card:string; id:string; decks:string[]}[];
   ambiguousRestores?: {ref:string; card:string; candidates:{id:string; label:string}[]}[];
   format?: 'json'|'zip';
+  archivedDecks?: {id:string; name:string; deletedAt:string; cards:number}[];
+  newDeckCardCount?: number;
+  newDeckDuplicates?: string[];
+  reusedCardCount?: number;
+  alternativeNew?: Omit<DeckPreview,'token'|'alternativeNew'>;
   append?: { added: string[]; linked: string[]; linkedIds: string[]; created: string[]; duplicates: string[]; conflicts: DeckConflict[]; trashed: string[] };
 }
 export interface DeckImportResult {
+  restoredDeck?: boolean;
   library: Library; name: string; deckId: string; replayed: boolean; notices: DeckNotice[]; added?: number;
   warnings?: string[];
   summary?: { linked: string[]; created: string[]; restored: string[]; duplicates: string[]; trashed: string[]; skipped: string[] };

@@ -222,6 +222,14 @@ export interface Deck { id: string; characterId: string; name: string; cardIds: 
 export const createProfileSchema = z.strictObject({ name: z.string().trim().min(1).max(100) });
 export const profileTrashSchema = z.strictObject({ kind: z.enum(['profile','deck']), id: idSchema, restore: z.boolean() });
 export interface ProfileTrashEntry { kind: 'profile'|'deck'; id: string; name: string; characterName?: string }
+export const profilePurgeTargetSchema = z.discriminatedUnion('kind', [
+  z.strictObject({kind:z.literal('empty')}),
+  z.strictObject({kind:z.enum(['profile','deck']),id:idSchema}),
+]);
+export const profilePurgeSchema = z.strictObject({target:profilePurgeTargetSchema, quote:z.string().regex(/^[0-9a-f]{64}$/), phrase:z.literal('영구 삭제')});
+export interface ProfilePurgePreview {
+  quote:string; characters:string[]; decks:string[]; cards:number; resources:number; events:number;
+}
 export const createDeckSchema = z.strictObject({ characterId: idSchema, name: z.string().trim().min(1).max(100) });
 export const selectDeckSchema = z.strictObject({ characterId: idSchema, deckId: idSchema });
 export const deckCardsSchema = z.strictObject({ deckId: idSchema, cardIds: z.array(idSchema).max(5000), operation: z.enum(['add','remove']).optional() });
@@ -258,6 +266,8 @@ export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge, 
   deleteTag(id: string): Promise<Result<Library>>;
   createProfile(input: z.infer<typeof createProfileSchema>): Promise<Result<Library>>;
   changeProfileTrash(input: z.infer<typeof profileTrashSchema>): Promise<Result<Library>>;
+  previewProfilePurge(input:z.infer<typeof profilePurgeTargetSchema>):Promise<Result<ProfilePurgePreview>>;
+  purgeProfiles(input:z.infer<typeof profilePurgeSchema>):Promise<Result<{library:Library;settings:Settings}>>;
   createDeck(input: z.infer<typeof createDeckSchema>): Promise<Result<Library>>;
   selectDeck(input: z.infer<typeof selectDeckSchema>): Promise<Result<Library>>;
   setDeckCards(input: z.infer<typeof deckCardsSchema>): Promise<Result<Library>>;
@@ -268,6 +278,7 @@ export const IPC = {
   getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save', saveLibraryState: 'library:state',
   importImages: 'assets:import', discardImports: 'assets:discard', assetAlpha: 'assets:alpha', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
   createProfile: 'profiles:create', changeProfileTrash: 'profiles:trash', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
+  previewProfilePurge:'profiles:purge-preview', purgeProfiles:'profiles:purge',
   previewClass: 'classes:preview', getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
   getResourceDefinitions: 'resources:definitions', createResourceDefinition: 'resources:definition:create',
   exportDeck: 'deck-exchange:export', inspectDeck: 'deck-exchange:inspect', importDeck: 'deck-exchange:import',
