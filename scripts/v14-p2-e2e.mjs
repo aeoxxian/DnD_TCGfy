@@ -26,6 +26,7 @@ const originalTrash = query(dbPath, 'SELECT * FROM card_trash ORDER BY card_id')
 const fixture = join(run, 'artwork.png');
 await sharp({ create: { width: 410, height: 210, channels: 3, background: '#4878a6' } }).png().toFile(fixture);
 const fixtureHash = hash(await readFile(fixture));
+const binary = process.env.DND_TCG_EXECUTABLE;
 const env = { ...process.env, DND_TCG_TEST_USER_DATA: userData, DND_TCG_TEST_NO_RELAUNCH: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
 delete env.DND_TCG_DEV_URL;
@@ -35,7 +36,7 @@ let app;
 let page;
 const pageErrors = [];
 async function launch() {
-  app = await electron.launch({ args: ['.'], env, cwd: process.cwd(), timeout: 45000 });
+  app = await electron.launch({ ...(binary ? { executablePath: binary, args: [] } : { args: ['.'] }), env, cwd: process.cwd(), timeout: 45000 });
   page = await app.firstWindow();
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.waitForSelector('.board');
@@ -137,14 +138,35 @@ try {
   await page.waitForFunction(async id => (await window.desktop.getResources(id)).value.resources.find(item => item.name === '의식 재료').remaining === 3, characterId);
   pass('Exhausted regular slots do not block a ritual; confirmation spends the explicit counter only and Undo restores it');
 
+  await page.evaluate(async () => {
+    const base = { kind: 'spell', spellLevel: 1, roles: [], range: { kind: 'self' }, tags: [], imageMode: 'none' };
+    const result = await window.desktop.saveCards({ cards: [
+      { ...base, name: 'P2 집중만', concentration: true, ritual: false, actions: ['reaction'] },
+      { ...base, name: 'P2 속성 없음', concentration: false, ritual: false, actions: ['bonus_action'] },
+    ] });
+    if (!result.ok) throw new Error(result.error);
+  });
+  await page.reload(); await page.waitForSelector('.board');
   await search('P2 ');
   const filters = await openExtraFilters(page);
   const traitsFilter = filters.getByRole('group', { name: '주문 속성 필터' });
-  await traitsFilter.getByRole('button', { name: '집중',exact:true }).click();
-  await traitsFilter.getByRole('button', { name: '의식',exact:true }).click();
-  await closeExtraFilters(page);
+  const concentration = traitsFilter.getByRole('button', { name: /집중/ });
+  const ritual = traitsFilter.getByRole('button', { name: /의식/ });
+  await concentration.click();
+  await tile('P2 집중만').waitFor();
+  await tile('P2 의식 재료 주문').waitFor({ state: 'hidden' });
+  await tile('P2 속성 없음').waitFor({ state: 'hidden' });
+  await ritual.click();
   await tile('P2 삽화 주문').waitFor();
-  await tile('P2 의식 재료 주문').waitFor({state:'hidden'});
+  await tile('P2 집중만').waitFor({ state: 'hidden' });
+  await openExtraFilters(page);
+  await concentration.click();
+  await tile('P2 의식 재료 주문').waitFor();
+  await tile('P2 집중만').waitFor({ state: 'hidden' });
+  await openExtraFilters(page);
+  await ritual.click();
+  await tile('P2 속성 없음').waitFor();
+  await closeExtraFilters(page);
   await page.getByRole('button', { name: '필터 초기화' }).click();
   await select('P2 삽화 주문');
   await openManagement(page, '정보 수정');
@@ -179,6 +201,10 @@ try {
   assert.equal(cards.find(item => item.name === 'P2 일괄 그림').imageMode, 'illustration');
   assert.equal(cards.find(item => item.name === 'P2 일괄 기본').imageMode, 'none');
   assert.equal(cards.find(item => item.name === 'P2 삽화 주문').upcastEffect, true);
+  const single = cards.find(item => item.name === 'P2 집중만');
+  const neither = cards.find(item => item.name === 'P2 속성 없음');
+  assert.deepEqual([single.concentration, single.ritual, single.actions], [true, false, ['reaction']]);
+  assert.deepEqual([neither.concentration, neither.ritual, neither.actions], [false, false, ['bonus_action']]);
   assert.equal((await readdir(backups)).filter(name => name.startsWith('before-v6-to-v9-')).length, 1);
   assert.deepEqual(query(dbPath,'PRAGMA foreign_key_check'),[]);
   assert.deepEqual(pageErrors,[]);

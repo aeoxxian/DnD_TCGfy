@@ -3,15 +3,17 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
-import { openManagement } from './navigation-helpers.mjs';
+import { openManagement, putInDeck, openExtraFilters, closeExtraFilters } from './navigation-helpers.mjs';
 
 const root = resolve('artifacts');
 await mkdir(root, { recursive: true });
 const run = await mkdtemp(join(root, 'v14-p4-'));
+const binary = process.env.DND_TCG_EXECUTABLE;
 const fromPath = join(run, 'source-profile');
 const toPath = join(run, 'target-profile');
 const jsonPath = join(run, 'deck.json');
 const imagePath = join(run, 'fixture.png');
+const fullImagePath = join(run, 'full-card.png');
 const checks = [];
 const errors = [];
 let app, page;
@@ -21,12 +23,13 @@ async function launch(userData) {
   const env = { ...process.env, DND_TCG_TEST_USER_DATA: userData, DND_TCG_TEST_NO_RELAUNCH: '1' };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.DND_TCG_DEV_URL;
-  app = await electron.launch({ args: ['.'], cwd: process.cwd(), env, timeout: 45000 });
+  app = await electron.launch({ ...(binary ? { executablePath: binary, args: [] } : { args: ['.'] }), cwd: process.cwd(), env, timeout: 45000 });
   page = await app.firstWindow();
   page.setDefaultTimeout(15000);
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForSelector('.board');
   assert.equal(await app.evaluate(({ app }) => app.getPath('userData')), userData);
+  if (binary) assert.equal(await app.evaluate(({ app }) => app.isPackaged), true);
 }
 async function useDialog(kind, path) {
   await app.evaluate(({ dialog }, { kind, path }) => {
@@ -51,31 +54,70 @@ const cardName = '교환 검증 · 별빛 주문';
 
 try {
   await sharp({ create: { width: 440, height: 260, channels: 3, background: '#456a85' } }).png().toFile(imagePath);
+  await sharp({ create: { width: 420, height: 612, channels: 4, background: { r: 32, g: 63, b: 78, alpha: 0.7 } } }).png().toFile(fullImagePath);
   await launch(fromPath);
-  const source = await page.evaluate(async () => {
-    const result = await window.desktop.createProfile({ name: '보내는 마법사' });
-    if (!result.ok) throw new Error(result.error);
-    return result.value.profiles[0];
-  });
-  await page.reload(); await page.waitForSelector('.board');
+  await openManagement(page, '캐릭터·덱');
+  const profiles = page.getByRole('dialog', { name: '캐릭터와 덱', exact: true });
+  await profiles.getByLabel('새 캐릭터 이름').fill('보내는 마법사');
+  await profiles.getByRole('button', { name: '캐릭터 만들기', exact: true }).click();
+  await profiles.getByRole('heading', { name: '보내는 마법사의 덱' }).waitFor();
+  const source = (await boot()).profiles[0];
+  await profiles.getByLabel('새 덱 이름').fill('검증 보조 덱');
+  await profiles.getByRole('button', { name: '덱 만들기', exact: true }).click();
+  await profiles.getByRole('listitem').filter({ hasText: '검증 보조 덱' }).waitFor();
+  await profiles.getByRole('button', { name: '캐릭터와 덱 닫기', exact: true }).click();
+  await page.getByLabel('활성 덱', { exact: true }).selectOption(source.activeDeckId);
   await page.getByRole('button', { name: '카드 등록', exact: true }).click();
   const registration = page.getByRole('dialog', { name: '카드 등록', exact: true });
   await registration.getByLabel('카드 이미지 파일').setInputFiles(imagePath);
   await registration.getByLabel('이미지 표시 방식').selectOption('illustration');
   await registration.getByLabel('카드 이름', { exact: true }).fill(cardName);
+  await registration.getByRole('radio', { name: '주문 슬롯', exact: true }).check();
+  await registration.getByLabel('등록 기본 주문 레벨').selectOption('2');
+  await registration.getByLabel('등록 허용 슬롯 범위').selectOption('fixed');
+  await registration.getByLabel('등록 규칙 적용 범위').selectOption('shared');
+  await registration.getByRole('checkbox', { name: '집중', exact: true }).check();
+  await registration.getByRole('checkbox', { name: '의식', exact: true }).check();
+  await registration.getByRole('checkbox', { name: '상위 슬롯 효과 강화', exact: true }).check();
+  await registration.getByRole('region', { name: '등록 카드 사용 규칙' }).evaluate(element => element.scrollIntoView({ block: 'center' }));
+  await screenshot('card-registration.png');
+  await registration.getByText('카드 고유 자원', { exact: true }).click();
+  await registration.getByRole('button', { name: '+ 고유 자원 추가', exact: true }).click();
+  const ownedFields = registration.getByRole('group', { name: '고유 자원 1', exact: true });
+  await ownedFields.getByLabel('고유 자원 1 이름').fill('별빛 충전');
+  await ownedFields.getByLabel('최대량', { exact: true }).fill('7');
+  await ownedFields.getByLabel('사용할 때 차감', { exact: true }).fill('2');
+  await ownedFields.getByLabel('짧은 휴식 회복 방식').selectOption('fixed');
+  await ownedFields.getByLabel('새벽 경과 회복 방식').selectOption('full');
+  await ownedFields.evaluate(element => element.scrollIntoView({ block: 'center' }));
+  await screenshot('owned-registration.png');
   await registration.getByRole('button', { name: '카드 저장', exact: true }).click();
   await registration.waitFor({ state: 'hidden' });
+  const addBasic = async (name, path) => {
+    await page.getByRole('button', { name: '카드 등록', exact: true }).click();
+    if (path) {
+      await registration.getByLabel('카드 이미지 파일').setInputFiles(path);
+      await registration.getByLabel('이미지 표시 방식').selectOption('full_card');
+    }
+    await registration.getByLabel('카드 이름', { exact: true }).fill(name);
+    await registration.getByRole('radio', { name: '무소모', exact: true }).check();
+    await registration.getByRole('button', { name: '카드 저장', exact: true }).click();
+    await registration.waitFor({ state: 'hidden' });
+  };
+  await addBasic('교환 검증 · 완성 카드', fullImagePath);
+  await addBasic('교환 검증 · 이미지 없음');
+  pass('한 프로필에서 캐릭터와 덱을 만들고 완성 카드·삽화·이미지 없음, 주문 속성·슬롯 제한·고유 자원을 실제 폼으로 저장');
   await page.evaluate(async ({ name, characterId, deckId }) => {
     const ok = result => { if (!result.ok) throw new Error(result.error); return result.value; };
     const original = ok(await window.desktop.getBootstrap()).cards.find(card => card.name === name);
     const tag = ok(await window.desktop.saveTag({ name: '별빛 태그' })).tags[0];
-    const definition = { id: crypto.randomUUID(), name: '별빛 충전', unit: '회', maximum: 7, amount: 2,
-      recovery: [{ triggers: ['dawn'], amount: { type: 'full' } }, { triggers: ['short_rest'], amount: { type: 'fixed', value: 1 } }] };
+    const definition = original.ownedResources[0];
+    if (!definition || definition.maximum !== 7 || definition.amount !== 2) throw new Error('카드 폼에서 저장한 고유 자원 확인 실패');
     ok(await window.desktop.saveCards({ cards: [{
       id: original.id, name, imageAssetId: original.imageAssetId, imageMode: 'illustration', kind: 'spell', spellLevel: 2,
       concentration: true, ritual: true, upcastEffect: true, range: { kind: 'ranged', feet: 60 }, roles: ['buff'], actions: ['bonus_action'],
       tags: [tag.id], description: '카드 설명과 고급 비용을 보존합니다.', ownedResources: [definition],
-    }, { name: '교환 검증 · 이미지 없음', kind: 'item', imageMode: 'none', range: { kind: 'self' }, roles: [], actions: ['action'], tags: [] }] }));
+    }] }));
     const change = async action => {
       const snapshot = ok(await window.desktop.getResources(characterId));
       return ok(await window.desktop.changeResource({ characterId, requestId: crypto.randomUUID(), expectedRevision: snapshot.revision, action }));
@@ -101,21 +143,41 @@ try {
     const cards = ok(await window.desktop.getBootstrap()).decks.find(deck => deck.id === deckId).cardIds;
     ok(await window.desktop.setDeckCards({ deckId, cardIds: cards.reverse() }));
   }, { name: cardName, characterId: source.id, deckId: source.activeDeckId });
-  const sourceSnapshot = await snap(source.id);
-  assert.equal(sourceSnapshot.resources.find(item => item.name === '별빛 충전').remaining, 5);
   await page.reload(); await page.waitForSelector('.board');
+  const search = page.getByRole('searchbox', { name: '카드 이름 검색', exact: true });
+  await search.fill('별빛 주문');
+  const filters = await openExtraFilters(page);
+  assert(await filters.isVisible());
+  await closeExtraFilters(page);
+  await page.getByRole('button', { name: `${cardName} 카드 선택`, exact: true }).click();
+  await page.getByRole('button', { name: '짧은 휴식', exact: true }).click();
+  await page.getByRole('button', { name: '회복 확정', exact: true }).click();
+  const waitResource = remaining => page.waitForFunction(async ({ id, remaining }) =>
+    (await window.desktop.getResources(id)).value.resources.find(item => item.name === '별빛 충전')?.remaining === remaining, { id: source.id, remaining });
+  await waitResource(6);
+  await page.getByRole('button', { name: '직전 자원 변경 실행 취소', exact: true }).click();
+  await waitResource(5);
+  await openManagement(page, '활성 덱에서 빼기');
+  await page.getByRole('button', { name: `별빛 충전 · ${cardName} 상태·수정`, exact: true }).waitFor({ state: 'detached' });
+  await putInDeck(page, cardName, '보내는 마법사 · 기본 덱');
+  await page.getByLabel('활성 캐릭터', { exact: true }).selectOption(source.id);
+  await search.fill('');
+  await waitResource(5);
+  const sourceSnapshot = await snap(source.id);
+  assert.equal(sourceSnapshot.resources.find(item => item.name === '별빛 충전').inactive, false);
+  pass('같은 프로필에서 검색·필터, 사용과 회복·실행 취소, 덱 제외와 재추가 후 잔여량 유지');
   await useDialog('save', jsonPath);
   await openManagement(page, '덱 JSON 교환');
   await manager().getByRole('button', { name: '덱 JSON 내보내기', exact: true }).click();
-  await manager().getByText('카드 2장의 덱 JSON을 저장했습니다.', { exact: true }).waitFor();
+  await manager().getByText('카드 3장의 덱 JSON을 저장했습니다.', { exact: true }).waitFor();
   await screenshot('01-export.png');
   const document = JSON.parse(await readFile(jsonPath, 'utf8'));
   assert.equal(document.format, 'dnd-tcg-fy-deck');
-  assert.deepEqual(document.cards.map(card => card.name), ['교환 검증 · 이미지 없음', cardName]);
-  assert.equal(document.cards[1].castOptions[0].casting.maxSlotLevel, 6);
-  assert.equal(document.cards[1].castOptions[0].costs[1].requirement.key, 'exchange:unowned');
-  assert.equal(document.cards[1].characterRules[1].costs[0].requirement.key, 'exchange:focus');
-  assert.equal(document.cards[1].characterRules[2].costs[0].reconnect, 'counter');
+  assert.deepEqual(document.cards.map(card => card.name), ['교환 검증 · 이미지 없음', '교환 검증 · 완성 카드', cardName]);
+  assert.equal(document.cards[2].castOptions[0].casting.maxSlotLevel, 6);
+  assert.equal(document.cards[2].castOptions[0].costs[1].requirement.key, 'exchange:unowned');
+  assert.equal(document.cards[2].characterRules[1].costs[0].requirement.key, 'exchange:focus');
+  assert.equal(document.cards[2].characterRules[2].costs[0].reconnect, 'counter');
   assert.doesNotMatch(JSON.stringify(document), /"remaining"|"events"|"resourceInstanceId"|source-private/);
   assert.deepEqual(await snap(source.id), sourceSnapshot);
   pass('Windows 관리 메뉴에서 덱 저장, 카드 순서와 고급 규칙, 캐릭터별 비용 보존 및 플레이 상태 제외');
@@ -139,7 +201,7 @@ try {
   await manager().getByRole('button', { name: '덱 JSON 파일 선택', exact: true }).click();
   let preview = getPreview();
   await preview.getByRole('heading', { name: '받는 캐릭터 · 기본 덱 (2)' }).waitFor();
-  await preview.getByText(/같은 원본 이미지가 없습니다/).waitFor();
+  assert.equal(await preview.getByText(/같은 원본 이미지가 없습니다/).count(), 2);
   await preview.getByText(/직접 연결해야 하는 비용이 있습니다/).waitFor();
   await preview.getByText('카드 순서 보기', { exact: true }).click();
   assert.equal((await boot()).cards.length, 0);
@@ -190,7 +252,7 @@ try {
   const returnedPath = join(run, 'round-trip.json');
   await useDialog('save', returnedPath);
   await manager().getByRole('button', { name: '덱 JSON 내보내기', exact: true }).click();
-  await manager().getByText('카드 2장의 덱 JSON을 저장했습니다.', { exact: true }).waitFor();
+  await manager().getByText('카드 3장의 덱 JSON을 저장했습니다.', { exact: true }).waitFor();
   const roundTrip = JSON.parse(await readFile(returnedPath, 'utf8'));
   assert.deepEqual(roundTrip, { ...document, name: '기본 덱 (2)' });
   assert.deepEqual(errors, []);
@@ -223,7 +285,7 @@ try {
   await getPreview().getByText(/이미 가져온 파일입니다/).waitFor();
   assert.deepEqual(errors, []);
   pass('기존 전체 ZIP 백업을 별도 프로필로 복원했을 때 가져온 덱, 5/7 잔여량, 사용 기록과 중복 가져오기 기록 유지');
-  await writeFile(join(run, 'report.json'), JSON.stringify({ outcome: 'PASS', checks, errors, fromPath, toPath }, null, 2));
+  await writeFile(join(run, 'report.json'), JSON.stringify({ outcome: 'PASS', target: binary ? 'packaged-exe' : 'built-bundle', checks, errors, fromPath, toPath }, null, 2));
 } catch (error) {
   if (page) await screenshot('failure.png').catch(() => {});
   throw error;
