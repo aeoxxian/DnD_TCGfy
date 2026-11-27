@@ -1,5 +1,6 @@
+import { OwnedResourcesEditor } from './OwnedResourcesEditor';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { AssetPreview, CardDraft, Library, RegistrationTarget, Tag } from '../shared/contracts';
+import type { CardDraft, Library, RegistrationTarget, Tag } from '../shared/contracts';
 import { ACTION_NAMES, KIND_NAMES, RANGE_NAMES, ROLE_NAMES } from '../shared/library';
 import { BATCH_RULE_NAMES, attemptFor, cardFields, effectiveItem, itemProblem, itemRequest, itemRule, summarizeBatch, type BatchCommon, type BatchItem, type BatchRule, type BatchRuleKind, type CardFields } from '../shared/batch-registration';
 import { describeUseRules } from '../shared/use-rules';
@@ -8,7 +9,9 @@ import type { ResourceView } from '../shared/resources';
 import type { ResourceController } from './ResourcePanel';
 import { RegistrationRules, type RegistrationKind } from './RegistrationRules';
 import { Checks } from './FormChecks';
-import { kindLine } from './CardFace';
+import { DefaultCard, kindLine } from './CardFace';
+import { CardTraits, ImageModeField } from './CardMetadataFields';
+import type { BatchAsset } from '../shared/batch-registration';
 
 type Phase = 'edit' | 'confirm' | 'running' | 'done';
 type Items = Record<string, BatchItem>;
@@ -21,7 +24,7 @@ const STOP_AFTER = 3;
  * its own; “N장 등록” → final check → one registration transaction per card → result with retry.
  */
 export function BatchRegistration({ assets, items, onItems, names, onName, onRemove, duplicates, common, tags, target, targetLabel, characterId, characterName, controller, resources, draft, draftView, pendingNote, busy, onLibrary, onClose, onRunning, onFocus, deckLink }: {
-  assets: AssetPreview[]; items: Items; onItems: (update: (current: Items) => Items) => void;
+  assets: BatchAsset[]; items: Items; onItems: (update: (current: Items) => Items) => void;
   names: Record<string, string>; onName: (assetId: string, name: string) => void; onRemove: (assetId: string) => void; duplicates: Duplicates;
   common: BatchCommon; tags: Tag[]; target: RegistrationTarget | null; targetLabel?: string; characterId?: string; characterName?: string;
   controller?: ResourceController; resources: ResourceView[]; draft?: NewResourceDraft; draftView?: ResourceView; pendingNote?: string;
@@ -36,8 +39,8 @@ export function BatchRegistration({ assets, items, onItems, names, onName, onRem
   const stop = useRef(false);
   const created = useRef<string | undefined>(undefined);
   const ctx = { target, characterId, draft, duplicates };
-  const nameOf = (asset: AssetPreview) => names[asset.id] ?? asset.name;
-  const itemOf = (asset: AssetPreview): BatchItem => items[asset.id] ?? { assetId: asset.id, include: true, status: 'ready', ids: { optionId: `${asset.id}-o`, costKey: `${asset.id}-c` } };
+  const nameOf = (asset: BatchAsset) => names[asset.id] ?? asset.name;
+  const itemOf = (asset: BatchAsset): BatchItem => items[asset.id] ?? { assetId: asset.id, include: true, status: 'ready', ids: { optionId: `${asset.id}-o`, costKey: `${asset.id}-c` } };
   const summary = summarizeBatch(assets.map(itemOf), Object.fromEntries(assets.map(asset => [asset.id, nameOf(asset)])), common, ctx);
   const running = phase === 'running';
   const update = (assetId: string, patch: Partial<BatchItem>) => onItems(current => current[assetId] ? { ...current, [assetId]: { ...current[assetId], ...patch } } : current);
@@ -54,6 +57,7 @@ export function BatchRegistration({ assets, items, onItems, names, onName, onRem
     setPhase('confirm');
   }
   async function run(retry: boolean) {
+    latest.current = items;
     stop.current = false; setError(''); setNote(''); setPhase('running'); setOpen(undefined); onRunning(true);
     const queue = assets.filter(asset => { const item = latest.current[asset.id]; return item?.include && item.status !== 'saved' && (!retry || item.status === 'failed' || item.status === 'pending'); });
     let failures = 0; let stopped = false;
@@ -115,12 +119,13 @@ export function BatchRegistration({ assets, items, onItems, names, onName, onRem
         const duplicate = duplicates.get(asset.id);
         const locked = busy || running || item.status === 'saved';
         let ruleText: string = BATCH_RULE_NAMES[effective.rule.kind];
+        if (effective.card.ownedResources?.length && ['unconfigured', 'none'].includes(effective.rule.kind)) ruleText = '고유 자원 사용';
         if (effective.rule.kind !== 'unconfigured' && !problem) {
           try { const rule = itemRule(effective, item.ids); ruleText = describeUseRules(rule.castOptions, rule.bindings, [...resources, ...(draftView ? [draftView] : [])])[0] ?? ruleText; } catch { /* shown as 확인 필요 */ }
         }
         return <li key={asset.id} className={`batch-row status-${item.status} ${item.include ? '' : 'is-excluded'} ${open === asset.id ? 'is-open' : ''}`} aria-label={`${index + 1}번 카드 ${name}`}>
           <label className="batch-include"><input type="checkbox" aria-label={`${name} 등록에 포함`} checked={item.include} disabled={locked} onChange={event => update(asset.id, { include: event.target.checked })}/></label>
-          <img className="batch-thumb" src={asset.thumbnailUrl} alt={`${asset.name} 등록 미리보기`} draggable={false}/>
+          {effective.card.imageMode === 'none' ? <span className="batch-thumb" aria-label="이미지 없음">◇</span> : effective.card.imageMode === 'illustration' ? <div className="batch-thumb card-face default-face"><DefaultCard card={effective.card} artwork={<img src={asset.thumbnailUrl} alt="" draggable={false}/>}/></div> : <img className="batch-thumb" src={asset.thumbnailUrl} alt={`${asset.name} 등록 미리보기`} draggable={false}/>}
           <div className="batch-main">
             <label className="batch-name">카드 이름 {index + 1}<input value={name} required maxLength={200} disabled={locked} onChange={event => onName(asset.id, event.target.value)}/></label>
             <p className="batch-chips">
@@ -191,11 +196,14 @@ function ItemEditor({ item, name, common, tags, target, targetLabel, characterId
       </div>
       <Checks title="개별 카드 역할" disabled={false} choices={ROLE_NAMES} values={card.roles} onChange={roles => setCard({ roles })}/>
       <Checks title="개별 카드 행동 경제" disabled={false} choices={ACTION_NAMES} values={card.actions} onChange={actions => setCard({ actions })}/>
+      <ImageModeField mode={effective.card.imageMode ?? 'full_card'} onChange={imageMode => setCard({ imageMode })} individual noFile={item.imageless}/>
+      <CardTraits value={card} onChange={setCard} individual/>
+      <OwnedResourcesEditor definitions={card.ownedResources} onChange={ownedResources => setCard({ ownedResources })}/>
       {tags.length > 0 && <Checks title="개별 카드 태그" disabled={false} choices={Object.fromEntries(tags.map(tag => [tag.id, tag.name]))} values={card.tags} onChange={selected => setCard({ tags: selected })}/>}
     </div> : <p className="muted">공통 설정을 따릅니다: {kindLine(common.card)} · {common.card.roles.map(role => ROLE_NAMES[role]).join('·') || '역할 없음'}</p>}
     <label className="form-field">설명 (선택)<textarea aria-label="개별 카드 설명" maxLength={10000} rows={2} value={item.description ?? ''} onChange={event => onChange({ description: event.target.value })}/></label>
     <label className="form-field">비용<select aria-label="개별 비용 방식" value={item.rule ? 'own' : 'common'} onChange={event => onChange({ rule: event.target.value === 'own' ? { ...common.rule, draft: { ...common.rule.draft } } : undefined })}><option value="common">공통 규칙 따르기 ({BATCH_RULE_NAMES[common.rule.kind]})</option><option value="own">이 카드만 정하기</option></select></label>
-    {item.rule && <RegistrationRules perCard advanced={false} kind={rule.kind as RegistrationKind} onKind={kind => setRule({ kind: (kind === 'advanced' ? 'unconfigured' : kind) as BatchRuleKind })} draft={{ ...rule.draft, spellLevel: effective.card.spellLevel }}
+    {item.rule && <RegistrationRules hasOwned={!!effective.card.ownedResources?.length} perCard advanced={false} kind={rule.kind as RegistrationKind} onKind={kind => setRule({ kind: (kind === 'advanced' ? 'unconfigured' : kind) as BatchRuleKind })} draft={{ ...rule.draft, spellLevel: effective.card.spellLevel }}
       onChange={patch => { if ('spellLevel' in patch) setCard({ kind: 'spell', spellLevel: patch.spellLevel }); const { spellLevel: _ignored, ...rest } = patch; void _ignored; if (Object.keys(rest).length) setRule({ draft: { ...rule.draft, ...rest } }); }}
       scope={rule.scope} onScope={scope => setRule({ scope })} characterId={characterId} snapshot={controller?.snapshot} busy={false} onAdvanced={() => undefined} summary={summary} pending={draftView} pendingNote={pendingNote} characterName={characterName}/>}
     {target && <label className="form-field">덱 연결<select aria-label="개별 덱 연결" value={item.addToDeck === undefined ? 'common' : item.addToDeck ? 'yes' : 'no'} onChange={event => onChange({ addToDeck: event.target.value === 'common' ? undefined : event.target.value === 'yes' })}><option value="common">공통 설정 따르기 ({common.addToDeck ? '넣기' : '넣지 않기'})</option><option value="yes">‘{targetLabel ?? '선택한 덱'}’에 넣기</option><option value="no">넣지 않기(라이브러리만)</option></select></label>}

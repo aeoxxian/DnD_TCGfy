@@ -18,7 +18,7 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { createServer } from 'vite';
 import { assertLayout, inside, measure } from './v13-board.mjs';
-import { closeExtraFilters, openExtraFilters, showWholeLibrary } from './navigation-helpers.mjs';
+import { closeExtraFilters, openBulkActions, openExtraFilters, openManagement, showWholeLibrary } from './navigation-helpers.mjs';
 
 const dev = process.argv.includes('--dev');
 const binary = process.env.DND_TCG_EXECUTABLE;
@@ -239,6 +239,29 @@ const cardInView = (page, button) => button.evaluate(el => { const a = el.closes
     searches[`${w}x${h}`] = { all, narrowed, found: names.length };
   }
   check('Search and filters: Ctrl+F focuses the search, results narrow the hand, an empty result shows its message inside the hand row, a role filter narrows and 전체 restores, the extra filters fit the window; no panel moves (1366×768 and 860×440)', searches);
+
+  await switchCharacter(page, '리벨리오 반 빅토르');
+  await openManagement(page, '선택 관리');
+  await openBulkActions(page);
+  const checkbox = page.getByRole('checkbox', { name: /일괄 선택$/ }).first();
+  await checkbox.check();
+  assert(await checkbox.isChecked(), 'batch selection is reachable in the minimum window');
+  assert(await page.locator('.board').evaluate(el => el.scrollTop > 0), 'the short board scrolls to the batch hand');
+  const batchLayout = await measure(page);
+  assert(batchLayout.handFit.overflowY <= 1, 'batch hand captions fit without vertical clipping');
+  const emptyPage = page.locator('.codex-page.empty-selection');
+  assert(await emptyPage.evaluate(el => el.scrollHeight <= el.clientHeight + 1), 'empty selection text fits on the compact page');
+  await page.getByRole('button', { name: '짧은 휴식', exact: true }).click();
+  const recovery = page.getByRole('dialog', { name: '짧은 휴식 확인' });
+  await recovery.waitFor(); await recovery.getByRole('button', { name: '취소', exact: true }).click();
+  const deck = page.locator('.deck-pile .pile-button');
+  await deck.scrollIntoViewIfNeeded();
+  assert(await deck.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }),
+    'the deck remains reachable while short-window batch actions are open');
+  await capture(app, page, 'batch-selection-860x440');
+  await page.getByRole('button', { name: '선택 관리 종료' }).click();
+  assert.equal((await measure(page)).overflow, 0, 'ending batch mode restores the board without page overflow');
+  check('At 860×440, expanded batch actions leave the card checkbox, recovery and DECK reachable by scrolling the board');
   assert.deepEqual(errors, []); await app.close();
   await assertPreserved(userData, before, 'keyboard / drag / search');
 }
@@ -309,7 +332,7 @@ const cardInView = (page, button) => button.evaluate(el => { const a = el.closes
     await change(byName('자원 1 검수').id, { type: 'create_resource', scope: 'character', template: { name: '검수 횟수', unit: '회', kind: 'counter', capacity: { type: 'fixed', value: 3 }, recovery: [{ triggers: ['long_rest'], amount: { type: 'full' } }] } });
     const many = byName('자원 많음 검수').id; const configuration = { classId: 'wizard', level: 20 };
     const preview = ok(await window.desktop.previewClass({ characterId: many, configuration })); await change(many, { type: 'configure_class', configuration, quote: preview.quote });
-    for (let i = 1; i <= 12; i++) await change(many, { type: 'create_resource', scope: 'character', template: { name: `검수 자원 ${String(i).padStart(2, '0')}`, unit: '회', kind: 'counter', capacity: { type: 'fixed', value: 4 }, recovery: [{ triggers: ['long_rest'], amount: { type: 'full' } }] } });
+    for (let i = 1; i <= 12; i++) await change(many, { type: 'create_resource', scope: 'character', template: { name: i === 12 ? '길이가 아주 긴 길드 마법 장비 회복 자원 이름을 확인하는 테스트 자원' : `검수 자원 ${String(i).padStart(2, '0')}`, unit: '회', kind: 'counter', capacity: { type: 'fixed', value: 4 }, recovery: [{ triggers: ['long_rest'], amount: { type: 'full' } }] } });
   });
   await page.reload(); await page.waitForSelector('.board'); await page.waitForTimeout(500);
   const counts = {}; const ledgers = {};
@@ -341,24 +364,30 @@ const cardInView = (page, button) => button.evaluate(el => { const a = el.closes
     counts[label] = { cardWidth: Math.round(nine[9]) };
     // Resources.
     // 자원 많음: wizard 20 (one spell-slot track with nine level rows, plus its class counter) and 12 counters = 14 resources.
+    let fixed;
     for (const [who, expected] of [['자원 0 검수', 0], ['자원 1 검수', 1], ['리벨리오 반 빅토르', 2], ['자원 많음 검수', 14]]) {
       await switchCharacter(page, who); await page.locator('.cards-area .card-button').first().click(); await page.mouse.move(1, 1); await page.waitForTimeout(300);
       const snap = await resources(page, (await activeHero(page)).id); assert.equal(snap.resources.length, expected, `${who} has ${expected} resources`);
       const m = await measure(page); assertLayout(m, `${label} ${expected} resources`);
+      const controls = { used: m.zones.used, deck: m.zones.deck, coins: m.coins, undo: m.undo };
+      if (fixed) assert.deepEqual(controls, fixed, `${label}: pile and recovery bounds are independent of the resource list`);
+      else fixed = controls;
       const list = page.getByLabel('자원 목록 스크롤', { exact: true });
       const scroll = await list.count() ? await list.evaluate(el => ({ overflow: el.scrollHeight - el.clientHeight })) : { overflow: 0 };
       const rows = await page.locator('.resource-status-row').count();
       if (expected === 14) {
         assert(rows >= 21, `${label}: ${rows} ledger rows`);
         assert(scroll.overflow > 40, `${label}: many resources scroll inside the ledger ${JSON.stringify(scroll)}`);
-        const lastRow = page.locator('.resource-status-row').last(); await lastRow.evaluate(el => el.scrollIntoView({ block: 'nearest' })); await page.waitForTimeout(200);
+        const lastRow = page.getByRole('button', { name: /길이가 아주 긴 길드 마법 장비 회복 자원 이름/ });
+        await lastRow.evaluate(el => el.scrollIntoView({ block: 'nearest' })); await page.waitForTimeout(200);
         const lb = await lastRow.boundingBox(); const view = await list.boundingBox();
         const shown = Math.min(lb.y + lb.height, view.y + view.height) - Math.max(lb.y, view.y);
         assert(view.height >= 48, `${label}: the ledger list keeps at least one row of height (${view.height})`);
         assert(shown >= Math.min(lb.height, view.height) - 1, `${label}: scrolling the ledger reaches the last resource ${JSON.stringify({ lb, view })}`);
+        assert(lb.x >= view.x && lb.x + lb.width <= view.x + view.width, `${label}: long resource names fit the ledger width`);
         assertLayout(await measure(page), `${label} 14 resources scrolled`);
       }
-      if (scale === 1 && [0, 14].includes(expected)) await capture(app, page, `ledger-${expected}-resources`);
+      if (scale === 1 && [0, 14].includes(expected)) await capture(app, page, `ledger-${expected}-resources-${w}x${h}`);
       ledgers[`${label} · ${expected}`] = { rows, ledgerHeight: Math.round(m.zones.ledger.h), listOverflow: Math.round(scroll.overflow) };
     }
   }

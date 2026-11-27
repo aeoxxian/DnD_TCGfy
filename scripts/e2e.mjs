@@ -118,14 +118,14 @@ try {
   });
   assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,JSON.parse(await readFile('package.json','utf8')).version);
   assert.equal(runtime.sandbox, true); assert.equal(runtime.nodeIntegration, false); assert.equal(runtime.contextIsolation, true); assert.equal(runtime.webSecurity, true);
-  let data = await state(); assert.equal(data.schemaVersion, 6); assert.deepEqual(data.settings, initialSettings);
+  let data = await state(); const toVersion = data.schemaVersion; assert.equal(toVersion, 8); assert.deepEqual(data.settings, initialSettings);
   assert.deepEqual(data.cards[0].castOptions, legacyCard.castOptions); assert.equal(data.cards[0].id, 'p0-card');
   assert.equal(data.tags[0].id, 'legacy-tag'); assert.equal(data.decks[0].cardIds[0], 'p0-card');
   assert.equal((await readdir(join(userData, 'backups'))).filter(name => name.startsWith('before-')).length, 1);
   const isolation = await page.evaluate(() => ({ require: typeof window.require, process: typeof window.process, keys: Object.keys(window.desktop).sort() }));
   assert.equal(isolation.require, 'undefined'); assert.equal(isolation.process, 'undefined');
   assert(!isolation.keys.includes('invoke')); assert(!isolation.keys.includes('getPathForFile'));
-  recordCheck(`v${fromVersion} DB → v6 migration backup; preferences, costs, character/deck IDs preserved; sandbox verified`);
+  recordCheck(`v${fromVersion} DB → v${toVersion} migration backup; preferences, costs, character/deck IDs preserved; sandbox verified`);
 
   await openManagement(page,'카드 등록');
   let dialog = page.getByRole('dialog', { name: '카드 등록', exact: true });
@@ -403,7 +403,7 @@ try {
   const hashDb=new DatabaseSync(dbPath,{readOnly:true});const allAssets=hashDb.prepare('SELECT * FROM assets').all();hashDb.close();
   for(const asset of allAssets){const source=sources.find(source=>source.fileName===asset.original_name);assert.equal(sha(await readFile(join(userData,asset.relative_path))),source.hash);assert.equal(sha(await readFile(source.path)),source.hash);}
   assert.deepEqual(pageErrors,[]);assert.deepEqual(securityWarnings,[]);const verificationDb=new DatabaseSync(dbPath,{readOnly:true});assert.deepEqual(verificationDb.prepare('PRAGMA foreign_key_check').all(),[]);assert.equal(verificationDb.prepare('PRAGMA integrity_check').get().integrity_check,'ok');verificationDb.close();
-  const result = { outcome: 'PASS', p3, p31, bulk, trash, migration: {fromVersion,toVersion:6,backupCount:(await readdir(join(userData,'backups'))).filter(name=>name.startsWith('before-')).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, initialBatchImagesRegistered: 20, finalManagedAssets: allAssets.length, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
+  const result = { outcome: 'PASS', p3, p31, bulk, trash, migration: {fromVersion,toVersion,backupCount:(await readdir(join(userData,'backups'))).filter(name=>name.startsWith('before-')).length}, mode: binary ? 'packaged-windows-exe' : devMode ? 'vite-development' : 'production-bundle', runtime, initialBatchImagesRegistered: 20, finalManagedAssets: allAssets.length, imageFormats: { png: 12, jpeg: 4, webp: 4 }, finalActiveCards: (await state()).cards.length, checks, pageErrors, securityWarnings, artifacts: runPath };
   await writeFile(join(runPath,'result.json'),JSON.stringify(result,null,2)); console.log(JSON.stringify(result,null,2));
   }
 } catch (error) {

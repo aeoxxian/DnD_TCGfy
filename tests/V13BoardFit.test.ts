@@ -25,9 +25,12 @@ describe('v1.3 Phase 3 UI-P4 · the board fits short windows', () => {
     expect(band).not.toMatch(/border-image|border-width/);
   });
   it('≤560 px windows give the ledger list more height without hiding anything', () => {
-    const short = media('(max-height: 560px)');
-    expect(short).toContain('.board-column > .mat-zone { height: clamp(70px, 24%, 104px); }');
-    expect(short).not.toMatch(/class-summary[^}]*display: none/);
+    expect(css).toMatch(/@media \(max-height: 560px\) \{[^}]*\}[^@]*\.board-right \{ grid-template-rows: minmax\(0, 1fr\) clamp\(70px, 17dvh, 96px\); \}/);
+    expect(css).not.toMatch(/class-summary[^}]*display: none/);
+  });
+  it('uses symmetric 24:52:24 tracks and keeps one fixed footer row for both piles', () => {
+    expect(css).toContain('grid-template-columns: minmax(0, 24fr) minmax(0, 52fr) minmax(0, 24fr);');
+    expect(css).toContain('.board-piles { display: grid; min-height: 0; grid-template-columns: repeat(2, minmax(0, 1fr));');
   });
   it('the hand shows the resource note on the card, above the card-back overlay, so the hand height never changes', () => {
     expect(css).toMatch(/\.app\.playmat \.hand \.card-resource-note \{ position: absolute;[^}]*bottom: calc\(100% \+ 10px\);[^}]*z-index: 4; \}/);

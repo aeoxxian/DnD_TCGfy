@@ -1,8 +1,13 @@
-import { boundResource, castingLevels, slotLevels } from './casting';
+import { castingLevels, slotLevels, resolveCastOption, resolveCostResource, ResourceRequirementError, hasConfiguredCost } from './casting';
 import type { CardDefinition } from './contracts';
 import type { CardBinding, ResourceChange, ResourceOverrides, ResourcePlan, ResourceTemplate, ResourceView, RecoveryTrigger } from './resources';
 
-export class ResourceError extends Error {}
+export class ResourceError extends Error {
+  constructor(message: string, readonly reason?: 'missing' | 'level') { super(message); }
+}
+function asResourceError(error: unknown): ResourceError {
+  return new ResourceError((error as Error).message, error instanceof ResourceRequirementError ? error.reason : undefined);
+}
 export interface CapacityProfile { level: number; abilityScores?: Record<string,number> }
 function integer(value: number, label: string) { if (!Number.isSafeInteger(value) || value < 0 || value > 1000000) throw new ResourceError(`${label}은 0~1,000,000 사이의 정수여야 합니다.`); return value; }
 export function capacityFor(rule: NonNullable<ResourceTemplate['capacity']>, profile: CapacityProfile): number {
@@ -32,13 +37,14 @@ export function stateAt(resource: ResourceView, slotLevel?: number): { current: 
   if (slotLevel === undefined || resource.capacityByLevel?.[String(slotLevel)] === undefined) throw new ResourceError('슬롯 트랙의 레벨을 지정해 주세요.');
   return { current: resource.remainingByLevel![String(slotLevel)], maximum: resource.capacityByLevel![String(slotLevel)] };
 }
-export function planUse(card: CardDefinition, optionId: string, resources: ResourceView[], bindings: CardBinding[], choices: Record<string,number>, castingLevel?:number): ResourcePlan {
-  if (card.costStatus === 'unconfigured') throw new ResourceError('비용 미설정 카드입니다. 카드 사용 규칙을 먼저 지정해 주세요.');
-  const option = card.castOptions.find(option => option.id === optionId);
-  if (!option) throw new ResourceError('사용 방식을 찾을 수 없습니다.');
+export function planUse(card: CardDefinition, optionId: string, resources: ResourceView[], bindings: CardBinding[], choices: Record<string,number>, castingLevel?:number, ritual = false): ResourcePlan {
+  if (!hasConfiguredCost(card)) throw new ResourceError('비용 미설정 카드입니다. 카드 사용 규칙을 먼저 지정해 주세요.');
+  let option: ReturnType<typeof resolveCastOption>;
+  try { option = resolveCastOption(card, optionId, ritual, resources, bindings); }
+  catch (error) { throw asResourceError(error); }
   let selectedCastingLevel:number|undefined;
   if(option.casting||option.costs.some(cost=>cost.type==='slot')){
-    let levels:number[];try{levels=castingLevels(card,option);}catch(error){throw new ResourceError((error as Error).message);}
+    let levels:number[];try{levels=castingLevels(card,option);}catch(error){throw asResourceError(error);}
     if(!option.costs.some(cost=>cost.type==='slot')){selectedCastingLevel=castingLevel??card.spellLevel;if(!levels.includes(selectedCastingLevel!))throw new ResourceError('허용되지 않는 시전 레벨입니다. 기본 규칙에서는 주문 레벨 미만으로 시전할 수 없습니다.');}
     else if(castingLevel!==undefined)throw new ResourceError('슬롯 비용은 비용별 슬롯 레벨로 선택하세요.');
   }else if(castingLevel!==undefined)throw new ResourceError('시전 레벨을 선택하지 않는 사용 방식입니다.');
@@ -49,10 +55,11 @@ export function planUse(card: CardDefinition, optionId: string, resources: Resou
   for (const cost of option.costs) {
     if(cost.type==='slot'&&card.kind==='spell'&&card.spellLevel===0)continue;
     let resource:ResourceView;
-    try{resource=boundResource(card.id,cost.costKey,resources,bindings,cost.type==='slot'&&cost.autoBind?cost.slotSelection:undefined);}catch(error){throw new ResourceError((error as Error).message);}
+    try{resource=resolveCostResource(card.id,cost,resources,bindings);}catch(error){throw asResourceError(error);}
     let slotLevel=cost.type==='slot'?undefined:cost.slotLevel;
     if(cost.type==='slot'){
-      let levels:number[];try{levels=slotLevels(card,option,cost.costKey,resources,bindings);}catch(error){throw new ResourceError((error as Error).message);}
+      let levels:number[];try{levels=slotLevels(card,option,cost.costKey,resources,bindings);}catch(error){throw asResourceError(error);}
+      if (!levels.length) throw new ResourceError('요구한 레벨의 슬롯을 보유하지 않았습니다.', 'level');
       slotLevel=choices[cost.costKey]??(levels.length===1?levels[0]:undefined);
       if(slotLevel===undefined||!levels.includes(slotLevel))throw new ResourceError('사용 가능한 슬롯 레벨을 선택하세요. 기본 규칙에서는 주문 레벨 미만 슬롯을 사용할 수 없습니다.');
       selectedSlotLevels[cost.costKey]=slotLevel;
@@ -63,6 +70,9 @@ export function planUse(card: CardDefinition, optionId: string, resources: Resou
     else {
       amount = choices[cost.costKey];
       if (!Number.isSafeInteger(amount) || amount < cost.min || amount > cost.max || (amount - cost.min) % cost.step !== 0) throw new ResourceError('가변 소모량의 범위 또는 간격이 올바르지 않습니다.');
+    }
+    if (cost.requirement?.kind === 'track' && slotLevel !== undefined && (resource.capacityByLevel?.[String(slotLevel)] ?? 0) <= 0) {
+      throw new ResourceError('요구한 레벨의 슬롯을 보유하지 않았습니다.', 'level');
     }
     integer(amount, '소모량'); stateAt(resource, slotLevel);
     if(resource.unlimited)continue;
@@ -81,7 +91,7 @@ export function planUse(card: CardDefinition, optionId: string, resources: Resou
 export function planRecovery(resources: ResourceView[], trigger: RecoveryTrigger): ResourcePlan {
   const changes: ResourceChange[] = [];
   for (const resource of resources) {
-    if(resource.unlimited)continue;
+    if(resource.unlimited||resource.retired)continue;
     const rules = resource.template.recovery;
     const rule = rules.find(rule => rule.triggers.includes(trigger)) ?? (trigger === 'long_rest' ? rules.find(rule => rule.triggers.includes('short_rest')) : undefined);
     if (!rule) continue;
@@ -95,6 +105,7 @@ export function planRecovery(resources: ResourceView[], trigger: RecoveryTrigger
   return { changes, label: ({ short_rest: '짧은 휴식', long_rest: '긴 휴식', dawn: '새벽 경과', manual: '수동 회복' })[trigger], canUse: true, canOverride: false };
 }
 export function planAdjustment(resource: ResourceView, delta: number, slotLevel?: number): ResourcePlan {
+  if(resource.retired)throw new ResourceError('삭제된 고유 자원은 사용 기록에서 확인할 수 있습니다.');
   if(resource.unlimited)throw new ResourceError('무제한 자원은 현재량을 조정하지 않습니다.');
   const { current, maximum } = stateAt(resource, slotLevel); const after = current + delta;
   if (!Number.isSafeInteger(delta) || after < 0 || after > maximum) throw new ResourceError('변경 후 현재량이 0~최대치 범위를 벗어납니다.');

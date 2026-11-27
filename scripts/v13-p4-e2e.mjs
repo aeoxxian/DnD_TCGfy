@@ -258,6 +258,7 @@ const deckBefore = data.decks.find(d => d.id === druid.activeDeckId).cardIds.len
 // ---------------------------------------------------------------------------------------------
 // 5. Settings, restart and every theme.
 {
+  await page.locator('.used-pile .pile-button').click({ button: 'right' });
   await page.getByRole('button', { name: '최근 사용 더미 비우기', exact: true }).click();
   await page.waitForFunction(() => /최근 0건/.test(document.querySelector('.used-pile .pile-button')?.getAttribute('aria-label') ?? ''));
   await setTheme(page, 'verdant');
@@ -308,8 +309,8 @@ const deckBefore = data.decks.find(d => d.id === druid.activeDeckId).cardIds.len
   for (const row of originalCards) assert.equal(now.get(row.id), JSON.stringify(row), `original card ${row.name} unchanged`);
   assert.equal(readDb(userData, 'PRAGMA integrity_check')[0].integrity_check, 'ok');
   assert.deepEqual(readDb(userData, 'PRAGMA foreign_key_check'), []);
-  assert.equal(readDb(userData, 'PRAGMA user_version')[0].user_version, 6, 'schema v6, no migration');
-  check('Data: every original image file and card row is byte-identical; integrity_check ok, no foreign key problems, schema still v6', { originalImages: Object.keys(originalAssets).length, originalCards: originalCards.length });
+  assert.equal(readDb(userData, 'PRAGMA user_version')[0].user_version, 8, 'schema v8 after resource migration');
+  check('Data: every original image file and card row is byte-identical; integrity_check ok, no foreign key problems, schema v7 after migration', { originalImages: Object.keys(originalAssets).length, originalCards: originalCards.length });
 }
 
 if (server) await server.close();

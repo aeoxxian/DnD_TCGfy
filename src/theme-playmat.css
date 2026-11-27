@@ -178,27 +178,19 @@ html, body { background: #0b0807; }
   background: var(--grain) 0 0 / 300px, linear-gradient(160deg, var(--bind-hi) 0%, var(--bind) 60%, var(--bind-lo) 100%);
   box-shadow: 0 10px 26px rgba(0, 0, 0, .7), inset 0 0 0 1px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 220, 190, .06); }
 .app.playmat .resource-panel::before { content: ''; position: absolute; inset: 5px; border: 1.5px dashed rgba(210, 190, 160, .28); border-radius: 7px; pointer-events: none; }
-.app.playmat .resource-panel > .panel-title { position: relative; min-height: 26px; padding: 0 2px; }
+.app.playmat .resource-panel > .panel-title { position: relative; flex: none; flex-direction: row; min-height: 24px; padding: 0 2px; }
 .app.playmat .resource-panel > .panel-title h2 { font: 700 14px var(--kserif); color: var(--ink-l); }
 .app.playmat .collapse-button { min-width: 28px; height: 24px; padding: 0 8px; font: 700 15px/1 var(--sans); color: var(--m0); }
-.app.playmat.resources-collapsed .resource-panel { padding: 12px 6px; }
-.app.playmat .live-resources { gap: 10px; }
+.app.playmat .live-resources { gap: 6px; }
 .app.playmat .ledger-sheet { position: relative; flex: 1; min-height: 0; display: flex; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .6)); }
 /* Corner ornaments of the theme (rivet guards / bronze clips / silver inlay / engraved brackets) over the page. */
 .app.playmat .ledger-sheet::after, .app.playmat .codex::after { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
   border: 15px solid transparent; border-image: var(--panel-img) 80 / 30px round; }
 .app.playmat .codex { position: relative; }
-.app.playmat .ledger-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 16px 8px; color: var(--ink);
-  background: var(--parchment) 0 0 / 420px, #e9e1cf; clip-path: var(--deckle);
+.app.playmat .ledger-page { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 12px 13px 8px; color: var(--ink);
+  background: linear-gradient(#fff7e530, #fff7e530), var(--parchment) 0 0 / 420px, #e9e1cf; clip-path: var(--deckle);
   box-shadow: inset 0 0 34px rgba(95, 72, 48, .42), inset 0 0 6px rgba(80, 58, 36, .35); }
-.app.playmat .ledger-heading { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.app.playmat .ledger-heading span { font: 9px var(--display); letter-spacing: 4px; color: var(--page-kicker); }
-.app.playmat .ledger-heading strong { font: 700 19px var(--kserif); color: var(--page-title); }
-.app.playmat .ledger-heading i { width: 70%; height: 9px; margin-top: 4px;
-  background: linear-gradient(45deg, transparent 38%, var(--ribbon) 38% 62%, transparent 62%) center / 7px 7px no-repeat,
-    linear-gradient(-45deg, transparent 38%, var(--ribbon) 38% 62%, transparent 62%) center / 7px 7px no-repeat,
-    linear-gradient(90deg, transparent, var(--page-kicker) 40%, transparent 46%, transparent 54%, var(--page-kicker) 60%, transparent) center / 100% 1px no-repeat; }
-.app.playmat .class-summary { flex: none; margin: 4px 0 6px; text-align: center; font-size: 11px; color: var(--ink-mute); }
+.app.playmat .class-summary { margin: 0 0 4px; font: 400 10px/1.45 var(--sans); color: var(--ink-mute); }
 .app.playmat .resource-scroll { scrollbar-color: var(--page-scroll) transparent; }
 .app.playmat .resource-group { margin: 0 0 6px; border: 0; }
 .app.playmat .resource-group > summary { display: flex; align-items: center; gap: 7px; padding: 6px 0 3px; border-bottom: 1px solid var(--ink-line); font: 700 13px var(--kserif); color: var(--page-head); }
@@ -209,16 +201,16 @@ html, body { background: #0b0807; }
 .app.playmat .resource-entry h3 { margin: 6px 0 0; font: 700 11px var(--kserif); color: var(--ink-mute); }
 .app.playmat .resource-track { margin: 0; padding: 0; border: 0; border-bottom: 1px dotted rgba(95, 72, 48, .4); border-radius: 0; background: transparent; }
 .app.playmat .resource-track span { color: inherit; }
-.app.playmat .resource-status-row { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 3px; color: var(--ink); background: transparent; box-shadow: none; border-radius: 3px; font-family: var(--sans); font-weight: 400; }
+.app.playmat .resource-status-row { display: flex; align-items: center; gap: 5px; min-height: 28px; padding: 3px; color: var(--ink); background: transparent; box-shadow: none; border-radius: 3px; font-family: var(--sans); font-weight: 400; }
 .app.playmat .resource-status-row:hover:not(:disabled) { filter: none; background: var(--page-hover); }
 .app.playmat .resource-name { min-width: 26px; font: 700 12px var(--kserif); color: var(--page-head); overflow-wrap: anywhere; }
 .app.playmat .slot-numeral { font: 700 12px var(--display); letter-spacing: .5px; color: var(--page-label); }
 .app.playmat .resource-gems { flex: 1; display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
-.app.playmat .resource-gems .gem { display: block; width: 13px; height: 13px; background: var(--gem-socket) center / contain no-repeat; }
+.app.playmat .resource-gems .gem { display: block; width: 11px; height: 11px; background: var(--gem-socket) center / contain no-repeat; }
 .app.playmat .resource-gems.sapphire .gem.filled { background-image: var(--gem-sapphire); }
 .app.playmat .resource-gems.amber .gem.filled { background-image: var(--gem-amber); }
 .app.playmat .resource-status-row:not(.has-gems) .resource-name { flex: 1; }
-.app.playmat .resource-status-row strong { margin-left: auto; font: 700 14px var(--kserif); color: var(--ink-strong); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.app.playmat .resource-status-row strong { flex: none; margin-left: auto; font: 700 13px var(--sans); color: var(--ink-strong); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .app.playmat .resource-status-row meter { width: 34px; height: 6px; }
 .app.playmat .resource-status-row.has-gems meter { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .app.playmat .resource-status-row > span[aria-hidden=true]:last-child { color: var(--ink-mute); }
@@ -240,7 +232,7 @@ html, body { background: #0b0807; }
 .app.playmat .live-resources > .empty-state { color: var(--mute-l); }
 .app.playmat .live-resources > .resource-error { color: #e9a99d; }
 
-.app.playmat .resource-footer { position: relative; padding: 2px 0 0; border: 0; }
+.app.playmat .resource-footer { position: relative; anchor-name: --resource-recovery; flex: none; padding: 2px 0 0; border: 0; }
 .app.playmat .rest-buttons { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; margin: 0 0 2px; }
 .app.playmat .rest-buttons button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0; background: transparent; box-shadow: none;
   font: 700 10.5px/1.25 var(--kserif); color: var(--ink-l); text-align: center; word-break: keep-all; }
@@ -262,8 +254,8 @@ html, body { background: #0b0807; }
 .app.playmat .filters { flex: 1; min-width: 0; height: 100%; margin: 0; max-height: none; overflow: visible; display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; }
 .app.playmat .search-row { margin: 0; flex: 0 1 230px; min-width: 130px; gap: 4px; }
 .app.playmat .search-field input { padding: 8px 12px; font-size: 13px; }
-.app.playmat .search-row > button { flex: none; padding: 6px; background: transparent; box-shadow: none; font: 400 11px var(--sans); color: var(--mute-l); white-space: nowrap; }
-.app.playmat .filter-strip { flex: 1 1 auto; min-width: 0; height: 100%; display: flex; align-items: center; gap: 10px; padding: 0 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.app.playmat .filter-reset { flex: none; padding: 6px; background: transparent; box-shadow: none; font: 400 11px var(--sans); color: var(--mute-l); white-space: nowrap; }
+.app.playmat .filter-strip { flex: 0 1 auto; min-width: 0; height: 100%; display: flex; align-items: center; gap: 10px; padding: 0 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .app.playmat .filter-strip::-webkit-scrollbar { display: none; }
 .app.playmat .filter-strip :focus-visible { outline-offset: 0; }
 .app.playmat .role-filter { flex: none; margin: 0; gap: 3px; flex-wrap: nowrap; }
@@ -383,7 +375,7 @@ html, body { background: #0b0807; }
 .app.playmat .empty-selection p { font-size: 13px; line-height: 1.8; color: var(--ink-mute); }
 .app.playmat .empty-selection .keyboard-hint { margin-top: 10px; font-size: 11px; color: var(--page-kicker); }
 
-/* Hand row: DECK pile, the hand, USED pile. */
+/* The hand and the two card piles. */
 .app.playmat .hand-row { flex: 1; min-height: 130px; display: flex; gap: 16px; align-items: stretch; }
 .app.playmat .mat-zone { position: relative; flex: 0 0 106px; margin-top: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 0;
   border-radius: 10px; color: var(--ink-l); background: transparent; box-shadow: inset 0 0 0 1px var(--m2), inset 0 0 26px rgba(0, 0, 0, .3); font: 700 11px var(--kserif); }
@@ -401,7 +393,6 @@ html, body { background: #0b0807; }
 .app.playmat .used-card:nth-child(2) { transform: rotate(5deg); }
 .app.playmat .used-card .card-face { width: 100%; height: 100%; border: 0; border-radius: 6px; }
 .app.playmat .pile-empty { position: absolute; inset: 0; border: 1px dashed var(--m2); border-radius: 6px; }
-.app.playmat .zone-caption { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app.playmat .hand-zone { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .app.playmat .hand-header { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 14px; }
 .app.playmat .hand-header > .deck-label { justify-self: start; min-width: 0; }
@@ -517,7 +508,7 @@ html, body { background: #0b0807; }
   .app.playmat .top-actions > button { padding: 8px 12px; }
 }
 @media (max-width: 900px) {
-  .app.playmat .class-ribbon, .app.playmat .used-pile { display: none; }
+  .app.playmat .class-ribbon { display: none; }
   .app.playmat .top-actions > button .icon { display: none; }
 }
 @media (max-height: 720px) {
@@ -566,6 +557,7 @@ html, body { background: #0b0807; }
 .app.playmat.reduced-motion .card-item .card-face { transition: none; }
 /* Unusable for the active character: the deck's card back at 75% over the untouched original. Selecting shows the original. */
 .app.playmat .card-face > .card-unusable-back { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; opacity: .75; pointer-events: none; transition: opacity 200ms ease; }
+.app.playmat .card-alpha-mask { position: absolute; pointer-events: none; }
 .app.playmat .card-item.is-selected .card-face > .card-unusable-back { opacity: 0; }
 .app.playmat.reduced-motion .card-face > .card-unusable-back { transition: none; }
 /* Enlargement: an untilted frame owns the click area; only the image inside may lean. */
@@ -720,8 +712,8 @@ html, body { background: #0b0807; }
   --page-title: #f3f7fc; --page-head: #d9e4f1; --page-label: #bccadd; --page-kicker: #8fd4ff; --page-body: #dce4ef; --page-mute: #a8b6ca;
   --page-hover: rgba(127, 207, 255, .08); --page-ctrl-bg: rgba(10, 14, 22, .45); --page-ctrl-ring: rgba(127, 207, 255, .38); --page-field-bg: rgba(8, 12, 20, .55); --page-scroll: #4d5c74;
   --page-tag: #c6e9ff; --page-tag-ring: rgba(127, 207, 255, .6); --page-tag-gap: rgba(30, 38, 52, .9); --page-tag-ring2: rgba(127, 207, 255, .22); }
-.app.playmat[data-theme=abyss] :is(.ledger-heading strong, .selected-card-heading h2) { text-shadow: 0 1px 0 #000, 0 0 12px rgba(127, 207, 255, .22); }
-.app.playmat[data-theme=abyss] .codex-kicker, .app.playmat[data-theme=abyss] .ledger-heading span { text-shadow: 0 0 6px rgba(127, 207, 255, .45); }
+.app.playmat[data-theme=abyss] :is(.resource-panel > .panel-title h2, .selected-card-heading h2) { text-shadow: 0 1px 0 #000, 0 0 12px rgba(127, 207, 255, .22); }
+.app.playmat[data-theme=abyss] .codex-kicker { text-shadow: 0 0 6px rgba(127, 207, 255, .45); }
 .app.playmat[data-theme=abyss] .card-use :is(select, input) { box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6), 0 0 0 1px var(--page-ctrl-ring); }
 .app.playmat[data-theme=abyss] .resource-gems .gem:not(.filled) { filter: invert(1) brightness(.85) opacity(.85); }
 .app.playmat[data-theme=abyss] .exception-button { text-decoration-color: rgba(168, 182, 202, .4); }
@@ -793,6 +785,8 @@ html, body { background: #0b0807; }
 .app.playmat .dc-name span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
   font-size: max(7px, 10.5cqi); font-weight: 700; color: var(--ink-l); overflow-wrap: anywhere; word-break: keep-all; text-shadow: 0 1px 0 rgba(0, 0, 0, .7); }
 .app.playmat .dc-emblem { position: relative; display: grid; place-items: center; min-height: 0; padding: 3cqi 0; }
+.app.playmat .dc-artwork { min-width: 0; min-height: 0; padding: 2cqi 4cqi; }
+.app.playmat .dc-artwork img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .app.playmat .dc-emblem svg { box-sizing: border-box; width: min(58cqi, 100%); height: auto; aspect-ratio: 1; padding: 12cqi; color: var(--m1);
   border: max(1px, .75cqi) solid var(--m5); border-radius: 50%; overflow: visible;
   background: radial-gradient(circle, color-mix(in srgb, var(--m1) 16%, transparent), transparent 68%);
@@ -801,6 +795,7 @@ html, body { background: #0b0807; }
   border-top: max(1px, .6cqi) solid var(--m3); background: linear-gradient(0deg, rgba(0, 0, 0, .36), rgba(0, 0, 0, .1)); }
 .app.playmat .dc-kind { font-size: max(6.5px, 8.2cqi); font-weight: 700; letter-spacing: .06em; color: var(--m0); }
 .app.playmat .dc-actions { font: max(6px, 6.8cqi) var(--sans); color: var(--mute-l); }
+.app.playmat .dc-cost { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .app.playmat .dc-broken { position: absolute; left: 4.2cqi; right: 4.2cqi; bottom: 4.2cqi; z-index: 1; margin: 0; padding: 2cqi 3cqi;
   border-radius: 0 0 3cqi 3cqi; color: #ffe2d8; background: rgba(92, 20, 12, .9); font: 700 max(6px, 6.6cqi) / 1.3 var(--sans); }
 .app.playmat .default-card.is-placeholder .dc-name span { opacity: .5; font-weight: 400; }
@@ -895,46 +890,32 @@ html, body { background: #0b0807; }
 .app.playmat .v13-editor.is-batch .batch-actions-bar { position: sticky; bottom: -20px; z-index: 4; margin: 16px -22px -20px; padding: 12px 22px 14px; background: var(--parchment) 0 0 / 420px, #e9e1cf; box-shadow: 0 -6px 12px rgba(60, 40, 20, .12); }
 @media (max-width: 760px) { .app.playmat .modal .batch-row { grid-template-columns: 20px 40px minmax(0, 1fr); } .app.playmat .modal .batch-actions { grid-column: 3; flex-direction: row; padding-top: 0; } }
 
-/* ---- v1.3 Phase 3 · UI-P0: the mat in three columns ----
-   left: IN PLAY (large card) over USED · centre: card page over HAND · right: ledger over DECK (user memo: deck right, used left).
-   The filter row stays across the whole mat. Each column splits its own height, so the large card uses the left column and
-   the hand gets the larger share of the centre. */
+/* The columns share their boundaries across the full height of the mat. */
 .app.playmat .workspace, .app.playmat.resources-collapsed .workspace { grid-template-columns: minmax(0, 1fr); }
 .app.playmat .board-grid { flex: 1; min-height: 0; display: grid; gap: 16px;
-  grid-template-columns: clamp(190px, 21%, 340px) minmax(0, 1fr) clamp(220px, 21%, 330px); }
-.app.playmat.resources-collapsed .board-grid { grid-template-columns: clamp(190px, 21%, 340px) minmax(0, 1fr) 112px; }
+  grid-template-columns: minmax(0, 24fr) minmax(0, 52fr) minmax(0, 24fr); }
 .app.playmat .board-column { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 /* Left: the IN PLAY slot takes the column; the card keeps its ratio inside it (size container). */
 .app.playmat .board-left > .in-play-slot { flex: 1; min-height: 0; container-type: size; padding: 0; }
 .app.playmat .board-left > .in-play-slot > .detail-card { width: min(calc(100cqw - 28px), calc((100cqh - 38px) / 1.458)); height: auto; max-width: none; aspect-ratio: 1 / 1.458; margin-top: 8px; }
 .app.playmat .in-play-slot > .zone-label { position: absolute; top: -9px; left: 50%; z-index: 2; transform: translateX(-50%); }
-/* The piles share one size and design on both sides. */
-.app.playmat .board-column > .mat-zone { flex: none; width: 100%; height: clamp(104px, 27%, 196px); margin: 0; padding: 13px 8px 5px; gap: 4px; }
-.app.playmat .board-column > .mat-zone .pile { width: auto; height: min(140px, calc(100% - 36px)); }
-.app.playmat .board-column > .mat-zone .zone-label { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); }
-.app.playmat .board-column > .mat-zone .zone-caption { max-width: calc(100% - 16px); }
 /* Centre: the card page over the hand. */
 .app.playmat .board-center > .detail-panel { margin: 0; }
 .app.playmat .board-center .selection { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .app.playmat .board-center > .hand-row { flex: 1; min-height: 130px; }
-/* Right: the ledger over the deck; collapsing it narrows the column and keeps the deck. */
-.app.playmat .board-right > .resource-panel { flex: 1; min-height: 0; }
-.app.playmat.resources-collapsed .board-right > .mat-zone .zone-caption { display: none; }
-@media (max-width: 1100px) {
-  .app.playmat .board-grid { gap: 12px; grid-template-columns: clamp(150px, 19%, 260px) minmax(0, 1fr) clamp(180px, 21%, 260px); }
-  .app.playmat.resources-collapsed .board-grid { grid-template-columns: clamp(150px, 19%, 260px) minmax(0, 1fr) 96px; }
-  .app.playmat .board-column > .mat-zone .pile { width: auto; }
-}
-/* On shorter windows the ledger's own heading (a second “자원 장부”) gives its room to the resources. */
-@media (max-height: 760px) { .app.playmat .board-right .ledger-heading { display: none; } }
-/* USED now lives in the left column, so the old narrow-window rule that hid it no longer applies. */
-@media (max-width: 900px) { .app.playmat .board-left > .used-pile { display: flex; } }
+/* The resource list fills its own row while both piles stay on the bottom edge. */
+.app.playmat .board-right { display: grid; grid-template-rows: minmax(0, 1fr) clamp(112px, 20dvh, 184px); }
+.app.playmat.resources-collapsed .board-right > .resource-panel { align-self: start; }
+@media (max-width: 1100px) { .app.playmat .board-grid { gap: 12px; } }
 /* Narrow windows (e.g. 1280×720 at 150% = 853 CSS px): the chip strip shows a thin scrollbar so hidden chips are
    discoverable, and the character name in the nameplate is cut with an ellipsis instead of running into the deck. */
 @media (max-width: 1000px) {
   .app.playmat .filter-strip { scrollbar-width: thin; scrollbar-color: #5a4236 transparent; }
   .app.playmat .filter-strip::-webkit-scrollbar { display: block; height: 6px; }
-  .app.playmat .search-row { flex-basis: 170px; min-width: 112px; }
+  .app.playmat .filters { gap: 6px; }
+  .app.playmat .search-row { flex-basis: 152px; min-width: 110px; }
+  .app.playmat .quick-actions button { padding-inline: 8px; }
+  .app.playmat .extra-filters-toggle { padding-inline: 8px; }
   .app.playmat .nameplate-character select { max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 /* Short windows (≤ 560 CSS px tall): thinner chrome and a compact card page, so the Use seal, the recovery buttons and
@@ -944,10 +925,15 @@ html, body { background: #0b0807; }
   .app.playmat .workspace { padding: 6px 8px 2px; }
   .app.playmat .board { gap: 6px; padding: 6px 12px 6px; border-width: 18px; border-image-width: 44px; }
   .app.playmat .board-top { height: 32px; }
+  .app.playmat .board:has(> .batch-tools) { overflow-y: auto; overscroll-behavior-y: contain; }
+  .app.playmat .board:has(> .batch-tools) > .board-grid { min-height: 320px; }
   .app.playmat .board-grid { gap: 10px; }
   .app.playmat .board-column { gap: 8px; }
   .app.playmat .board-center > .detail-panel { flex: 0 0 auto; height: clamp(132px, 48%, 190px); min-height: 0; }
   .app.playmat .codex-page { padding: 7px 14px 5px; gap: 2px; }
+  .app.playmat .board-center .selection.is-empty .codex-page { padding: 8px 14px; }
+  .app.playmat .board-center .empty-selection h3 { margin: 0 0 2px; font-size: 17px; }
+  .app.playmat .board-center .empty-selection p { margin: 0; font-size: 11px; line-height: 1.4; }
   /* A shorter bookmark (same proportions) ends above the description on the compact page. */
   .app.playmat .codex-page::before { width: 9px; height: 22px; right: 60px; }
   .app.playmat .selected-card-heading h2 { font-size: 16px; }
@@ -957,9 +943,8 @@ html, body { background: #0b0807; }
   .app.playmat .card-use { min-height: 56px; max-height: 70px; padding-top: 3px; }
   .app.playmat.p4-b .use-button { width: 58px; height: 58px; margin: -2px 0; padding: 0 10px; font-size: 11px; }
   .app.playmat .board-center > .hand-row { min-height: 96px; }
-  .app.playmat .board-column > .mat-zone { height: clamp(78px, 30%, 120px); padding: 10px 6px 4px; }
-  .app.playmat .board-column > .mat-zone .pile { height: calc(100% - 18px); }
-  .app.playmat .board-column > .mat-zone .pile-count { width: 24px; height: 24px; font-size: 10px; right: -8px; bottom: -6px; }
+  .app.playmat .board-right { grid-template-rows: minmax(0, 1fr) clamp(70px, 17dvh, 96px); }
+  .app.playmat .board-piles .pile-count { width: 24px; height: 24px; font-size: 10px; right: -8px; bottom: -6px; }
   .app.playmat .resource-panel { gap: 4px; padding: 8px 9px 6px; }
   .app.playmat .resource-panel > .panel-title { min-height: 22px; }
   .app.playmat .ledger-sheet { min-height: 64px; }
@@ -977,31 +962,22 @@ html, body { background: #0b0807; }
 .app.playmat .board-center > .detail-panel { flex-basis: clamp(200px, 34dvh, 330px); }
 @media (max-height: 720px) { .app.playmat .board-center > .detail-panel { flex-basis: clamp(180px, 33dvh, 240px); } }
 
-/* DECK and USED: one zone design — name plate on the border, the pile (a button) filling the zone's height on the left,
-   name / count / small actions on the right; narrow zones (collapsed ledger) stack the pile over the name. */
-.app.playmat .board-column > .mat-zone { container-type: inline-size; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
-  align-items: center; gap: 0 14px; padding: 14px 14px 10px; text-align: left; }
-.app.playmat .mat-zone > .pile-button { height: 100%; min-height: 0; display: grid; place-items: center; padding: 2px 10px 6px 2px; border: 0; border-radius: 8px; background: transparent; box-shadow: none; }
-.app.playmat .mat-zone > .pile-button:hover:not(:disabled) { filter: brightness(1.08); background: transparent; }
+.app.playmat .board-piles { display: grid; min-height: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.app.playmat .board-piles > .mat-zone { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); margin: 0; padding: 0; }
+.app.playmat .board-piles .zone-label { position: absolute; z-index: 2; top: -7px; left: 50%; transform: translateX(-50%); pointer-events: none; }
+.app.playmat .mat-zone > .pile-button { container-type: size; display: grid; place-items: center; width: 100%; height: 100%; min-height: 0; padding: 11px 12px 10px; border: 0; border-radius: 8px; background: transparent; box-shadow: none; }
+.app.playmat .mat-zone > .pile-button:hover:not([aria-disabled=true]) { filter: brightness(1.08); background: transparent; }
 .app.playmat .mat-zone > .pile-button:focus-visible { outline: 2px solid var(--m1); outline-offset: 2px; }
-.app.playmat .board-column > .mat-zone .pile { width: auto; height: min(150px, 100%); }
-.app.playmat .zone-info { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-.app.playmat .board-column > .mat-zone .zone-caption { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 13px var(--kserif); color: var(--ink-l); }
-.app.playmat .zone-meta { font: 700 11px var(--sans); color: var(--mute-l); }
-.app.playmat .zone-hint { font: 400 10.5px var(--sans); color: var(--mute-l); opacity: .85; }
-.app.playmat .zone-action { margin-top: 3px; padding: 3px 11px 4px; border: 0; border-radius: 999px; font: 700 11px var(--kserif); color: var(--ink-l);
-  background: rgba(0, 0, 0, .28); box-shadow: inset 0 0 0 1px var(--m2); }
-.app.playmat .zone-action:hover:not(:disabled) { filter: none; box-shadow: inset 0 0 0 1px var(--m1); color: #fff; }
-@container (max-width: 180px) {
-  .app.playmat .board-column > .mat-zone { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; justify-items: center; gap: 2px; padding: 13px 6px 6px; text-align: center; }
-  .app.playmat .zone-info { align-items: center; }
-  .app.playmat .zone-meta, .app.playmat .zone-hint { display: none; }
-  .app.playmat .board-column > .mat-zone .zone-caption { font-size: 11px; }
-}
-@media (max-height: 560px) {
-  .app.playmat .board-column > .mat-zone { padding: 11px 10px 5px; }
-  .app.playmat .zone-hint { display: none; }
-}
+.app.playmat .board-piles .pile { width: min(100cqw, calc(100cqh / 1.458), 102px); }
+.app.playmat .pile-tooltip, .app.playmat .pile-menu { color: var(--ink-l); background: var(--bind-lo); border: 1px solid var(--m2); border-radius: 6px; box-shadow: 0 4px 14px #0008; font: 400 11px/1.5 var(--sans); }
+.app.playmat .pile-tooltip { display: none; position: fixed; z-index: 4; right: anchor(right); bottom: anchor(--resource-recovery top, anchor(top)); margin-bottom: 7px; width: min(190px, 32vw); padding: 6px 8px; pointer-events: none; overflow-wrap: anywhere; }
+.app.playmat .mat-zone:not(:has(.pile-menu:popover-open)):is(:hover, :has(.pile-button:focus-visible)) > .pile-tooltip { display: grid; gap: 2px; }
+.app.playmat .used-pile > .pile-button { anchor-name: --used-pile-button; }
+.app.playmat .deck-pile > .pile-button { anchor-name: --deck-pile-button; }
+.app.playmat .used-pile > :is(.pile-menu, .pile-tooltip) { position-anchor: --used-pile-button; }
+.app.playmat .deck-pile > :is(.pile-menu, .pile-tooltip) { position-anchor: --deck-pile-button; }
+.app.playmat .pile-menu { position: fixed; inset: auto; right: anchor(right); bottom: anchor(top); margin: 0 0 5px; padding: 4px; position-try-fallbacks: flip-inline, flip-block; }
+.app.playmat .pile-menu button { display: block; padding: 5px 12px; white-space: nowrap; font: inherit; }
 /* Shuffle (memo 4): the top cards swing apart and back; nothing moves with reduced motion. */
 @keyframes deck-shuffle-a { 0%, 100% { transform: none; } 35% { transform: translateX(-14px) rotate(-8deg); } 70% { transform: translateX(9px) rotate(5deg); } }
 @keyframes deck-shuffle-b { 0%, 100% { transform: none; } 35% { transform: translateX(14px) rotate(8deg); } 70% { transform: translateX(-9px) rotate(-5deg); } }
@@ -1061,9 +1037,6 @@ html, body { background: #0b0807; }
 }
 .app.playmat .board-center .description-content p:not(.detail-description) { margin-bottom: 2px; font-size: 11.5px; line-height: 1.6; color: var(--page-mute); }
 .app.playmat .board-center .card-use { margin-top: auto; }
-/* Ledger: as tall as its resources (scrolling inside when the column is full); the deck stays at the bottom. */
-.app.playmat .board-right > .resource-panel { flex: 0 1 auto; max-height: 100%; }
-.app.playmat .board-right > .deck-pile { margin-top: auto; }
 /* Recovery buttons read as the ledger's own footer: an engraved heading between rules, close to the page. */
 .app.playmat .rest-heading { display: flex; align-items: center; gap: 8px; margin: 2px 0 3px; font: 700 9.5px var(--display); letter-spacing: 3px; color: var(--mute-l); }
 .app.playmat .rest-heading::before, .app.playmat .rest-heading::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--m2), transparent); }
@@ -1089,10 +1062,9 @@ html, body { background: #0b0807; }
 .app.playmat:not([data-theme]) .board-right > .resource-panel::before, .app.playmat[data-theme=oxblood] .board-right > .resource-panel::before { border: 1px solid rgba(210, 190, 160, .16); }
 /* Typography: decorative serif for titles and names (card name, ledger, DECK/USED, headers); the plain sans for
    functional text — filters, toggles, small buttons, costs, numbers and secondary lines. */
-.app.playmat :is(.role-filter > button, .role-filter .chips button, .quick-actions button, .view-switch button, .zone-action) { font-family: var(--sans); font-size: 12px; }
+.app.playmat :is(.role-filter > button, .role-filter .chips button, .quick-actions button, .view-switch button) { font-family: var(--sans); font-size: 12px; }
 .app.playmat :is(.selected-properties, .card-use .cost-preview, .card-use .form-field, .exception-button) { font-family: var(--sans); }
 .app.playmat .detail-tags span { font-family: var(--sans); font-size: 10.5px; }
-.app.playmat .resource-status-row strong { font-family: var(--sans); font-size: 13px; }
 .app.playmat .rest-buttons button { font-family: var(--sans); font-weight: 700; }
 
 /* ---- v1.3 Phase 3 · UI-P4: play checks ---- */
@@ -1107,7 +1079,7 @@ html, body { background: #0b0807; }
   .app.playmat .board-top { height: 32px; }
   .app.playmat .board-grid { gap: 10px; }
   .app.playmat .board-column { gap: 8px; }
-  .app.playmat .board-column > .mat-zone { height: clamp(96px, 26%, 124px); }
+  .app.playmat .board-right { grid-template-rows: minmax(0, 1fr) clamp(96px, 18dvh, 124px); }
   .app.playmat .resource-panel { gap: 4px; padding: 8px 9px 6px; }
   .app.playmat .resource-panel > .panel-title { min-height: 24px; }
   .app.playmat .ledger-page { padding: 8px 10px 4px; }
@@ -1131,10 +1103,7 @@ html, body { background: #0b0807; }
 .app.playmat .hand .card-resource-note { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); max-width: calc(100% - 4px);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 8px 2px; border-radius: 999px; font: 700 10px/1.35 var(--sans);
   color: #f6dccf; background: rgba(18, 9, 7, .88); box-shadow: inset 0 0 0 1px var(--m2), 0 1px 4px rgba(0, 0, 0, .6); pointer-events: none; z-index: 4; }
-/* Short windows (≤ 560 CSS px, e.g. 1366×768 or 1280×720 at 150%): the ledger list was down to one cut line. The class
-   line now scrolls with the list (ResourcePanel), DECK and USED are a little lower and the recovery row is tighter. */
 @media (max-height: 560px) {
-  .app.playmat .board-column > .mat-zone { height: clamp(70px, 24%, 104px); }
   .app.playmat .coin { width: 28px; height: 28px; }
   .app.playmat .rest-buttons { margin: 0; }
   .app.playmat .rest-buttons button { padding: 0; font-size: 9.5px; line-height: 1.1; }

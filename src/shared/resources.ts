@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { cardSchema, idSchema } from './contracts';
+import { cardSchema, idSchema, recoveryRuleSchema, resourceMatchKeySchema } from './contracts';
+export { recoveryRuleSchema } from './contracts';
 import { classInputSchema, type ClassPreview, type ClassInput, type CharacterConfiguration } from './class-contracts';
 
 export const resourceInteger = z.number().int().min(0).max(1000000);
@@ -12,8 +13,8 @@ export const capacityRuleSchema = z.discriminatedUnion('type', [
 ]);
 export const recoveryTriggerSchema = z.enum(['short_rest','long_rest','dawn','manual']);
 export type RecoveryTrigger = z.infer<typeof recoveryTriggerSchema>;
-export const recoveryRuleSchema = z.strictObject({ triggers: z.array(recoveryTriggerSchema).min(1).max(4), amount: z.discriminatedUnion('type', [z.strictObject({ type: z.literal('full') }),z.strictObject({ type: z.literal('fixed'), value: resourceInteger })]) });
 export const templateDraftSchema = z.strictObject({
+  matchKey: resourceMatchKeySchema.optional(),
   id: idSchema.optional(), name: z.string().trim().min(1).max(100), unit: z.string().trim().min(1).max(30), kind: z.enum(['counter','slot_track']),
   unlimited: z.boolean().optional(), slotKind: z.enum(['standard','pact','generic']).optional(), capacity: capacityRuleSchema.optional(), slotCapacity: z.record(levelKey, capacityRuleSchema).optional(),
   slotCapacityByClassLevel: z.record(classLevelKey, z.record(levelKey, resourceInteger)).optional(), recovery: z.array(recoveryRuleSchema).max(4),
@@ -37,6 +38,7 @@ export interface ResourceView {
   id: string; characterId: string; presetKey?: string; unlimited?: boolean; templateId: string; name: string; unit: string; kind: 'counter'|'slot_track';
   capacity?: number; remaining?: number; capacityByLevel?: Record<string,number>; remainingByLevel?: Record<string,number>;
   overrides: ResourceOverrides; template: ResourceTemplate;
+  ownedDefinitionId?: string; ownerCardName?: string; inactive?: boolean; retired?: boolean;
 }
 export interface ResourceChange { resourceInstanceId: string; slotLevel?: number; before: number; after: number }
 export interface CardBinding { id: string; characterId: string; cardId: string; costKey: string; resourceInstanceId: string }
@@ -46,7 +48,7 @@ export interface ResourceEvent {
 }
 export interface ResourceSnapshot { profile?: CharacterConfiguration; costOverrides?: {cardId:string;castOptions:import('./contracts').CastOption[]}[]; sharedCostUsers?: Record<string,number>; characterId: string; revision: number; resources: ResourceView[]; templates: ResourceTemplate[]; bindings: CardBinding[]; events: ResourceEvent[]; warnings: string[]; undoTargetId?: string }
 export const choicesSchema = z.record(z.string().min(1).max(128), resourceInteger).default({});
-export const usePreviewActionSchema = z.strictObject({ type: z.literal('use'), cardId: idSchema, optionId: idSchema, choices: choicesSchema, castingLevel: z.number().int().min(0).max(9).optional() });
+export const usePreviewActionSchema = z.strictObject({ type: z.literal('use'), cardId: idSchema, optionId: idSchema, choices: choicesSchema, castingLevel: z.number().int().min(0).max(9).optional(), ritual: z.boolean().optional() });
 const recoverActionSchema = z.strictObject({ type: z.literal('recover'), trigger: recoveryTriggerSchema });
 const adjustActionSchema = z.strictObject({ type: z.literal('adjust'), resourceId: idSchema, slotLevel: z.number().int().min(1).max(9).optional(), delta: z.number().int().min(-1000000).max(1000000) });
 export const previewRequestSchema = z.strictObject({ characterId: idSchema, action: z.discriminatedUnion('type', [usePreviewActionSchema,recoverActionSchema,adjustActionSchema]) });

@@ -23,13 +23,22 @@ describe('v1.1 Phase 1 filter bar', () => {
     expect(quickAction.getAttribute('aria-pressed')).toBe('true');
     expect(inPanel('행동 경제 필터', '행동').getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(quickBonus);
-    expect(onChange).toHaveBeenLastCalledWith({ actions: ['action', 'bonus_action'] });
+    expect(onChange).toHaveBeenLastCalledWith({ actions: ['bonus_action'] });
     fireEvent.click(inPanel('행동 경제 필터', '행동'));
     expect(onChange).toHaveBeenLastCalledWith({ actions: [] });
     view.rerender(<Filters state={state({ actions: ['bonus_action'] })} tags={tags} onChange={onChange}/>);
     expect(quickAction.getAttribute('aria-pressed')).toBe('false');
     expect(quickBonus.getAttribute('aria-pressed')).toBe('true');
     expect(inPanel('행동 경제 필터', '보너스 행동').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(quickBonus);
+    expect(onChange).toHaveBeenLastCalledWith({ actions: [] });
+    fireEvent.click(inPanel('행동 경제 필터', '반응 행동'));
+    expect(onChange).toHaveBeenLastCalledWith({ actions: ['bonus_action', 'reaction'] });
+    view.rerender(<Filters state={state({ actions: ['bonus_action', 'reaction'] })} tags={tags} onChange={onChange}/>);
+    expect(quick.querySelectorAll('[aria-pressed=true]')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /^추가 필터/ }).textContent).toBe('추가 필터 · 2');
+    fireEvent.click(quickBonus);
+    expect(onChange).toHaveBeenLastCalledWith({ actions: ['bonus_action'] });
   });
 
   it('combines the quick action filter with roles as AND, exactly like the extra filter', () => {
@@ -42,7 +51,7 @@ describe('v1.1 Phase 1 filter bar', () => {
     const active = state({ roles: ['damage'], kinds: ['spell'], ranges: ['ranged'], tagIds: ['tag-fire'], query: '불' });
     const view = render(<Filters state={active} tags={tags} onChange={vi.fn()}/>);
     const section = view.container.querySelector('.filters')!;
-    expect([...section.children].map(child => child.className)).toEqual(['search-row', 'filter-strip', 'extra-filters']);
+    expect([...section.children].map(child => child.className)).toEqual(['search-row', 'filter-strip', 'quick-actions', 'extra-filters', 'filter-reset']);
     const toggle = view.container.querySelector('.extra-filters-toggle')!;
     expect(toggle.getAttribute('title')).toBe(`적용 중: ${filterSummary(active, tags)}`);
     expect(filterSummary(active, tags)).toBe('역할 공격 · 그리고 · 유형 주문 · 그리고 · 사거리 원거리 · 그리고 · 태그 화염 · 그리고 · 이름 “불”');

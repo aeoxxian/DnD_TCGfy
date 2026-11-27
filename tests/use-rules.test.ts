@@ -8,6 +8,7 @@ import { ResourceStore } from '../electron/resource-store';
 import { buildBasicRule, emptyBasicRule, inferBasicRule, describeUseRules } from '../src/shared/use-rules';
 import type { ResourceAction } from '../src/shared/resources';
 import type { CardDefinition } from '../src/shared/contracts';
+import { castingLevels, castingOptions, resolveCastOption } from '../src/shared/casting';
 
 const root=resolve('artifacts/p31-unit');mkdirSync(root,{recursive:true});
 function fixture(){const path=mkdtempSync(join(root,'case-'));const store=new AppStore(path);const library=new LibraryStore(store);library.createProfile({name:'A'});const a=library.getLibrary().profiles[0].id;const resources=new ResourceStore(store);return{path,store,library,resources,a};}
@@ -19,6 +20,23 @@ function automatic(f:Fixture,c:CardDefinition,base=4,id=f.a,family:'standard'|'p
 function use(f:Fixture,c:CardDefinition,level?:number,id=f.a){const action={type:'use' as const,cardId:c.id,optionId:'auto',choices:(level?{slot:level}:{}) as Record<string,number>};const p=f.resources.preview({characterId:id,action});return change(f,{...action,quote:p.quote},id);}
 
 describe('P3.1 automatic slot rule and engine compatibility',()=>{
+  it('keeps slot range apart from effect enhancement and offers an explicit ritual only once', () => {
+    const f = fixture();
+    try {
+      const spell = { ...card(f, 2), ritual: true, upcastEffect: false };
+      const ids = { optionId: 'general', costKey: 'slot' };
+      const draft = { ...emptyBasicRule(spell), kind: 'slots' as const, minLevel: 3, maxLevel: 4 };
+      const [general] = buildBasicRule(spell, draft, ids).castOptions;
+      expect(castingLevels(spell, general)).toEqual([3, 4]);
+      expect(castingLevels(spell, buildBasicRule(spell, { ...draft, minLevel: undefined, maxLevel: undefined, allowUpcast: false }, ids).castOptions[0])).toEqual([2]);
+      const explicit = { ...general, id: 'ritual', label: '의식 준비', ritual: true, costs: [...general.costs, { type: 'fixed' as const, amount: 1, costKey: 'counter' }] };
+      const configured = { ...spell, castOptions: [general, explicit] };
+      expect(castingOptions(configured, false)).toEqual([general]);
+      expect(castingOptions(configured, true)).toEqual([explicit]);
+      expect(resolveCastOption(configured, explicit.id, true, [], []).costs).toEqual([{ type: 'fixed', amount: 1, costKey: 'counter' }]);
+      expect(() => resolveCastOption(configured, general.id, true, [], [])).toThrow();
+    } finally { f.store.close(); }
+  });
   it('registers one level-4 rule once and independently spends levels 4, 5 and 6',()=>{
     const f=fixture();const r=preset(f);const c=card(f);automatic(f,c);const stored=f.resources.snapshot(f.a).costOverrides![0].castOptions;expect(stored).toHaveLength(1);expect(stored[0].costs).toHaveLength(1);expect(f.resources.snapshot(f.a).bindings).toEqual([]);
     const start=f.resources.snapshot(f.a).resources.find(value=>value.id===r.id)!.remainingByLevel!;
@@ -52,7 +70,7 @@ describe('P3.1 automatic slot rule and engine compatibility',()=>{
   it('preserves v4 legacy multiple tier costs and use history, with no startup migration or automatic rewrite',()=>{
     const f=fixture();const r=preset(f);const c=card(f,4);const options=[{id:'manual',label:'수동',costs:[4,5,6].map(slotLevel=>({type:'fixed' as const,costKey:`tier-${slotLevel}`,slotLevel,amount:1}))}];change(f,{type:'save_costs',cardId:c.id,castOptions:options,bindings:[4,5,6].map(slotLevel=>({costKey:`tier-${slotLevel}`,resourceInstanceId:r.id}))});
     const legacy=f.library.getLibrary().cards.find(value=>value.id===c.id)!;const snap=f.resources.snapshot(f.a);expect(inferBasicRule(legacy,snap)).toBeUndefined();expect(describeUseRules(legacy.castOptions,snap.bindings,snap.resources)[0]).toContain('4레벨');const backupCount=readdirSync(join(f.path,'backups')).length;f.store.close();
-    const store=new AppStore(f.path);expect(new LibraryStore(store).getLibrary().cards.find(value=>value.id===c.id)!.castOptions).toEqual(options);expect(new ResourceStore(store).snapshot(f.a)).toEqual(snap);expect(readdirSync(join(f.path,'backups'))).toHaveLength(backupCount);expect(store.db.prepare('PRAGMA user_version').get()!.user_version).toBe(6);store.close();
+    const store=new AppStore(f.path);expect(new LibraryStore(store).getLibrary().cards.find(value=>value.id===c.id)!.castOptions).toEqual(options);expect(new ResourceStore(store).snapshot(f.a)).toEqual(snap);expect(readdirSync(join(f.path,'backups'))).toHaveLength(backupCount);expect(store.db.prepare('PRAGMA user_version').get()!.user_version).toBe(8);store.close();
   });
   it('builds simple fixed or variable costs without tier duplication and validates homebrew ranges',()=>{
     const f=fixture();const c=card(f);const draft={...emptyBasicRule(c),kind:'points' as const,resourceId:'points',amount:2};const fixed=buildBasicRule(c,draft,{optionId:'one',costKey:'p'});expect(fixed.castOptions[0].costs).toEqual([{type:'fixed',costKey:'p',amount:2}]);expect(buildBasicRule(c,{...draft,variable:true,min:1,max:5,step:2},{optionId:'one',costKey:'p'}).castOptions[0].costs[0]).toMatchObject({type:'variable',min:1,max:5,step:2});expect(()=>buildBasicRule(c,{...draft,kind:'slots',spellLevel:4,homebrew:true,minLevel:6,maxLevel:2},{optionId:'one',costKey:'s'})).toThrow('범위');f.store.close();

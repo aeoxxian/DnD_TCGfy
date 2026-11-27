@@ -88,4 +88,38 @@ describe('v1.3 Phase 2 · batch registration helpers', () => {
     expect(registrationTemplatesSchema.safeParse([template, { ...template, id: 'tpl-2', name: '화살 주문' }]).success).toBe(false);
     expect(registrationTemplatesSchema.safeParse(Array.from({ length: 21 }, (_, i) => ({ ...template, id: `t${i}`, name: `t${i}` }))).success).toBe(false);
   });
+
+  it('round-trips the image mode, independent spell traits and fixed slot choice through templates', () => {
+    const settings = common({ card: { ...common().card, kind: 'spell', spellLevel: 2, imageMode: 'illustration', concentration: true, ritual: true, upcastEffect: false },
+      rule: { kind: 'slots', scope: 'shared', draft: { ...base, allowUpcast: false } } });
+    const [template] = registrationTemplatesSchema.parse([templateFrom('p2-template', 'P2', settings, [])]);
+    const { common: applied } = applyTemplate(template, { tags: [], resources: [], characterId: 'a', base });
+    const picture = newBatchItem(asset('1'), true, uuid);
+    const blank = newBatchItem({ id: 'blank', name: '기본' }, true, uuid);
+    expect(effectiveItem(picture, '삽화', applied).card).toMatchObject({ imageMode: 'illustration', imageAssetId: '1', concentration: true, ritual: true, upcastEffect: false });
+    expect(effectiveItem(blank, '기본', applied).card).toMatchObject({ imageMode: 'none', concentration: true, ritual: true });
+    expect(itemRequest(effectiveItem(picture, '삽화', applied), picture.ids, { target, characterId: 'a' }).initialRules.castOptions[0].casting?.allowUpcast).toBe(false);
+  });
+
+  it('round-trips owned definitions and keyed requirements without guessing an ambiguous named binding', () => {
+    const definition = { id: '04d673e9-c25f-43a1-80cd-a699a5026a22', name: '불꽃', unit: '회', maximum: 7, amount: 2,
+      recovery: [{ triggers: ['dawn' as const], amount: { type: 'full' as const } }] };
+    const original = common({
+      card: { ...common().card, ownedResources: [definition] },
+      rule: { kind: 'uses', scope: 'shared', draft: { ...base, resourceId: 'first', resourceKey: 'homebrew:focus', amount: 2 } },
+    });
+    const first = counter('first', '집중');
+    const [template] = registrationTemplatesSchema.parse([templateFrom('p3', 'P3', original, [first])]);
+    expect(template.rule).toMatchObject({ resourceName: '집중', resourceKey: 'homebrew:focus' });
+    const ambiguous = applyTemplate(template, { tags: [], resources: [first, counter('second', '집중')], characterId: 'a', base });
+    expect(ambiguous.common.rule.draft.resourceId).toBe('');
+    expect(ambiguous.notes[0]).toContain('여러 개');
+    const item = newBatchItem(asset('1'), true, uuid);
+    const input = itemRequest(effectiveItem(item, '복사 카드', ambiguous.common), item.ids, { target, characterId: 'a' });
+    expect(input.cards[0].ownedResources).toEqual([definition]);
+    expect(input.initialRules.bindings).toEqual([]);
+    expect(input.initialRules.castOptions[0].costs[0]).toMatchObject({ amount: 2, requirement: { key: 'homebrew:focus', kind: 'counter' } });
+    const legacy = applyTemplate(templateFrom('legacy', '기본', common(), []), { tags: [], resources: [], base });
+    expect({ ...original.card, ...legacy.common.card }.ownedResources).toBeUndefined();
+  });
 });

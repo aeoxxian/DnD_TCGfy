@@ -28,7 +28,7 @@ export function recoveryRules(choices: RecoveryChoices, kind: TemplateDraft['kin
 export function sameResourceName(a: string, b: string): boolean { return normalizeText(a) === normalizeText(b); }
 /** An active resource of the character with the same (normalised) name, if any. */
 export function findSameNameResource(resources: ResourceView[], name: string): ResourceView | undefined {
-  return name.trim() ? resources.find(resource => sameResourceName(resource.name, name)) : undefined;
+  return name.trim() ? resources.find(resource => !resource.ownedDefinitionId && sameResourceName(resource.name, name)) : undefined;
 }
 /** Counters that a basic use rule can bind (card-owned resources belong to another card). */
 export function bindableCounters(resources: ResourceView[]): ResourceView[] {

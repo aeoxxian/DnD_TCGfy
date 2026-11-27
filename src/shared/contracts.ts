@@ -63,6 +63,30 @@ export const roleSchema = z.enum(['damage', 'heal', 'protect', 'buff', 'debuff',
 export const actionSchema = z.enum(['action', 'bonus_action', 'reaction', 'no_action', 'passive', 'special']);
 export const kindSchema = z.enum(['spell', 'attack', 'feature', 'feat', 'item', 'other']);
 export const rangeSchema = z.enum(['self', 'touch', 'melee', 'ranged', 'special']);
+export const resourceMatchKeySchema = z.string().trim().min(1).max(128).regex(/^[a-z0-9][a-z0-9:_-]*$/i, '자원 식별 키에는 영문, 숫자, 콜론, 밑줄, 하이픈을 사용하세요.');
+const portableAmount = z.number().int().min(0).max(1000000);
+export const recoveryRuleSchema = z.strictObject({
+  triggers: z.array(z.enum(['short_rest','long_rest','dawn','manual'])).min(1).max(4),
+  amount: z.discriminatedUnion('type', [z.strictObject({ type: z.literal('full') }), z.strictObject({ type: z.literal('fixed'), value: portableAmount })]),
+});
+export const ownedResourcesSchema = z.array(z.strictObject({
+  id: z.uuid(), name: z.string().trim().min(1).max(100), unit: z.string().trim().min(1).max(30),
+  maximum: portableAmount, amount: portableAmount.min(1), recovery: z.array(recoveryRuleSchema).max(4),
+}).refine(definition => {
+  const triggers = definition.recovery.flatMap(rule => rule.triggers);
+  return new Set(triggers).size === triggers.length;
+}, '같은 회복 조건을 두 번 정의할 수 없습니다.')).max(12)
+  .refine(definitions => new Set(definitions.map(definition => definition.id)).size === definitions.length, '고유 자원 ID가 중복됩니다.');
+export type OwnedResource = z.infer<typeof ownedResourcesSchema>[number];
+export const resourceRequirementSchema = z.strictObject({ kind: z.enum(['counter', 'track']), key: resourceMatchKeySchema });
+export const imageModeSchema = z.enum(['full_card', 'illustration', 'none']);
+export type ImageMode = z.infer<typeof imageModeSchema>;
+const cardMetadata = {
+  imageMode: imageModeSchema.optional(),
+  concentration: z.boolean().optional(),
+  ritual: z.boolean().optional(),
+  upcastEffect: z.boolean().optional(),
+};
 /**
  * v1.3 Phase 2: a saved registration template (settings key `registration_templates`). Resources are kept by name because
  * resource IDs differ per character; applying a template looks the name up in the current character's resources.
@@ -70,6 +94,8 @@ export const rangeSchema = z.enum(['self', 'touch', 'melee', 'ranged', 'special'
 export const registrationTemplateSchema = z.strictObject({
   id: idSchema, name: z.string().trim().min(1).max(40),
   card: z.strictObject({
+    ...cardMetadata,
+    ownedResources: ownedResourcesSchema.optional(),
     kind: kindSchema, spellLevel: z.number().int().min(0).max(9).optional(),
     roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
     range: z.strictObject({ kind: rangeSchema, feet: z.number().int().min(0).max(100000).optional() }),
@@ -78,8 +104,10 @@ export const registrationTemplateSchema = z.strictObject({
   rule: z.strictObject({
     kind: z.enum(['unconfigured', 'none', 'slots', 'uses', 'points']), scope: z.enum(['shared', 'character']),
     family: z.enum(['standard', 'pact']), homebrew: z.boolean(), belowBase: z.boolean(),
+    allowUpcast: z.boolean().optional(),
     minLevel: z.number().int().min(1).max(9).optional(), maxLevel: z.number().int().min(1).max(9).optional(),
     resourceName: z.string().trim().min(1).max(60).optional(),
+    resourceKey: resourceMatchKeySchema.optional(),
     amount: z.number().int().min(0).max(1000000), variable: z.boolean(),
     min: z.number().int().min(0).max(1000000), max: z.number().int().min(0).max(1000000), step: z.number().int().min(1).max(1000000),
   }),
@@ -106,24 +134,32 @@ export const settingsSchema = z.strictObject({
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };
 
+const costKeySchema = z.string().min(1);
 export const costSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('fixed'), costKey: z.string().min(1), amount: z.number().int().nonnegative(), slotLevel: z.number().int().min(1).max(9).optional() }),
-  z.strictObject({ type: z.literal('slot'), costKey: z.string().min(1), slotSelection: z.enum(['standard', 'pact']), autoBind: z.boolean().optional() }),
-  z.strictObject({ type: z.literal('variable'), costKey: z.string().min(1), min: z.number().int().nonnegative(), max: z.number().int().nonnegative(), step: z.number().int().positive(), slotLevel: z.number().int().min(1).max(9).optional() }).refine(v => v.min <= v.max),
-]);
+  z.strictObject({ type: z.literal('fixed'), costKey: costKeySchema, amount: z.number().int().nonnegative(), slotLevel: z.number().int().min(1).max(9).optional(), requirement: resourceRequirementSchema.optional() }),
+  z.strictObject({ type: z.literal('slot'), costKey: costKeySchema, slotSelection: z.enum(['standard', 'pact', 'generic']), autoBind: z.boolean().optional(), requirement: resourceRequirementSchema.optional() }),
+  z.strictObject({ type: z.literal('variable'), costKey: costKeySchema, min: z.number().int().nonnegative(), max: z.number().int().nonnegative(), step: z.number().int().positive(), slotLevel: z.number().int().min(1).max(9).optional(), requirement: resourceRequirementSchema.optional() }).refine(v => v.min <= v.max),
+]).superRefine((cost, ctx) => {
+  if (!cost.requirement) return;
+  const kind = cost.type === 'slot' || cost.slotLevel !== undefined ? 'track' : 'counter';
+  if (cost.requirement.kind !== kind) ctx.addIssue({ code: 'custom', message: '요구 자원 종류와 슬롯 레벨을 확인해 주세요.' });
+});
 const castingSchema = z.strictObject({
   mode: z.enum(['standard', 'pact', 'homebrew']), allowUpcast: z.boolean().default(true), allowBelowBase: z.boolean().default(false),
   minSlotLevel: z.number().int().min(1).max(9).optional(), maxSlotLevel: z.number().int().min(1).max(9).optional(),
 }).refine(v => !v.allowBelowBase || v.mode === 'homebrew', '다운캐스팅은 홈브루 옵션에만 허용됩니다.')
   .refine(v => v.minSlotLevel === undefined || v.maxSlotLevel === undefined || v.minSlotLevel <= v.maxSlotLevel);
 export const cardSchema = z.strictObject({
+  ...cardMetadata,
+  ownedResources: ownedResourcesSchema.optional(),
   id: z.string().min(1), name: z.string().min(1), imageAssetId: z.string().min(1).optional(),
   kind: kindSchema,
   roles: z.array(roleSchema),
   actions: z.array(actionSchema),
   range: z.strictObject({ kind: z.enum(['self', 'touch', 'melee', 'ranged', 'special']), feet: z.number().nonnegative().optional() }),
   tags: z.array(z.string().min(1)), description: z.string().optional(), spellLevel: z.number().int().min(0).max(9).optional(),
-  castOptions: z.array(z.strictObject({ id: z.string().min(1), label: z.string().min(1), costs: z.array(costSchema), casting: castingSchema.optional() })).min(1),
+  castOptions: z.array(z.strictObject({ id: z.string().min(1), label: z.string().min(1), costs: z.array(costSchema), casting: castingSchema.optional(), ritual: z.boolean().optional() })).min(1)
+    .refine(options => options.some(option => !option.ritual), '일반 사용 방식이 한 가지 이상 필요합니다.'),
   costStatus: z.enum(['unconfigured', 'configured']).optional(),
   createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
 }).refine(v => v.spellLevel === undefined || v.kind === 'spell');
@@ -132,6 +168,8 @@ export type Role = CardDefinition['roles'][number];
 export type CastOption = CardDefinition['castOptions'][number];
 
 export const cardDraftSchema = z.strictObject({
+  ...cardMetadata,
+  ownedResources: ownedResourcesSchema.optional(),
   id: idSchema.optional(),
   name: z.string().trim().min(1, '카드 이름을 입력해 주세요.').max(200),
   imageAssetId: idSchema.optional(),
@@ -158,6 +196,7 @@ export type InitialRules = z.infer<typeof initialRulesSchema>;
 // v1.3: `addToDeck: false` registers into the library only while still checking `registrationTarget` (the deck the form showed).
 export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional(), addToDeck: z.boolean().optional(), initialRules: initialRulesSchema.optional() });
 export const libraryStateSchema = z.strictObject({
+  concentration: z.boolean().optional(), ritual: z.boolean().optional(),
   query: z.string().max(200), roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
   kinds: z.array(kindSchema).max(6), ranges: z.array(rangeSchema).max(5), tagIds: z.array(idSchema).max(100),
   viewScope: z.enum(['library', 'deck']), activeCharacterId: idSchema.optional(),

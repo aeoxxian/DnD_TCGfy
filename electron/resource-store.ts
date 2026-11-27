@@ -13,9 +13,10 @@ import { ClassStore, type ClassUndo } from './class-store';
 import { classInputSchema } from '../src/shared/class-contracts';
 import type { ClassInput } from '../src/shared/class-contracts';
 import { ResourceError, maximums, assertResource, planUse, planRecovery, planAdjustment, applyChanges, type CapacityProfile } from '../src/shared/resource-engine';
+import { resolveCastOption, resolveCostResource } from '../src/shared/casting';
 
 interface TemplateRow { id: string; key: string; name: string; kind: 'counter'|'slot_track'; source: 'class_2014'|'user'; version: number; definition_json: string }
-interface InstanceRow { id: string; character_id: string; template_id: string; overrides_json: string; current_state_json: string; preset_key?: string | null }
+interface InstanceRow { id: string; character_id: string; template_id: string; overrides_json: string; current_state_json: string; preset_key?: string | null; definition_id?: string; owner_card_name?: string | null; active?: number; retired?: number }
 interface EventRow { id: string; character_id: string; event_type: string; payload_json: string; occurred_at: string }
 const stateSchema = z.union([z.strictObject({ remaining: resourceInteger }),z.strictObject({ remainingByLevel: z.record(z.string().regex(/^[1-9]$/), resourceInteger) })]);
 function canonical(value: unknown): string {
@@ -37,7 +38,7 @@ export class ResourceStore {
   }
   private template(row: TemplateRow): ResourceTemplate {
     const raw = JSON.parse(row.definition_json);
-    const draft = templateDraftSchema.parse({ id: row.id, name: row.name, kind: row.kind, unit: raw.unit ?? '점', unlimited:raw.unlimited, slotKind:raw.slotKind, capacity: raw.capacity, slotCapacity: raw.slotCapacity, slotCapacityByClassLevel: raw.slotCapacityByClassLevel, recovery: raw.recovery ?? [] });
+    const draft = templateDraftSchema.parse({ id: row.id, name: row.name, kind: row.kind, unit: raw.unit ?? '점', unlimited:raw.unlimited, matchKey:raw.matchKey, slotKind:raw.slotKind, capacity: raw.capacity, slotCapacity: raw.slotCapacity, slotCapacityByClassLevel: raw.slotCapacityByClassLevel, recovery: raw.recovery ?? [] });
     return { ...draft, id: row.id, key: row.key, source: row.source, version: row.version };
   }
   private getTemplate(id: string): ResourceTemplate {
@@ -47,7 +48,7 @@ export class ResourceStore {
   private readInstance(row: InstanceRow, profile: CapacityProfile): ResourceView {
     const template = this.getTemplate(row.template_id); const overrides = overrideSchema.parse(JSON.parse(row.overrides_json));
     const state = stateSchema.parse(JSON.parse(row.current_state_json));
-    const view: ResourceView = { id: row.id, characterId: row.character_id, templateId: row.template_id, presetKey:row.preset_key??undefined, unlimited:overrides.unlimitedOverride??template.unlimited, name: overrides.nameOverride ?? template.name, unit: template.unit, kind: template.kind, template, overrides, ...maximums(template, profile, overrides), ...state };
+    const view: ResourceView = { id: row.id, characterId: row.character_id, templateId: row.template_id, presetKey:row.preset_key??undefined, unlimited:overrides.unlimitedOverride??template.unlimited, name: overrides.nameOverride ?? template.name, unit: template.unit, kind: template.kind, template, overrides, ...(row.definition_id ? { ownedDefinitionId: row.definition_id, ownerCardName: row.owner_card_name ?? undefined, inactive: !row.active, retired: !!row.retired } : {}), ...maximums(template, profile, overrides), ...state };
     if ((view.kind === 'counter') !== ('remaining' in state)) throw new ResourceError('자원 종류와 현재 상태가 일치하지 않습니다.');
     assertResource(view); return view;
   }
@@ -76,11 +77,19 @@ export class ResourceStore {
   snapshot(input: unknown): ResourceSnapshot {
     const characterId = idSchema.parse(input); const profile = this.profile(characterId); const warnings: string[] = [];
     const templates: ResourceTemplate[] = [];
-    for (const row of this.db.prepare("SELECT * FROM resource_templates WHERE archived_at IS NULL AND (source='user' OR id IN (SELECT template_id FROM resource_instances WHERE character_id=? AND archived_at IS NULL)) ORDER BY rowid").all(characterId) as unknown as TemplateRow[]) {
+    for (const row of this.db.prepare("SELECT * FROM resource_templates WHERE archived_at IS NULL AND key NOT LIKE 'card-owned:%' AND (source='user' OR id IN (SELECT template_id FROM resource_instances WHERE character_id=? AND archived_at IS NULL)) ORDER BY rowid").all(characterId) as unknown as TemplateRow[]) {
       try { templates.push(this.template(row)); } catch { warnings.push(`“${row.name}” 템플릿 설정이 불완전합니다. 기존 데이터는 보존했습니다.`); }
     }
     const resources: ResourceView[] = [];
-    for (const row of this.db.prepare('SELECT * FROM resource_instances WHERE character_id=? AND archived_at IS NULL ORDER BY rowid').all(characterId) as unknown as InstanceRow[]) {
+    for (const row of this.db.prepare(`SELECT i.*, m.definition_id, owner.name AS owner_card_name,
+      CASE WHEN m.instance_id IS NOT NULL AND def.definition_id IS NULL THEN 1 ELSE 0 END AS retired,
+      EXISTS(SELECT 1 FROM deck_cards dc JOIN character_profiles p ON p.id=i.character_id
+        JOIN card_definitions c ON c.id=dc.card_id
+        WHERE dc.deck_id=p.active_deck_id AND dc.card_id=m.card_id AND c.archived_at IS NULL AND def.definition_id IS NOT NULL) AS active
+      FROM resource_instances i LEFT JOIN card_owned_resources m ON m.instance_id=i.id
+      LEFT JOIN card_definitions owner ON owner.id=m.card_id
+      LEFT JOIN card_owned_definitions def ON def.card_id=m.card_id AND def.definition_id=m.definition_id
+      WHERE i.character_id=? AND i.archived_at IS NULL ORDER BY i.rowid`).all(characterId) as unknown as InstanceRow[]) {
       try { resources.push(this.readInstance(row, profile)); } catch { warnings.push(`자원 ${row.id}의 설정/현재량을 확인해 주세요. 초기화하지 않았습니다.`); }
     }
     const revision = (this.db.prepare('SELECT revision FROM resource_revisions WHERE character_id=?').get(characterId) as { revision: number } | undefined)?.revision ?? 0;
@@ -109,12 +118,14 @@ export class ResourceStore {
       return planAdjustment(resource, action.delta, action.slotLevel);
     }
     const card = this.getCard(action.cardId,snapshot.characterId);
-    const keys = new Set(card.castOptions.find(option => option.id === action.optionId)?.costs.map(cost => cost.costKey));
+    const plan = planUse(card, action.optionId, snapshot.resources, snapshot.bindings, action.choices, action.castingLevel, action.ritual);
+    const option = resolveCastOption(card, action.optionId, !!action.ritual, snapshot.resources, snapshot.bindings);
+    const keys = new Set(option.costs.map(cost => cost.costKey));
     for (const binding of snapshot.bindings.filter(binding => binding.cardId === card.id && keys.has(binding.costKey))) {
       const resource = snapshot.resources.find(resource => resource.id === binding.resourceInstanceId);
       if (resource?.overrides.scope === 'item') this.checkScope(resource.overrides);
     }
-    return planUse(card, action.optionId, snapshot.resources, snapshot.bindings, action.choices,action.castingLevel);
+    return plan;
   }
   private quote(snapshot: ResourceSnapshot, action: z.output<typeof previewRequestSchema>['action']): string {
     return digest({ characterId: snapshot.characterId, revision: snapshot.revision, action, card: action.type === 'use' ? this.getCard(action.cardId,snapshot.characterId) : undefined, bindings: snapshot.bindings, resources: snapshot.resources });
@@ -129,6 +140,7 @@ export class ResourceStore {
   private saveTemplate(draft: TemplateDraft): string {
     const existing = draft.id ? this.db.prepare('SELECT * FROM resource_templates WHERE id=? AND archived_at IS NULL').get(draft.id) as unknown as TemplateRow | undefined : undefined;
     if (draft.id && !existing) throw new UserInputError('템플릿을 찾을 수 없습니다.');
+    if (existing?.key.startsWith('card-owned:')) throw new UserInputError('고유 자원 정의는 카드 정보에서 수정하세요.');
     if (existing && this.db.prepare('SELECT id FROM resource_instances WHERE template_id=? AND archived_at IS NULL').get(existing.id)) throw new UserInputError('장착 중인 템플릿은 복제해서 편집해 주세요. 현재량은 변경하지 않았습니다.');
     const id = existing?.id ?? randomUUID(); const template = { ...draft, id, key: existing?.key ?? `user_${id}`, source: existing?.source ?? 'user', version: (existing?.version ?? 0) + 1 };
     this.db.prepare(`INSERT INTO resource_templates(id,key,name,kind,definition_json,source,version) VALUES (?,?,?,?,?,?,?)
@@ -136,7 +148,7 @@ export class ResourceStore {
     return id;
   }
   private attach(characterId: string, templateId: string, overrides: ResourceOverrides): void {
-    if (!this.db.prepare('SELECT id FROM resource_templates WHERE id=? AND archived_at IS NULL').get(templateId)) throw new UserInputError('보관 해제된 템플릿은 새로 장착할 수 없습니다.');
+    if (!this.db.prepare("SELECT id FROM resource_templates WHERE id=? AND archived_at IS NULL AND key NOT LIKE 'card-owned:%'").get(templateId)) throw new UserInputError('보관 해제된 템플릿은 새로 장착할 수 없습니다.');
     this.checkScope(overrides); const template = this.getTemplate(templateId); const max = maximums(template, this.profile(characterId), overrides);
     const state = template.kind === 'counter' ? { remaining: max.capacity } : { remainingByLevel: max.capacityByLevel };
     this.db.prepare('INSERT INTO resource_instances(id,character_id,template_id,overrides_json,current_state_json) VALUES (?,?,?,?,?)').run(randomUUID(),characterId,templateId,JSON.stringify(overrides),JSON.stringify(state));
@@ -167,11 +179,12 @@ export class ResourceStore {
           const templateId = this.saveTemplate(action.template); this.attach(characterId, templateId, { scope: action.scope, ownerCardId: action.ownerCardId }); label = `${action.template.name} 자원 생성`;
         } else if (action.type === 'save_template') { this.saveTemplate(action.template); label = `${action.template.name} 템플릿 저장`;
         } else if (action.type === 'archive_template') {
-          if (!this.db.prepare('SELECT id FROM resource_templates WHERE id=? AND archived_at IS NULL').get(action.templateId)) throw new UserInputError('템플릿을 찾을 수 없습니다.');
+          if (!this.db.prepare("SELECT id FROM resource_templates WHERE id=? AND archived_at IS NULL AND key NOT LIKE 'card-owned:%'").get(action.templateId)) throw new UserInputError('템플릿을 찾을 수 없습니다.');
           this.db.prepare('UPDATE resource_templates SET archived_at=? WHERE id=?').run(new Date().toISOString(),action.templateId); label = '템플릿 보관 해제 · 장착 자원 유지';
         } else if (action.type === 'attach') { this.attach(characterId,action.templateId,{ scope: action.scope, ownerCardId: action.ownerCardId }); label = '자원 장착';
         } else if (action.type === 'edit_resource') {
           const old = snapshot.resources.find(resource => resource.id === action.resourceId); if (!old) throw new UserInputError('현재 캐릭터의 자원이 아닙니다.');
+          if (old.ownedDefinitionId) throw new UserInputError('고유 자원 정의는 카드 정보에서 수정하세요.');
           this.checkScope(action.overrides);
           if (old.kind === 'counter' && action.overrides.slotCapacityOverride || old.kind === 'slot_track' && action.overrides.capacityOverride !== undefined) throw new UserInputError('자원 종류에 맞는 최대치를 지정하세요.');
           const max = maximums(old.template, this.profile(characterId), action.overrides);
@@ -188,6 +201,7 @@ export class ResourceStore {
           label = `${old.name} 설정 변경`;
         } else if (action.type === 'delete_resource') {
           const resource = snapshot.resources.find(resource => resource.id === action.resourceId); if (!resource) throw new UserInputError('현재 캐릭터의 자원이 아닙니다.');
+          if (resource.ownedDefinitionId) throw new UserInputError('고유 자원은 카드의 덱 소속으로 관리합니다.');
           this.db.prepare('UPDATE resource_instances SET archived_at=? WHERE id=? AND character_id=?').run(new Date().toISOString(),resource.id,characterId); label = `${resource.name} 연결 해제`;
         } else if (action.type === 'save_costs') {
           barrier = !newCardRegistration;
@@ -198,9 +212,14 @@ export class ResourceStore {
           for (const binding of action.bindings) {
             if (!keys.has(binding.costKey)) throw new UserInputError('사용 방식에 없는 비용 연결입니다.');
             const resource = snapshot.resources.find(resource => resource.id === binding.resourceInstanceId);
-            if (!resource) throw new UserInputError('현재 캐릭터의 활성 자원만 연결할 수 있습니다.');
+            if (!resource || resource.ownedDefinitionId) throw new UserInputError('현재 캐릭터에서 직접 연결할 수 있는 활성 자원을 고르세요.');
             this.checkScope(resource.overrides);
             if (resource.overrides.scope === 'card' && resource.overrides.ownerCardId !== card.id) throw new UserInputError('다른 카드 전용 자원입니다.');
+            for (const cost of options.flatMap(option => option.costs)) {
+              if (cost.costKey !== binding.costKey || !cost.requirement) continue;
+              try { resolveCostResource(card.id, cost, snapshot.resources, [{ ...binding, id: binding.costKey, cardId: card.id, characterId }]); }
+              catch (error) { throw new UserInputError((error as Error).message); }
+            }
           }
           const shared=this.getCard(card.id);
           if(action.expectedCardVersion!==undefined&&action.expectedCardVersion!==shared.updatedAt)throw new UserInputError('공통 카드가 변경됐습니다. 비용 설정을 다시 열어 주세요.');
@@ -219,10 +238,16 @@ export class ResourceStore {
         } else if (action.type === 'undo') {
           const target = this.undoTarget(characterId); if (!target) throw new UserInputError('되돌릴 자원 변경이 없습니다. 설정 변경 이전 기록은 되돌리지 않습니다.');
           if(target.classUndo)this.classes().undo(characterId,target.classUndo as ClassUndo);
-          changes = target.changes.map(change => ({ ...change, before: change.after, after: change.before }));
+          changes = target.changes.map(change => {
+            const resource = snapshot.resources.find(value => value.id === change.resourceInstanceId);
+            if (!resource?.ownedDefinitionId) return { ...change, before: change.after, after: change.before };
+            const current = resource.remaining!;
+            // Capacity changes may have clamped the stored amount since the event.
+            return { ...change, before: current, after: Math.max(0, Math.min(resource.capacity!, current + change.before - change.after)) };
+          });
           if(!target.classUndo)this.writeStates(applyChanges(snapshot.resources, changes),changes,characterId); label = `${target.label} 실행 취소`; eventType = 'undo'; barrier = false; undoId = target.id;
         } else {
-          const previewAction = action.type === 'use' ? { type: 'use' as const, cardId: action.cardId, optionId: action.optionId, choices: action.choices,castingLevel:action.castingLevel } : action;
+          const previewAction = action.type === 'use' ? { type: 'use' as const, cardId: action.cardId, optionId: action.optionId, choices: action.choices,castingLevel:action.castingLevel,ritual:action.ritual } : action;
           const plan = this.plan(snapshot, previewAction);usePlan=plan;
           if (action.type === 'use') {
             if (action.quote !== this.quote(snapshot,previewAction)) throw new UserInputError('카드 비용 또는 자원이 바뀌었습니다. 비용을 다시 확인해 주세요.');
@@ -237,7 +262,7 @@ export class ResourceStore {
         if (shouldRecord) {
           eventId = randomUUID();
           const usedCard=action.type==='use'?this.getCard(action.cardId,characterId):undefined;
-          const event = { classUndo,costSnapshot:usedCard&&action.type==='use'?{name:usedCard.name,spellLevel:usedCard.spellLevel,option:usedCard.castOptions.find(option=>option.id===action.optionId)}:undefined,selectedSlotLevels:usePlan?.selectedSlotLevels,castingLevel:usePlan?.castingLevel,engineVersion: 1, label, changes, reversible: !barrier && eventType !== 'undo' && (changes.length > 0 || !!classUndo), barrier,
+          const event = { classUndo,costSnapshot:usedCard&&action.type==='use'?{name:usedCard.name,spellLevel:usedCard.spellLevel,option:resolveCastOption(usedCard,action.optionId,!!action.ritual,snapshot.resources,snapshot.bindings)}:undefined,selectedSlotLevels:usePlan?.selectedSlotLevels,castingLevel:usePlan?.castingLevel,engineVersion: 1, label, changes, reversible: !barrier && eventType !== 'undo' && (changes.length > 0 || !!classUndo), barrier,
             cardId: action.type === 'use' ? action.cardId : undefined, castOptionId: action.type === 'use' ? action.optionId : undefined,
             configuration, choices: action.type === 'use' ? action.choices : undefined, override: action.type === 'use' ? action.override : undefined, undoesEventId: undoId };
           this.db.prepare('INSERT INTO play_events(id,character_id,event_type,payload_json,occurred_at) VALUES (?,?,?,?,?)').run(eventId,characterId,eventType,JSON.stringify(event),new Date().toISOString());

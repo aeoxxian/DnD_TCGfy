@@ -48,6 +48,25 @@ describe('v1.3 Phase 1 · default face of a card without an image', () => {
     expect(screen.getByText('이미지 파일을 읽을 수 없습니다.')).toBeDefined();
   });
 
+  it('replaces the alpha mask and clears the failure when the image source changes', async () => {
+    window.desktop = { assetAlpha: vi.fn().mockImplementation(async (ids: string[]) =>
+      ok(Object.fromEntries(ids.map(id => [id, id === 'mask-alpha'])))) } as unknown as DesktopBridge;
+    const face = (imageAssetId: string) => <CardFace card={card({ imageAssetId })} overlay={<img className="card-unusable-back" src="back.png" alt=""/>}/>;
+    const { container, rerender } = render(face('mask-alpha'));
+    const front = () => screen.getByRole('img', { name: '마법 화살 카드 이미지' });
+    await waitFor(() => expect(container.querySelector('.card-alpha-mask image')?.getAttribute('href')).toContain('mask-alpha'));
+    fireEvent.error(front());
+    expect(screen.getByText('이미지 파일을 읽을 수 없습니다.')).toBeDefined();
+    expect(container.querySelector('.card-alpha-mask')).toBeNull();
+    rerender(face('mask-opaque'));
+    expect(front().getAttribute('src')).toContain('mask-opaque');
+    await waitFor(() => expect(container.querySelector<HTMLImageElement>('.card-unusable-back')?.style.visibility).toBe(''));
+    expect(container.querySelector('.card-alpha-mask')).toBeNull();
+    rerender(face('mask-alpha'));
+    expect(front().getAttribute('src')).toContain('mask-alpha');
+    expect(container.querySelector('.card-alpha-mask')).not.toBeNull();
+  });
+
   it('a selected card without an image opens the enlargement when clicked again, which draws the default face large', () => {
     const onPreview = vi.fn(); const onSelect = vi.fn();
     render(<CardGallery cards={[card()]} mode="hand" selectedId="c1" selectedIds={[]} selectionMode={false} notes={new Map()} onSelect={onSelect} onCheck={vi.fn()} onPreview={onPreview}/>);

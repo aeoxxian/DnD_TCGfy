@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import backDragon from '../assets/playmat/back-dragon.png';
 import backCrest from '../assets/playmat/back-crest.svg';
 import backStars from '../assets/playmat/back-stars.png';
@@ -121,47 +121,69 @@ export function CardBackDialog({ appearance, deck, busy, onSave, onClose }: {
   </Modal>;
 }
 
-/**
- * v1.3 Phase 3 (UI-P1): DECK and USED share one zone — the name plate on the border, the stacked pile (a button) on the
- * left and the name, count and small actions on the right. DECK shuffles the hand's display order (memo 4; card backs
- * moved to 관리 → 캐릭터·덱, memo 6); USED opens the full use history and can be cleared for display only (memo 3).
- */
-export function DeckPile({ src, deckName, count, shuffled, onShuffle, onUnshuffle }: { src: string; deckName: string; count: number; shuffled: boolean; onShuffle: () => void; onUnshuffle: () => void }) {
-  const [spin, setSpin] = useState(0);
-  return <section className="mat-zone deck-pile" aria-label={`덱 · ${deckName}`}>
-    <span className="zone-label" aria-hidden="true">DECK</span>
-    <button type="button" className="pile-button" aria-label={`${deckName} ${count}장 · 눌러서 손패 순서 섞기`} onClick={() => { setSpin(value => value + 1); onShuffle(); }}>
-      <span className={`pile ${spin ? `is-shuffling-${spin % 2}` : ''}`} aria-hidden="true">
-        <img src={src} alt="" draggable={false}/><img src={src} alt="" draggable={false}/><img src={src} alt="" draggable={false}/>
-        <span className="pile-count">{count}</span>
-      </span>
-    </button>
-    <div className="zone-info">
-      <strong className="zone-caption" title={deckName}>{deckName}</strong>
-      <span className="zone-meta">{count}장 · {shuffled ? '섞인 순서' : '등록 순서'}</span>
-      <span className="zone-hint">더미를 누르면 섞습니다</span>
-      {shuffled && <button type="button" className="zone-action" onClick={onUnshuffle}>원래 순서</button>}
+function Pile({ kind, name, buttonLabel, hint, actionLabel, actionName, onAction, onClick, inactive = false, children }: {
+  kind: 'used' | 'deck'; name: string; buttonLabel: string; hint: string; actionLabel: string; actionName?: string;
+  onAction?: () => void; onClick: () => void; inactive?: boolean; children: ReactNode;
+}) {
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const action = useRef<HTMLButtonElement>(null);
+  const menuLabel = `${kind.toUpperCase()} 더미 메뉴`;
+  function openMenu() {
+    if (!button.current || !menu.current || inactive) return;
+    button.current.focus();
+    menu.current.showPopover();
+    const target = onAction ? action.current : menu.current;
+    target?.focus();
+  }
+  function closeMenu() {
+    menu.current?.hidePopover();
+    button.current?.focus();
+  }
+  return <section className={`mat-zone ${kind}-pile`} aria-label={name}>
+    <span className="zone-label" aria-hidden="true">{kind.toUpperCase()}</span>
+    <button ref={button} type="button" className="pile-button" aria-label={buttonLabel} aria-description={hint}
+      aria-haspopup={kind === 'used' ? 'dialog' : undefined} aria-disabled={inactive || undefined} aria-keyshortcuts="Shift+F10 ContextMenu"
+      onClick={() => { if (!inactive) onClick(); }}
+      onContextMenu={event => { event.preventDefault(); openMenu(); }}
+      onKeyDown={event => {
+        if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+          event.preventDefault();
+          openMenu();
+        }
+      }}>{children}</button>
+    <span className="pile-tooltip" aria-hidden="true"><strong>{name}</strong><span>{hint}</span></span>
+    <div ref={menu} popover="auto" className="pile-menu" role="group" aria-label={menuLabel} tabIndex={-1}
+      onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeMenu(); } }}>
+      <button ref={action} type="button" disabled={!onAction} aria-label={actionName} onClick={() => { closeMenu(); onAction?.(); }}>{actionLabel}</button>
     </div>
   </section>;
 }
 
-export function UsedPile({ events, cards, disabled, cleared, onOpen, onClear, onRestore }: { events: ResourceEvent[]; cards: CardDefinition[]; disabled: boolean; cleared: boolean; onOpen: () => void; onClear?: () => void; onRestore?: () => void }) {
+export function DeckPile({ src, deckName, count, shuffled, onShuffle, onUnshuffle }: { src: string; deckName: string; count: number; shuffled: boolean; onShuffle: () => void; onUnshuffle: () => void }) {
+  const [spin, setSpin] = useState(0);
+  const order = shuffled ? '섞인 순서' : '등록 순서';
+  return <Pile kind="deck" name={`덱 · ${deckName}`} buttonLabel={`${deckName} ${count}장 · 눌러서 손패 순서 섞기`}
+    hint={`${order} · 클릭으로 섞기 · 우클릭 또는 Shift+F10으로 원래 순서`}
+    actionLabel="원래 순서" onAction={shuffled ? onUnshuffle : undefined}
+    onClick={() => { if (count > 1) setSpin(value => value + 1); onShuffle(); }}>
+    <span className={`pile ${spin ? `is-shuffling-${spin % 2}` : ''}`} aria-hidden="true">
+      {count ? <><img src={src} alt="" draggable={false}/><img src={src} alt="" draggable={false}/><img src={src} alt="" draggable={false}/></> : <span className="pile-empty"/>}
+      <span className="pile-count">{count}</span>
+    </span>
+  </Pile>;
+}
+
+export function UsedPile({ events, cards, disabled, onOpen, onClear, onRestore }: { events: ResourceEvent[]; cards: CardDefinition[]; disabled: boolean; onOpen: () => void; onClear?: () => void; onRestore?: () => void }) {
   const used = events.filter(event => event.type === 'card_used');
   const top = used.slice(0, 2).map(event => cards.find(card => card.id === event.cardId)).filter((card): card is CardDefinition => !!card).reverse();
-  return <section className="mat-zone used-pile" aria-label="최근 사용">
-    <span className="zone-label" aria-hidden="true">USED</span>
-    <button type="button" className="pile-button" aria-haspopup="dialog" disabled={disabled} aria-label={`사용한 카드 더미 · 최근 ${used.length}건 · 전체 카드 사용 기록 열기`} onClick={onOpen}>
-      <span className="pile" aria-hidden="true">
-        {top.length ? top.map((card, index) => <span className="used-card" key={`${card.id}-${index}`}><CardFace card={card}/></span>) : <span className="pile-empty"/>}
-        <span className="pile-count">{used.length}</span>
-      </span>
-    </button>
-    <div className="zone-info">
-      <strong className="zone-caption">최근 사용</strong>
-      <span className="zone-meta">{used.length}건{cleared ? ' · 비운 뒤' : ''}</span>
-      <span className="zone-hint">더미를 누르면 전체 기록</span>
-      {onRestore ? <button type="button" className="zone-action" onClick={onRestore}>되돌리기</button>
-        : onClear && used.length > 0 && <button type="button" className="zone-action" aria-label="최근 사용 더미 비우기" onClick={onClear}>비우기</button>}
-    </div>
-  </section>;
+  return <Pile kind="used" name="최근 사용" buttonLabel={`사용한 카드 더미 · 최근 ${used.length}건 · 전체 카드 사용 기록 열기`}
+    hint={disabled ? '캐릭터를 선택하면 사용 기록을 볼 수 있습니다.' : '클릭으로 전체 기록 보기 · 우클릭 또는 Shift+F10으로 표시 관리'}
+    inactive={disabled} actionLabel={onRestore ? '되돌리기' : '비우기'} actionName={onRestore ? undefined : '최근 사용 더미 비우기'}
+    onAction={onRestore ?? (used.length ? onClear : undefined)} onClick={onOpen}>
+    <span className="pile" aria-hidden="true">
+      {top.length ? top.map((card, index) => <span className="used-card" key={`${card.id}-${index}`}><CardFace card={card}/></span>) : <span className="pile-empty"/>}
+      <span className="pile-count">{used.length}</span>
+    </span>
+  </Pile>;
 }

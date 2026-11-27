@@ -23,13 +23,16 @@ function seeded(): { store: AppStore; image: Buffer } {
   db.prepare('INSERT INTO assets(id,relative_path,sha256,mime_type,width,height) VALUES (?,?,?,?,?,?)').run('img-1', 'assets/img-1.png', sha(image), 'image/png', 10, 15);
   db.prepare('INSERT INTO tags(id,name,created_at,updated_at) VALUES (?,?,?,?)').run('tag-fire', '화염', now, now);
   const card = db.prepare('INSERT INTO card_definitions(id,name,image_asset_id,kind,spell_level,attributes_json,created_at,updated_at,archived_at) VALUES (?,?,?,?,?,?,?,?,?)');
-  card.run('card-1', '화염구', 'img-1', 'spell', 3, attributes(['tag-fire']), now, now, null);
+  card.run('card-1', '화염구', 'img-1', 'spell', 3, JSON.stringify({ ...JSON.parse(attributes(['tag-fire'])),
+    imageMode: 'illustration', ritual: true, concentration: true, upcastEffect: false,
+    ownedResources: [{ id: '04d673e9-c25f-43a1-80cd-a699a5026a22', name: '불꽃', unit: '회', maximum: 7, amount: 1, recovery: [] }] }), now, now, null);
   card.run('card-2', '검격', null, 'attack', null, attributes([]), now, now, null);
   card.run('card-3', '버린 카드', null, 'other', null, attributes([]), now, now, now);
   db.prepare('INSERT INTO card_tags(card_id,tag_id) VALUES (?,?)').run('card-1', 'tag-fire');
   db.prepare('INSERT INTO character_profiles(id,name,ruleset,level) VALUES (?,?,?,?)').run('hero', '엘라라', 'homebrew', 5);
   db.prepare('INSERT INTO decks(id,character_id,name) VALUES (?,?,?)').run('deck-1', 'hero', '주문서 덱');
   db.prepare('INSERT INTO deck_cards(deck_id,card_id,position) VALUES (?,?,?)').run('deck-1', 'card-1', 0);
+  db.prepare("UPDATE resource_instances SET current_state_json=json_object('remaining',2) WHERE id IN (SELECT instance_id FROM card_owned_resources)").run();
   return { store, image };
 }
 async function unzipAll(path: string): Promise<Map<string, Buffer>> {
@@ -70,7 +73,7 @@ describe('ZIP backup export', () => {
     const { store, files, zip } = await exported();
     expect([...files.keys()].sort()).toEqual(['assets/img-1.png', 'data/app.sqlite3', 'manifest.json']);
     const manifest = JSON.parse(files.get('manifest.json')!.toString('utf8')) as BackupManifest;
-    expect(manifest).toMatchObject({ format: 'dnd-tcg-fy-backup', formatVersion: 1, appVersion: '0.6.0', schemaVersion: 6, counts: { cards: 2, trashedCards: 1, characters: 1, decks: 1, assets: 1, tags: 1 } });
+    expect(manifest).toMatchObject({ format: 'dnd-tcg-fy-backup', formatVersion: 1, appVersion: '0.6.0', schemaVersion: 8, counts: { cards: 2, trashedCards: 1, characters: 1, decks: 1, assets: 1, tags: 1 } });
     for (const file of manifest.files) expect(sha(files.get(file.path)!)).toBe(file.sha256);
     expect(files.get('assets/img-1.png')).toEqual(readFileSync(join(store.userData, 'assets', 'img-1.png')));
     expect(existsSync(`${zip}.partial`)).toBe(false);
@@ -93,8 +96,14 @@ describe('restore: replace the whole library', () => {
     const reopened = new AppStore(folder);
     expect(countLibrary(reopened.db)).toEqual(countLibrary(source.store.db));
     expect((reopened.db.prepare('SELECT id FROM card_definitions ORDER BY id').all() as { id: string }[]).map(row => row.id)).toEqual(['card-1', 'card-2', 'card-3']);
+    expect(reopened.db.prepare("SELECT attributes_json FROM card_definitions WHERE id='card-1'").get())
+      .toEqual(source.store.db.prepare("SELECT attributes_json FROM card_definitions WHERE id='card-1'").get());
     expect(readFileSync(join(folder, 'assets', 'img-1.png'))).toEqual(readFileSync(join(source.store.userData, 'assets', 'img-1.png')));
     expect(reopened.getSettings()).toEqual(source.store.getSettings());
+    const owned = "SELECT m.*, json_extract(i.current_state_json,'$.remaining') AS remaining FROM card_owned_resources m JOIN resource_instances i ON i.id=m.instance_id";
+    expect(reopened.db.prepare(owned).all()).toEqual(source.store.db.prepare(owned).all());
+    expect(reopened.db.prepare(owned).get()).toMatchObject({ card_id: 'card-1', remaining: 2 });
+    expect(reopened.db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
     const preserved = readdirSync(join(folder, 'backups')).filter(name => name.startsWith('replaced-'));
     expect(preserved).toHaveLength(1);
     const old = new DatabaseSync(join(folder, 'backups', preserved[0], 'data', 'app.sqlite3'), { readOnly: true });

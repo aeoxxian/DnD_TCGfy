@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 8;
 export const migrations = [{
   version: 1,
   sql: `
@@ -78,6 +78,70 @@ export const migrations = [{
     CREATE TRIGGER track_card_image_insert AFTER INSERT ON card_definitions WHEN NEW.image_asset_id IS NOT NULL BEGIN INSERT INTO card_asset_history SELECT NEW.id,NEW.image_asset_id WHERE NOT EXISTS(SELECT 1 FROM card_asset_history WHERE card_id=NEW.id AND asset_id=NEW.image_asset_id); END;
     CREATE TRIGGER track_card_image_update AFTER UPDATE OF image_asset_id ON card_definitions BEGIN INSERT INTO card_asset_history SELECT NEW.id,NEW.image_asset_id WHERE NEW.image_asset_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM card_asset_history WHERE card_id=NEW.id AND asset_id=NEW.image_asset_id); INSERT INTO card_asset_history SELECT NEW.id,OLD.image_asset_id WHERE OLD.image_asset_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM card_asset_history WHERE card_id=NEW.id AND asset_id=OLD.image_asset_id); END;
     CREATE TRIGGER reject_pending_image_history BEFORE INSERT ON card_asset_history WHEN EXISTS(SELECT 1 FROM asset_cleanup WHERE asset_id=NEW.asset_id) BEGIN SELECT RAISE(ABORT,'Image deletion pending'); END;
+  `,
+}, {
+  version: 7,
+  // The existing JSON columns carry the new optional metadata. A version entry protects the
+  // old strict readers, without rewriting legacy cards, templates, events or edit journals.
+  sql: '',
+}, {
+  version: 8,
+  sql: `
+    CREATE TABLE card_owned_resources (
+      character_id TEXT NOT NULL REFERENCES character_profiles(id),
+      card_id TEXT NOT NULL,
+      definition_id TEXT NOT NULL,
+      instance_id TEXT NOT NULL UNIQUE REFERENCES resource_instances(id) DEFERRABLE INITIALLY DEFERRED,
+      PRIMARY KEY(character_id, card_id, definition_id)
+    );
+    CREATE INDEX idx_card_owned_definition ON card_owned_resources(card_id, definition_id);
+    CREATE VIEW card_owned_definitions AS
+      SELECT c.id AS card_id, json_extract(r.value,'$.id') AS definition_id,
+        json_extract(r.value,'$.name') AS name, json_extract(r.value,'$.maximum') AS maximum,
+        json_object('unit',json_extract(r.value,'$.unit'),'capacity',json_object('type','fixed','value',json_extract(r.value,'$.maximum')),
+          'recovery',json(json_extract(r.value,'$.recovery'))) AS template_json
+      FROM card_definitions c, json_each(c.attributes_json,'$.ownedResources') r;
+    CREATE TRIGGER card_owned_create AFTER INSERT ON card_owned_resources BEGIN
+      INSERT INTO resource_templates(id,key,name,kind,definition_json,source,version)
+        SELECT NEW.instance_id,'card-owned:'||NEW.instance_id,d.name,'counter',d.template_json,'user',1
+        FROM card_owned_definitions d WHERE d.card_id=NEW.card_id AND d.definition_id=NEW.definition_id;
+      INSERT INTO resource_instances(id,character_id,template_id,overrides_json,current_state_json)
+        SELECT NEW.instance_id,NEW.character_id,NEW.instance_id,json_object('scope','card','ownerCardId',NEW.card_id),json_object('remaining',d.maximum)
+        FROM card_owned_definitions d WHERE d.card_id=NEW.card_id AND d.definition_id=NEW.definition_id;
+    END;
+    CREATE TRIGGER card_owned_deck_add AFTER INSERT ON deck_cards
+    WHEN EXISTS(SELECT 1 FROM card_owned_definitions WHERE card_id=NEW.card_id) BEGIN
+      INSERT INTO card_owned_resources(character_id,card_id,definition_id,instance_id)
+        SELECT decks.character_id,NEW.card_id,d.definition_id,lower(hex(randomblob(16)))
+        FROM decks JOIN card_owned_definitions d ON d.card_id=NEW.card_id WHERE decks.id=NEW.deck_id
+        ON CONFLICT(character_id,card_id,definition_id) DO NOTHING;
+      INSERT INTO resource_revisions(character_id,revision) SELECT character_id,1 FROM decks WHERE id=NEW.deck_id
+        ON CONFLICT(character_id) DO UPDATE SET revision=revision+1;
+    END;
+    CREATE TRIGGER card_owned_deck_remove AFTER DELETE ON deck_cards
+    WHEN EXISTS(SELECT 1 FROM card_owned_definitions WHERE card_id=OLD.card_id) BEGIN
+      UPDATE resource_revisions SET revision=revision+1 WHERE character_id=(SELECT character_id FROM decks WHERE id=OLD.deck_id);
+    END;
+    CREATE TRIGGER card_owned_deck_switch AFTER UPDATE OF active_deck_id ON character_profiles
+    WHEN OLD.active_deck_id IS NOT NEW.active_deck_id
+      AND EXISTS(SELECT 1 FROM card_owned_resources WHERE character_id=NEW.id) BEGIN
+      UPDATE resource_revisions SET revision=revision+1 WHERE character_id=NEW.id;
+    END;
+    CREATE TRIGGER card_owned_definition_change AFTER UPDATE OF attributes_json ON card_definitions
+    WHEN json_extract(OLD.attributes_json,'$.ownedResources') IS NOT json_extract(NEW.attributes_json,'$.ownedResources') BEGIN
+      INSERT INTO card_owned_resources(character_id,card_id,definition_id,instance_id)
+        SELECT decks.character_id,NEW.id,d.definition_id,lower(hex(randomblob(16)))
+        FROM deck_cards JOIN decks ON decks.id=deck_cards.deck_id JOIN card_owned_definitions d ON d.card_id=NEW.id
+        WHERE deck_cards.card_id=NEW.id ON CONFLICT(character_id,card_id,definition_id) DO NOTHING;
+      UPDATE resource_templates SET name=d.name,definition_json=d.template_json
+        FROM card_owned_resources m JOIN card_owned_definitions d ON d.card_id=m.card_id AND d.definition_id=m.definition_id
+        WHERE resource_templates.id=m.instance_id AND m.card_id=NEW.id;
+      UPDATE resource_instances SET current_state_json=json_object('remaining',min(json_extract(current_state_json,'$.remaining'),d.maximum))
+        FROM card_owned_resources m JOIN card_owned_definitions d ON d.card_id=m.card_id AND d.definition_id=m.definition_id
+        WHERE resource_instances.id=m.instance_id AND m.card_id=NEW.id;
+      UPDATE resource_revisions SET revision=revision+1 WHERE character_id IN
+        (SELECT character_id FROM card_owned_resources WHERE card_id=NEW.id);
+    END;
   `,
 }];
 

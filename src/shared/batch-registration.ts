@@ -10,13 +10,14 @@ import type { ResourceView } from './resources';
 export type BatchRuleKind = 'unconfigured' | 'none' | 'slots' | 'uses' | 'points';
 export const BATCH_RULE_NAMES: Record<BatchRuleKind, string> = { unconfigured: '나중에 설정', none: '무소모', slots: '주문 슬롯', uses: '사용 횟수', points: '포인트 자원' };
 export interface BatchRule { kind: BatchRuleKind; draft: BasicRuleDraft; scope: 'shared' | 'character' }
-export type CardFields = Pick<CardDraft, 'kind' | 'spellLevel' | 'roles' | 'actions' | 'range' | 'tags'>;
+export type CardFields = Pick<CardDraft, 'kind' | 'spellLevel' | 'roles' | 'actions' | 'range' | 'tags' | 'imageMode' | 'concentration' | 'ritual' | 'upcastEffect' | 'ownedResources'>;
+export type BatchAsset = AssetPreview | { id: string; name: string; thumbnailUrl?: undefined; sha256?: undefined; duplicates?: undefined };
 /** The defaults every card follows unless it is set on its own. */
 export interface BatchCommon { card: CardFields; rule: BatchRule; addToDeck: boolean }
 /** ready → saving → saved | failed; `pending` = 미처리 (left after a stop). */
 export type BatchStatus = 'ready' | 'saving' | 'saved' | 'failed' | 'pending';
 export interface BatchItem {
-  assetId: string; include: boolean;
+  assetId: string; include: boolean; imageless?: boolean;
   /** Per-card values; undefined = follow the common default. */
   card?: CardFields; rule?: BatchRule; addToDeck?: boolean; description?: string;
   status: BatchStatus; error?: string; cardId?: string;
@@ -26,15 +27,18 @@ export interface BatchItem {
 }
 export interface EffectiveItem { card: CardDraft; rule: BatchRule; addToDeck: boolean; custom: { card: boolean; rule: boolean; deck: boolean } }
 
-export function newBatchItem(asset: AssetPreview, include = true, uuid: () => string = () => crypto.randomUUID()): BatchItem {
-  return { assetId: asset.id, include, status: 'ready', ids: { optionId: uuid(), costKey: uuid() } };
+export function newBatchItem(asset: BatchAsset, include = true, uuid: () => string = () => crypto.randomUUID()): BatchItem {
+  return { assetId: asset.id, include, ...(asset.thumbnailUrl === undefined ? { imageless: true } : {}), status: 'ready', ids: { optionId: uuid(), costKey: uuid() } };
 }
 export function cardFields(draft: CardFields): CardFields {
-  return { kind: draft.kind, spellLevel: draft.kind === 'spell' ? draft.spellLevel : undefined, roles: [...draft.roles], actions: [...draft.actions], range: { ...draft.range }, tags: [...draft.tags] };
+  const { kind, spellLevel, roles, actions, range, tags, imageMode, concentration, ritual, upcastEffect, ownedResources } = draft;
+  return { kind, spellLevel: kind === 'spell' ? spellLevel : undefined, roles: [...roles], actions: [...actions], range: { ...range }, tags: [...tags],
+    ...(imageMode === undefined ? {} : { imageMode }), ...(concentration === undefined ? {} : { concentration }),
+    ...(ritual === undefined ? {} : { ritual }), ...(upcastEffect === undefined ? {} : { upcastEffect }), ...(ownedResources === undefined ? {} : { ownedResources }) };
 }
 export function effectiveItem(item: BatchItem, name: string, common: BatchCommon): EffectiveItem {
   const fields = item.card ?? common.card;
-  const card: CardDraft = { ...cardFields(fields), name: name.trim(), imageAssetId: item.assetId, ...(item.description?.trim() ? { description: item.description } : {}) };
+  const card: CardDraft = { ...cardFields(fields), name: name.trim(), ...(item.imageless || fields.imageMode === 'none' ? { imageMode: 'none' } : { imageAssetId: item.assetId }), ...(item.description?.trim() ? { description: item.description } : {}) };
   if (card.spellLevel === undefined) delete card.spellLevel;
   return { card, rule: item.rule ?? common.rule, addToDeck: item.addToDeck ?? common.addToDeck,
     custom: { card: !!item.card, rule: !!item.rule, deck: item.addToDeck !== undefined && item.addToDeck !== common.addToDeck } };
@@ -52,8 +56,9 @@ export function itemProblem(effective: EffectiveItem, ids: BatchItem['ids'], ctx
   const parsed = cardDraftSchema.safeParse(effective.card);
   if (!parsed.success) return parsed.error.issues[0].message;
   if (effective.rule.scope === 'character' && effective.rule.kind !== 'unconfigured' && !ctx.characterId) return '캐릭터 전용 규칙에는 캐릭터가 필요합니다.';
-  try { itemRule(effective, ids); } catch (error) { return (error as Error).message; }
-  if ((effective.rule.kind === 'uses' || effective.rule.kind === 'points') && !ctx.characterId) return '횟수·포인트 연결에는 캐릭터가 필요합니다.';
+  try {
+    if (itemRule(effective, ids).bindings.length && !ctx.characterId) return '횟수·포인트 연결에는 캐릭터가 필요합니다.';
+  } catch (error) { return (error as Error).message; }
   return undefined;
 }
 
@@ -83,8 +88,8 @@ export function attemptFor(item: BatchItem, request: ReturnType<typeof itemReque
 }
 
 /** Same image twice in one batch: later copies are flagged (and excluded by default). Existing cards come from the import. */
-export function batchDuplicates(assets: AssetPreview[]): Map<string, { existing: string[]; trashed: boolean; repeatOf?: string }> {
-  const seen = new Map<string, AssetPreview>(); const out = new Map<string, { existing: string[]; trashed: boolean; repeatOf?: string }>();
+export function batchDuplicates(assets: BatchAsset[]): Map<string, { existing: string[]; trashed: boolean; repeatOf?: string }> {
+  const seen = new Map<string, BatchAsset>(); const out = new Map<string, { existing: string[]; trashed: boolean; repeatOf?: string }>();
   for (const asset of assets) {
     const first = asset.sha256 ? seen.get(asset.sha256) : undefined;
     if (asset.sha256 && !first) seen.set(asset.sha256, asset);
@@ -124,11 +129,13 @@ export function templateFrom(id: string, name: string, common: BatchCommon, reso
   const resource = resources.find(item => item.id === draft.resourceId);
   return {
     id, name: name.trim(),
-    card: { kind: common.card.kind, ...(common.card.kind === 'spell' && common.card.spellLevel !== undefined ? { spellLevel: common.card.spellLevel } : {}), roles: [...common.card.roles], actions: [...common.card.actions], range: { ...common.card.range }, tags: [...common.card.tags] },
+    card: cardFields(common.card),
     rule: { kind: rule.kind, scope: rule.scope, family: draft.family, homebrew: draft.homebrew, belowBase: draft.belowBase,
       ...(draft.minLevel !== undefined ? { minLevel: draft.minLevel } : {}), ...(draft.maxLevel !== undefined ? { maxLevel: draft.maxLevel } : {}),
+      ...((rule.kind === 'uses' || rule.kind === 'points') && draft.resourceKey?.trim() ? { resourceKey: draft.resourceKey.trim() } : {}),
       ...((rule.kind === 'uses' || rule.kind === 'points') && resource ? { resourceName: resource.name } : {}),
-      amount: draft.amount, variable: draft.variable, min: draft.min, max: draft.max, step: draft.step },
+      amount: draft.amount, variable: draft.variable, min: draft.min, max: draft.max, step: draft.step,
+      ...(draft.allowUpcast === undefined ? {} : { allowUpcast: draft.allowUpcast }) },
     addToDeck: common.addToDeck,
   };
 }
@@ -140,17 +147,24 @@ export function applyTemplate(template: RegistrationTemplate, ctx: { tags: Tag[]
   const t = template.rule;
   let resourceId = '';
   if ((t.kind === 'uses' || t.kind === 'points') && t.resourceName) {
-    const match = bindableCounters(ctx.resources).find(resource => sameResourceName(resource.name, t.resourceName!));
-    if (match) resourceId = match.id; else notes.push(`템플릿의 자원 ‘${t.resourceName}’을(를) 이 캐릭터에서 찾지 못했습니다. 사용할 자원을 골라 주세요.`);
+    const matches = bindableCounters(ctx.resources).filter(resource => sameResourceName(resource.name, t.resourceName!));
+    if (matches.length === 1) resourceId = matches[0].id;
+    else {
+      const issue = matches.length ? `템플릿의 자원 ‘${t.resourceName}’과 이름이 같은 자원이 여러 개 있습니다.`
+        : `템플릿의 자원 ‘${t.resourceName}’을(를) 이 캐릭터에서 찾지 못했습니다.`;
+      const next = t.resourceKey ? '사용할 자원을 직접 고르거나 식별 키로 연결할지 확인해 주세요.' : '사용할 자원을 직접 골라 주세요.';
+      notes.push(`${issue} ${next}`);
+    }
   }
   let scope = t.scope;
   if (scope === 'character' && !ctx.characterId) { scope = 'shared'; notes.push('캐릭터를 고르지 않아 규칙 적용 범위를 공통으로 바꿨습니다.'); }
-  const card: CardFields = { kind: template.card.kind, spellLevel: template.card.kind === 'spell' ? template.card.spellLevel : undefined, roles: [...template.card.roles], actions: [...template.card.actions], range: { ...template.card.range }, tags };
+  const card: CardFields = { ...cardFields(template.card), imageMode: template.card.imageMode, concentration: template.card.concentration ?? false,
+    ritual: template.card.ritual ?? false, upcastEffect: template.card.upcastEffect ?? false, ownedResources: template.card.ownedResources, tags };
   return {
     common: {
       card,
-      rule: { kind: t.kind, scope, draft: { ...ctx.base, kind: t.kind === 'unconfigured' ? 'none' : t.kind, resourceId, amount: t.amount, variable: t.variable, min: t.min, max: t.max, step: t.step,
-        family: t.family, homebrew: t.homebrew, belowBase: t.belowBase, minLevel: t.minLevel, maxLevel: t.maxLevel, spellLevel: card.spellLevel } },
+      rule: { kind: t.kind, scope, draft: { ...ctx.base, kind: t.kind === 'unconfigured' ? 'none' : t.kind, resourceId, resourceKey: t.resourceKey, amount: t.amount, variable: t.variable, min: t.min, max: t.max, step: t.step,
+        family: t.family, homebrew: t.homebrew, belowBase: t.belowBase, allowUpcast: t.allowUpcast, minLevel: t.minLevel, maxLevel: t.maxLevel, spellLevel: card.spellLevel } },
       addToDeck: template.addToDeck,
     },
     notes,

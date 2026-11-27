@@ -1,6 +1,6 @@
-import { cloneElement, isValidElement, useEffect, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, isValidElement, useEffect, useId, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import type { CardDefinition } from '../shared/contracts';
-import { ACTION_NAMES, KIND_NAMES } from '../shared/library';
+import { ACTION_NAMES, KIND_NAMES, cardImageMode } from '../shared/library';
 
 export function imageUrl(id: string, thumbnail = false): string { return `app://assets/${encodeURIComponent(id)}${thumbnail ? '/thumbnail' : ''}`; }
 
@@ -23,20 +23,22 @@ export function kindLine(card: Pick<CardDefinition, 'kind' | 'spellLevel'>): str
   const level = card.kind === 'spell' && card.spellLevel !== undefined ? ` · ${card.spellLevel === 0 ? '소마법' : `${card.spellLevel}레벨`}` : '';
   return `${KIND_NAMES[card.kind] ?? KIND_NAMES.other}${level}`;
 }
-export type DefaultCardInfo = Pick<CardDefinition, 'name' | 'kind' | 'spellLevel' | 'actions'>;
+export type DefaultCardInfo = Pick<CardDefinition, 'name' | 'kind' | 'spellLevel' | 'actions'> & Partial<Pick<CardDefinition, 'castOptions' | 'costStatus'>>;
 
 /**
  * v1.3: the printed face of a card that has no image — a plain TCG frame in the theme's trim with the name, a kind
  * emblem and the kind/action lines. It never says that an image is missing; a card whose image file cannot be read
  * (a real error) gets a small notice strip instead.
  */
-export function DefaultCard({ card, broken = false, placeholder = false }: { card: DefaultCardInfo; broken?: boolean; placeholder?: boolean }) {
+export function DefaultCard({ card, artwork, broken = false, placeholder = false }: { card: DefaultCardInfo; artwork?: ReactNode; broken?: boolean; placeholder?: boolean }) {
   const actions = card.actions.map(action => ACTION_NAMES[action]).filter(Boolean).join(' · ');
+  const costs = card.castOptions?.find(option => !option.ritual)?.costs;
+  const cost = costs?.map(value => value.type === 'slot' || value.slotLevel !== undefined ? '슬롯' : value.type === 'fixed' ? String(value.amount) : `${value.min}–${value.max}`).join(' + ');
   return <div className={`default-card ${placeholder ? 'is-placeholder' : ''}`} data-kind={card.kind}>
     <div className="dc-frame">
       <div className="dc-name"><span>{card.name || '이름 없는 카드'}</span></div>
-      <div className="dc-emblem"><KindIcon kind={card.kind}/></div>
-      <div className="dc-type"><span className="dc-kind">{kindLine(card)}</span>{actions && <span className="dc-actions">{actions}</span>}</div>
+      <div className={artwork ? 'dc-artwork' : 'dc-emblem'}>{artwork ?? <KindIcon kind={card.kind}/>}</div>
+      <div className="dc-type"><span className="dc-kind">{kindLine(card)}</span>{actions && <span className="dc-actions">{actions}</span>}{artwork && cost && card.costStatus !== 'unconfigured' && <span className="dc-actions dc-cost" title={`비용 ${cost}`}>비용 {cost}</span>}</div>
     </div>
     {broken && <p className="dc-broken">이미지 파일을 읽을 수 없습니다.</p>}
   </div>;
@@ -48,15 +50,21 @@ export function DefaultCard({ card, broken = false, placeholder = false }: { car
  * shadow and selection glow along the image and mask the card-back overlay; opaque cards keep the cheaper box shadow.
  */
 const alphaCache = new Map<string, boolean>();
-const alphaWaiting = new Map<string, ((value: boolean) => void)[]>();
+const alphaWaiting = new Map<string, ((value: boolean | undefined) => void)[]>();
 let alphaFlush: ReturnType<typeof setTimeout> | undefined;
-export function requestAlpha(id: string): Promise<boolean> {
+function requestAlpha(id: string): Promise<boolean | undefined> {
   const known = alphaCache.get(id); if (known !== undefined) return Promise.resolve(known);
   return new Promise(resolve => {
     alphaWaiting.set(id, [...(alphaWaiting.get(id) ?? []), resolve]);
     alphaFlush ??= setTimeout(() => {
       alphaFlush = undefined; const batch = new Map(alphaWaiting); alphaWaiting.clear();
-      const settle = (values: Record<string, boolean>) => { for (const [key, callbacks] of batch) { const value = !!values[key]; alphaCache.set(key, value); for (const done of callbacks) done(value); } };
+      const settle = (values: Record<string, boolean>) => {
+        for (const [key, callbacks] of batch) {
+          const value = Object.hasOwn(values, key) ? values[key] : undefined;
+          if (value !== undefined) alphaCache.set(key, value);
+          for (const done of callbacks) done(value);
+        }
+      };
       const ids = [...batch.keys()];
       const chunks = Array.from({ length: Math.ceil(ids.length / 500) }, (_, i) => ids.slice(i * 500, i * 500 + 500));
       Promise.all(chunks.map(chunk => Promise.resolve(window.desktop?.assetAlpha?.(chunk)).then(result => result?.ok ? result.value : {}, () => ({}))))
@@ -65,24 +73,44 @@ export function requestAlpha(id: string): Promise<boolean> {
   });
 }
 
-export function CardFace({ card, original = false, overlay }: { card: CardDefinition; original?: boolean; overlay?: ReactNode }) {
+type CardFaceProps = { card: CardDefinition; original?: boolean; overlay?: ReactNode };
+
+export function CardFace(props: CardFaceProps) {
+  return <CardFaceContent key={`${props.original ? 'original' : 'thumbnail'}:${cardImageMode(props.card)}:${props.card.imageAssetId ?? ''}`} {...props}/>;
+}
+
+function CardFaceContent({ card, original = false, overlay }: CardFaceProps) {
+  const mode = cardImageMode(card);
+  const assetId = mode === 'none' ? undefined : card.imageAssetId;
+  const alphaAssetId = mode === 'full_card' ? assetId : undefined;
+  const maskId = useId();
   const [failed, setFailed] = useState(false);
-  const [alpha, setAlpha] = useState(() => !!card.imageAssetId && alphaCache.get(card.imageAssetId) === true);
-  const showImage = !!card.imageAssetId && !failed;
+  const [alpha, setAlpha] = useState(() => alphaAssetId ? alphaCache.get(alphaAssetId) : undefined);
+  const src = assetId && !failed ? imageUrl(assetId, !original) : undefined;
+  const fullImage = mode === 'full_card' ? src : undefined;
   useEffect(() => {
-    if (!card.imageAssetId || alphaCache.has(card.imageAssetId)) return;
-    let live = true; void requestAlpha(card.imageAssetId).then(value => { if (live && value) setAlpha(true); });
+    if (!alphaAssetId) return;
+    let live = true;
+    void requestAlpha(alphaAssetId).then(value => { if (live) setAlpha(value); });
     return () => { live = false; };
-  }, [card.imageAssetId]);
-  const src = showImage ? imageUrl(card.imageAssetId!, !original) : '';
-  // The card back over an unusable card only covers the image's own shape.
-  const mask: CSSProperties | undefined = alpha && showImage ? { maskImage: `url("${src}")`, maskSize: 'contain', maskPosition: 'center', maskRepeat: 'no-repeat' } : undefined;
-  const shownOverlay = mask && isValidElement(overlay) ? cloneElement(overlay as ReactElement<{ style?: CSSProperties }>, { style: mask }) : overlay;
-  return <div className={`card-face ${showImage ? 'image-face' : 'default-face'} ${alpha && showImage ? 'has-alpha' : ''} role-${card.roles[0] ?? 'other'}`}>
-    {showImage
-      ? <img src={src} alt={`${card.name} 카드 이미지`} loading={original ? 'eager' : 'lazy'} decoding="async" draggable={false} onError={() => setFailed(true)}
- />
-      : <div className="default-face-art" role="img" aria-label={`${card.name} 기본 카드 · ${kindLine(card)}${failed ? ' · 이미지 파일을 읽을 수 없음' : ''}`}><DefaultCard card={card} broken={failed}/></div>}
+  }, [alphaAssetId]);
+  const masked = !!fullImage && alpha === true && isValidElement(overlay);
+  // A CSS mask fetched from app://assets is cross-origin. An inline SVG mask can use the same image as an <img>
+  // without canvas access or changes to Electron's protocol permissions. The viewBox mirrors the card face's contain fit.
+  const style: CSSProperties | undefined = masked ? { maskImage: `url("#${maskId}")` } : fullImage && alpha === undefined ? { visibility: 'hidden' } : undefined;
+  const shownOverlay = style && isValidElement(overlay) ? cloneElement(overlay as ReactElement<{ style?: CSSProperties }>, { style }) : overlay;
+  const image = src ? <img src={src} alt={`${card.name} 카드 이미지`} loading={original ? 'eager' : 'lazy'} decoding="async" draggable={false} onError={() => setFailed(true)}/> : undefined;
+  const illustrated = mode === 'illustration' && !!image;
+  return <div className={`card-face ${fullImage ? 'image-face' : 'default-face'} ${alpha && fullImage ? 'has-alpha' : ''} role-${card.roles[0] ?? 'other'}`}>
+    {fullImage ? image
+      : <div className="default-face-art" role="img" aria-label={`${card.name} ${illustrated ? '삽화 카드' : '기본 카드'} · ${kindLine(card)}${failed ? ' · 이미지 파일을 읽을 수 없음' : ''}`}><DefaultCard card={card} artwork={illustrated ? image : undefined} broken={failed}/></div>}
+    {masked && <svg aria-hidden="true" focusable="false" className="card-alpha-mask" width="0" height="0">
+      <defs><mask id={maskId} maskContentUnits="objectBoundingBox" style={{ maskType: 'alpha' }}>
+        <svg width="1" height="1" viewBox="0 0 100 145.8" preserveAspectRatio="none">
+          <image href={src} width="100" height="145.8"/>
+        </svg>
+      </mask></defs>
+    </svg>}
     {shownOverlay}
   </div>;
 }

@@ -1,6 +1,8 @@
 import { memo } from 'react';
 import type { CardDefinition } from '../shared/contracts';
-import { KIND_NAMES, ROLE_NAMES } from '../shared/library';
+import { effectiveCard } from '../shared/casting';
+import type { ResourceSnapshot } from '../shared/resources';
+import { cardImageMode, KIND_NAMES, ROLE_NAMES } from '../shared/library';
 import { CardFace } from './CardFace';
 import { HandSurface } from './HandSurface';
 import { isUnusable, USABILITY_NOTES, type CardUsability } from '../shared/usability';
@@ -27,12 +29,12 @@ const CardTile = memo(function CardTile({ card, selected, checked, selectionMode
   </div>;
 });
 
-export function CardGallery({ cards, mode, inertia = false, selectedId, selectedIds, selectionMode, notes, usability, backSrc, onSelect, onCheck, onPreview }: {
-  cards: CardDefinition[]; mode: 'hand' | 'grid'; inertia?: boolean; selectedId?: string; selectedIds: string[]; selectionMode: boolean; notes: Map<string, string>; usability?: Map<string, CardUsability>; backSrc?: string;
+export function CardGallery({ cards, snapshot, mode, inertia = false, selectedId, selectedIds, selectionMode, notes, usability, backSrc, onSelect, onCheck, onPreview }: {
+  cards: CardDefinition[]; snapshot?: ResourceSnapshot; mode: 'hand' | 'grid'; inertia?: boolean; selectedId?: string; selectedIds: string[]; selectionMode: boolean; notes: Map<string, string>; usability?: Map<string, CardUsability>; backSrc?: string;
   onSelect: (cardId: string, button: HTMLButtonElement) => void; onCheck: (cardId: string, checked: boolean) => void; onPreview: (cardId: string, button: HTMLButtonElement) => void;
 }) {
   return <div className={`card-gallery ${selectionMode ? 'batch-selection' : ''} ${cards.length >= 50 ? 'large-hand' : cards.length >= 20 ? 'medium-hand' : ''}`}>
     <p id="card-navigation-help" className="sr-only">방향키로 카드 포커스 이동, Home과 End로 처음과 끝 이동, Enter 또는 Space로 선택, 선택한 카드에서 다시 누르면 원본 확대. 사용 확정은 오른쪽 버튼에서 별도로 실행합니다.</p>
-    <HandSurface mode={mode} inertia={inertia} resetKey={cards}>{cards.map(card => <CardTile key={card.id} card={card} selected={selectedId === card.id} checked={selectedIds.includes(card.id)} selectionMode={selectionMode} note={notes.get(card.id)} usability={usability?.get(card.id)} backSrc={backSrc} onSelect={onSelect} onCheck={onCheck} onPreview={onPreview}/>)}</HandSurface>
+    <HandSurface mode={mode} inertia={inertia} resetKey={cards}>{cards.map(card => <CardTile key={card.id} card={cardImageMode(card)==='illustration'?effectiveCard(card,snapshot):card} selected={selectedId === card.id} checked={selectedIds.includes(card.id)} selectionMode={selectionMode} note={notes.get(card.id)} usability={usability?.get(card.id)} backSrc={backSrc} onSelect={onSelect} onCheck={onCheck} onPreview={onPreview}/>)}</HandSurface>
   </div>;
 }

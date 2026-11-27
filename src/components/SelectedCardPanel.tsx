@@ -24,9 +24,10 @@ export function InPlaySlot({ card, onPreview }: { card?: CardDefinition; onPrevi
  * The card page (centre top of the mat): the selected card's text, costs and the Use seal on a parchment page.
  */
 export function SelectedCardPanel({card,tags,controller,onClose,closeRef}:{card?:CardDefinition;tags:Tag[];controller:ResourceController;onClose:()=>void;closeRef:RefObject<HTMLButtonElement|null>}) {
-  const properties=card?`${KIND_NAMES[card.kind]} · ${card.actions.map(a=>ACTION_NAMES[a]).join(' · ')} · ${RANGE_NAMES[card.range.kind]}${card.range.feet!==undefined?` ${card.range.feet} ft`:''}${card.spellLevel!==undefined?` · 주문 ${card.spellLevel}레벨`:''}`:'';
+  const traits = [card?.concentration && '집중', card?.ritual && '의식', card?.upcastEffect && '상위 슬롯 효과 강화'].filter(Boolean).join(' · ');
+  const properties=card?`${KIND_NAMES[card.kind]} · ${card.actions.map(a=>ACTION_NAMES[a]).join(' · ')} · ${RANGE_NAMES[card.range.kind]}${card.range.feet!==undefined?` ${card.range.feet} ft`:''}${card.spellLevel!==undefined?` · 주문 ${card.spellLevel}레벨`:''}${traits ? ' · ' + traits : ''}`:'';
   // v1.3 UI-P2: the header line under the name leaves the kind and level to the kicker above it (no repeat).
-  const headline=card?`${card.actions.map(a=>ACTION_NAMES[a]).join(' · ')} · ${RANGE_NAMES[card.range.kind]}${card.range.feet!==undefined?` ${card.range.feet} ft`:''}`:'';
+  const headline=card?`${card.actions.map(a=>ACTION_NAMES[a]).join(' · ')} · ${RANGE_NAMES[card.range.kind]}${card.range.feet!==undefined?` ${card.range.feet} ft`:''}${traits ? ' · ' + traits : ''}`:'';
   const kicker=card?`${KIND_NAMES[card.kind]}${card.spellLevel!==undefined?` · ${card.spellLevel===0?'소마법':`${ROMAN[card.spellLevel]} 레벨`}`:''}`:'';
   return <aside className="detail-panel" aria-label="선택 카드 상세">{card?<div className="selection" key={card.id}>
     <div className="codex"><article className="codex-page">

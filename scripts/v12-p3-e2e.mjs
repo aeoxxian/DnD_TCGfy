@@ -70,9 +70,10 @@ const contrast = page => page.evaluate(() => {
   const pageBase = { oxblood: [229, 222, 205], ebony: [234, 228, 216], verdant: [234, 228, 216], abyss: [40, 48, 64] }[theme];
   const buttonBase = { oxblood: [40, 27, 23], ebony: [36, 31, 28], verdant: [28, 44, 33], abyss: [44, 53, 70] }[theme];
   const color = selector => { const el = document.querySelector(selector); return el ? parse(getComputedStyle(el).color) : undefined; };
-  const items = { ledgerTitle: '.ledger-heading strong', resourceName: '.resource-name', groupTitle: '.resource-group > summary', cardTitle: '.selected-card-heading h2', properties: '.selected-properties', description: '.description-content p', costLine: '.card-use .cost-preview' };
+  const items = { resourceName: '.resource-name', groupTitle: '.resource-group > summary', cardTitle: '.selected-card-heading h2', properties: '.selected-properties', description: '.description-content p', costLine: '.card-use .cost-preview' };
   const out = {};
   for (const [name, selector] of Object.entries(items)) { const c = color(selector); if (c) out[name] = Number(ratio(c, pageBase).toFixed(2)); }
+  out.ledgerTitle = Number(ratio(color('.resource-panel > .panel-title h2'), buttonBase).toFixed(2));
   out.topButton = Number(ratio(color('.top-actions > button'), buttonBase).toFixed(2));
   return out;
 });

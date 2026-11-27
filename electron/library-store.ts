@@ -82,12 +82,18 @@ export class LibraryStore {
       if (drafts.some(card => !card.id) && target && !this.db.prepare('SELECT id FROM decks WHERE id=? AND character_id=?').get(target.deckId, target.characterId)) throw new UserInputError('선택한 덱의 소유 캐릭터가 일치하지 않습니다.');
       for (const draft of drafts) {
         const existing = draft.id ? this.getCard(draft.id) : undefined;
-        const imageAssetId = draft.imageAssetId ?? existing?.imageAssetId;
+        const imageMode = draft.imageMode ?? (draft.imageAssetId && existing?.imageMode === 'none' ? 'full_card' : existing?.imageMode);
+        if (draft.imageMode === 'none' && draft.imageAssetId) throw new UserInputError('이미지 없음과 이미지 파일을 함께 지정할 수 없습니다.');
+        const imageAssetId = draft.imageMode === 'none' ? undefined : draft.imageAssetId ?? existing?.imageAssetId;
+        if (imageMode && (imageMode === 'none') === !!imageAssetId) throw new UserInputError('이미지 표시 방식과 파일을 확인해 주세요.');
         if (imageAssetId && !this.getAsset(imageAssetId)) throw new UserInputError('가져온 이미지를 찾을 수 없습니다. 이미지를 다시 선택해 주세요.');
         for (const tag of draft.tags) if (!this.db.prepare('SELECT id FROM tags WHERE id=?').get(tag)) throw new UserInputError('삭제되었거나 존재하지 않는 태그입니다.');
         const now = new Date().toISOString();
         const card = cardSchema.parse({
           ...draft, id: existing?.id ?? randomUUID(), imageAssetId,
+          ownedResources: draft.ownedResources ?? existing?.ownedResources,
+          imageMode, concentration: draft.concentration ?? existing?.concentration,
+          ritual: draft.ritual ?? existing?.ritual, upcastEffect: draft.upcastEffect ?? existing?.upcastEffect,
           roles: [...new Set(draft.roles)], actions: [...new Set(draft.actions)], tags: [...new Set(draft.tags)],
           costStatus: existing?.costStatus,
           castOptions: existing?.castOptions ?? [{ id: randomUUID(), label: '일반 사용', costs: [] }],

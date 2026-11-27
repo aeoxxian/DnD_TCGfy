@@ -32,17 +32,18 @@ export class ClassStore {
     return {classId:row.class_id??undefined,level:row.level,ruleset:row.ruleset,abilityScores:row.ability_scores_json?JSON.parse(row.ability_scores_json):undefined};
   }
   private capture(characterId:string):ClassState {
-    return {profile:this.db.prepare('SELECT class_id,level,ruleset,ability_scores_json FROM character_profiles WHERE id=?').get(characterId) as unknown as ProfileRow,rows:this.db.prepare('SELECT * FROM resource_instances WHERE character_id=? ORDER BY id').all(characterId) as unknown as InstanceRow[]};
+    return {profile:this.db.prepare('SELECT class_id,level,ruleset,ability_scores_json FROM character_profiles WHERE id=?').get(characterId) as unknown as ProfileRow,rows:this.db.prepare('SELECT * FROM resource_instances WHERE character_id=? AND id NOT IN (SELECT instance_id FROM card_owned_resources) ORDER BY id').all(characterId) as unknown as InstanceRow[]};
   }
   preview(characterId:string,input:ClassInput):ClassPreview {
     const configuration=classInputSchema.parse(input);const snapshot=this.readSnapshot(characterId);const before=this.profile(characterId);
     const rows=this.capture(characterId).rows;
-    if(rows.filter(row=>!row.archived_at).length!==snapshot.resources.length)throw new UserInputError('읽을 수 없는 기존 자원 설정이 있습니다. 원본을 보존했으므로 자원 설정을 먼저 확인해 주세요.');
+    const currentResources=snapshot.resources.filter(resource=>!resource.ownedDefinitionId);
+    if(rows.filter(row=>!row.archived_at).length!==currentResources.length)throw new UserInputError('읽을 수 없는 기존 자원 설정이 있습니다. 원본을 보존했으므로 자원 설정을 먼저 확인해 주세요.');
     const abilityScores={...before.abilityScores,...(configuration.charisma!==undefined?{CHA:configuration.charisma}:{})};
     const after:CharacterConfiguration={classId:configuration.classId==='homebrew'?(before.classId&&!(before.classId in CLASS_NAMES)?before.classId:undefined):configuration.classId,level:configuration.level,ruleset:configuration.classId==='homebrew'?'homebrew':'dnd5e_2014',abilityScores:Object.keys(abilityScores).length?abilityScores:undefined};
     const requested=classResources(configuration);const resources:ClassPreview['resources']=[];const warnings:string[]=[];
     for(const {key,template:draft}of requested){
-      const old=snapshot.resources.find(resource=>resource.presetKey===key);
+      const old=currentResources.find(resource=>resource.presetKey===key);
       const template:ResourceTemplate={...draft,id:stableId(`${characterId}:${snapshot.revision}:${key}:template`),key:key,source:'class_2014',version:1};
       const overrides=old?.overrides??{scope:'character' as const};const max=maximums(template,after,overrides);
       const next:ResourceView={id:old?.id??stableId(`${characterId}:${snapshot.revision}:${key}:instance`),characterId,templateId:template.id,presetKey:key,template,overrides,name:overrides.nameOverride??template.name,unit:template.unit,kind:template.kind,unlimited:overrides.unlimitedOverride??template.unlimited,...max,...(template.kind==='counter'?{remaining:max.capacity}:{remainingByLevel:max.capacityByLevel})};
@@ -51,7 +52,7 @@ export class ClassStore {
       if(old?.unlimited&&!next.unlimited)warnings.push(`${old.name}: 무제한에서 유한으로 변경하여 현재량 0으로 시작합니다.`);
     }
     const keys=new Set(requested.map(resource=>resource.key));
-    for(const old of snapshot.resources.filter(resource=>!keys.has(resource.presetKey??''))){
+    for(const old of currentResources.filter(resource=>!keys.has(resource.presetKey??''))){
       if(old.presetKey){
         const next=structuredClone(old);delete next.presetKey;
         if(next.kind==='counter')next.overrides.capacityOverride=next.capacity;else next.overrides.slotCapacityOverride=next.capacityByLevel;
@@ -87,7 +88,7 @@ export class ClassStore {
     const oldIds=new Set(undo.before.rows.map(row=>row.id));
     for(const row of undo.after.rows)if(!oldIds.has(row.id))this.db.prepare('UPDATE resource_instances SET archived_at=?,preset_key=NULL WHERE id=? AND character_id=?').run(new Date().toISOString(),row.id,characterId);
     // Clear ownership before restoration to avoid a transient partial unique-index conflict.
-    this.db.prepare('UPDATE resource_instances SET preset_key=NULL WHERE character_id=?').run(characterId);
+    this.db.prepare('UPDATE resource_instances SET preset_key=NULL WHERE character_id=? AND preset_key IS NOT NULL').run(characterId);
     for(const row of undo.before.rows)this.db.prepare('UPDATE resource_instances SET template_id=?,overrides_json=?,current_state_json=?,archived_at=?,preset_key=? WHERE id=? AND character_id=?').run(row.template_id,row.overrides_json,row.current_state_json,row.archived_at,row.preset_key,row.id,characterId);
   }
 }

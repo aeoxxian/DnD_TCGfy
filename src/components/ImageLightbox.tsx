@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import type { CardDefinition } from '../shared/contracts';
 import { DefaultCard, imageUrl, kindLine } from './CardFace';
+import { cardImageMode } from '../shared/library';
 
 const DURATION = 220;
 const MAX_TILT = 6;
@@ -53,7 +54,9 @@ export function ImageLightbox({ card, onClose, label, origin, tilt = false }: { 
   const state = useRef<{ played: boolean; settled: boolean; closing: boolean; animate: boolean }>({ played: false, settled: false, closing: false, animate: false });
   const help = useId();
   const [failed, setFailed] = useState(false);
-  const drawn = !card.imageAssetId || failed;
+  const mode = cardImageMode(card);
+  const illustrated = mode === 'illustration' && !!card.imageAssetId && !failed;
+  const drawn = mode !== 'full_card' || !card.imageAssetId || failed;
   useEffect(() => {
     const previous = document.activeElement;
     const dialog = ref.current!;
@@ -120,7 +123,8 @@ export function ImageLightbox({ card, onClose, label, origin, tilt = false }: { 
     <p id={help} className="sr-only">{card.name} 확대 화면. 카드 밖을 클릭하거나 Escape를 눌러 돌아갑니다.</p>
     <div ref={frame} className={`lightbox-card ${tilt ? 'can-tilt' : ''} ${drawn ? 'is-default' : ''}`}>
       {drawn
-        ? <div ref={image as RefObject<HTMLDivElement | null>} className="card-face default-face lightbox-default" role="img" aria-label={`${card.name} 기본 카드 확대 · ${kindLine(card)}`}><DefaultCard card={card} broken={failed}/></div>
+        ? <div ref={image as RefObject<HTMLDivElement | null>} className="card-face default-face lightbox-default" role="img" aria-label={`${card.name} ${illustrated ? '삽화 카드' : '기본 카드'} 확대 · ${kindLine(card)}`}><DefaultCard card={card} broken={failed}
+            artwork={illustrated ? <img src={imageUrl(card.imageAssetId!)} alt="" draggable={false} onError={() => setFailed(true)}/> : undefined}/></div>
         : <img ref={image as RefObject<HTMLImageElement | null>} src={imageUrl(card.imageAssetId!)} alt={`${card.name} 원본 확대`} draggable={false} onLoad={open} onError={() => { setFailed(true); state.current.played = false; }}/>}
     </div>
   </dialog>;

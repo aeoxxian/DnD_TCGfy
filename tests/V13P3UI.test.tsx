@@ -31,6 +31,8 @@ const handNames = () => screen.getAllByRole('button', { name: / 카드 선택$/ 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
+  HTMLElement.prototype.showPopover = function () { this.style.display = 'block'; };
+  HTMLElement.prototype.hidePopover = function () { this.style.display = 'none'; };
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -55,9 +57,15 @@ describe('v1.3 Phase 3 UI-P1 · hand order', () => {
     for (let i = 0; i < 6 && order.join() === original.join(); i++) { fireEvent.click(deck); order = handNames(); }
     expect([...order].sort()).toEqual([...original].sort());
     expect(order).not.toEqual(original);
-    expect(within(screen.getByRole('region', { name: '덱 · 주문서 덱' })).getByText(/섞인 순서/)).toBeDefined();
+    expect(deck.getAttribute('aria-description')).toContain('섞인 순서');
     expect(desktop.saveSettings.mock.calls.length + desktop.saveLibraryState.mock.calls.length).toBe(saves);
-    fireEvent.click(screen.getByRole('button', { name: '원래 순서' }));
+    fireEvent.keyDown(deck, { key: 'F10', shiftKey: true });
+    const restore = within(screen.getByRole('group', { name: 'DECK 더미 메뉴' })).getByRole('button', { name: '원래 순서' });
+    expect(document.activeElement).toBe(restore);
+    fireEvent.keyDown(restore, { key: 'Escape' });
+    expect(document.activeElement).toBe(deck);
+    fireEvent.keyDown(deck, { key: 'ContextMenu' });
+    fireEvent.click(restore);
     expect(handNames()).toEqual(original);
     expect(screen.queryByRole('button', { name: '원래 순서' })).toBeNull();
   });
@@ -70,13 +78,15 @@ describe('v1.3 Phase 3 UI-P1 · clearing the USED pile', () => {
     render(<App/>);
     const pile = await screen.findByRole('button', { name: '사용한 카드 더미 · 최근 2건 · 전체 카드 사용 기록 열기' });
     expect(pile).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: '최근 사용 더미 비우기' }));
+    fireEvent.contextMenu(pile);
+    fireEvent.click(within(screen.getByRole('group', { name: 'USED 더미 메뉴' })).getByRole('button', { name: '최근 사용 더미 비우기' }));
     await waitFor(() => expect(desktop.saveSettings).toHaveBeenCalled());
     const saved = desktop.saveSettings.mock.calls.at(-1)![0];
     expect(saved.usedViews).toEqual({ hero: { clearedEventId: 'e3', clearedAt: '2026-11-25T10:03:00.000Z' } });
     expect(await screen.findByRole('button', { name: '사용한 카드 더미 · 최근 0건 · 전체 카드 사용 기록 열기' })).toBeDefined();
     expect(desktop.changeResource).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
+    fireEvent.contextMenu(pile);
+    fireEvent.click(within(screen.getByRole('group', { name: 'USED 더미 메뉴' })).getByRole('button', { name: '되돌리기' }));
     await waitFor(() => expect(desktop.saveSettings.mock.calls.at(-1)![0].usedViews).toEqual({}));
     expect(await screen.findByRole('button', { name: '사용한 카드 더미 · 최근 2건 · 전체 카드 사용 기록 열기' })).toBeDefined();
   });

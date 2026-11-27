@@ -48,7 +48,7 @@ export class RegistrationStore {
           if (draft.template.kind !== 'counter' || draft.template.id) throw new UserInputError('카드 등록 중에는 횟수·포인트 자원만 새로 만들 수 있습니다.');
           if (existing.some(resource => resource.id === draft.draftId)) throw new UserInputError('새 자원 초안 ID가 기존 자원과 겹칩니다.');
           if (!rules.bindings.some(binding => binding.resourceInstanceId === draft.draftId)) throw new UserInputError('비용에 연결하지 않은 새 자원은 만들지 않습니다.');
-          const same = existing.find(resource => sameResourceName(resource.name, draft.template.name))?.name ?? drafts.slice(0, index).find(other => sameResourceName(other.template.name, draft.template.name))?.template.name;
+          const same = existing.find(resource => !resource.ownedDefinitionId && sameResourceName(resource.name, draft.template.name))?.name ?? drafts.slice(0, index).find(other => sameResourceName(other.template.name, draft.template.name))?.template.name;
           if (same) throw new UserInputError(`같은 이름의 자원 “${same}”이(가) 이미 있습니다. 기존 자원을 선택해 주세요.`);
         });
       }
@@ -60,7 +60,7 @@ export class RegistrationStore {
       }
       for (const option of rules.castOptions) for (const cost of option.costs) {
         if (cost.type === 'slot' && parsed.cards.some(card => card.kind !== 'spell' || card.spellLevel === undefined)) throw new UserInputError('슬롯을 사용할 카드의 유형과 기본 주문 레벨을 지정해 주세요.');
-        if (!(cost.type === 'slot' && (cost.autoBind || parsed.cards.every(card=>card.spellLevel===0))) && !rules.bindings.some(binding => binding.costKey === cost.costKey)) throw new UserInputError('사용할 자원을 연결해 주세요.');
+        if (!cost.requirement && !(cost.type === 'slot' && (cost.autoBind || parsed.cards.every(card=>card.spellLevel===0))) && !rules.bindings.some(binding => binding.costKey === cost.costKey)) throw new UserInputError('사용할 자원을 연결해 주세요.');
       }
       const before = new Set(this.library.getLibrary().cards.map(card => card.id));
       const library = this.library.saveCards(cardsInput, true);
@@ -89,13 +89,13 @@ export class RegistrationStore {
             const resource = current.resources.find(resource => resource.id === binding.resourceInstanceId);
             if (!resource) throw new UserInputError('현재 캐릭터의 활성 자원만 연결할 수 있습니다.');
             for (const option of rules.castOptions) for (const cost of option.costs.filter(cost => cost.costKey === binding.costKey)) {
-              if (cost.type === 'slot' && (resource.kind !== 'slot_track' || resource.template.slotKind !== cost.slotSelection)) throw new UserInputError('슬롯 계열과 연결 자원이 다릅니다.');
-              if (cost.type !== 'slot' && resource.kind === 'slot_track' && (cost.slotLevel === undefined || resource.capacityByLevel?.[String(cost.slotLevel)] === undefined)) throw new UserInputError('사용할 자원 단계를 확인해 주세요.');
+              if (cost.type === 'slot' && (resource.kind !== 'slot_track' || (resource.template.slotKind ?? 'generic') !== cost.slotSelection)) throw new UserInputError('슬롯 계열과 연결 자원이 다릅니다.');
+              if (cost.type !== 'slot' && resource.kind === 'slot_track' && (cost.slotLevel === undefined || !cost.requirement && resource.capacityByLevel?.[String(cost.slotLevel)] === undefined)) throw new UserInputError('사용할 자원 단계를 확인해 주세요.');
             }
           }
           this.resources.change({ requestId: randomUUID(), characterId: rules.characterId, expectedRevision: current.revision, action: { type: 'save_costs', scope: rules.scope, cardId: card.id, castOptions: rules.castOptions, bindings } }, true, true);
         } else {
-          if (rules.bindings.length || rules.castOptions.some(option => option.costs.some(cost => cost.type !== 'slot' || !cost.autoBind && card.spellLevel !== 0))) throw new UserInputError('횟수·포인트 연결에는 캐릭터가 필요합니다.');
+          if (rules.bindings.length || rules.castOptions.some(option => option.costs.some(cost => !cost.requirement && (cost.type !== 'slot' || !cost.autoBind && card.spellLevel !== 0)))) throw new UserInputError('횟수·포인트 연결에는 캐릭터가 필요합니다.');
           this.store.db.prepare("UPDATE card_definitions SET attributes_json=json_set(attributes_json,'$.castOptions',json(?),'$.costStatus','configured') WHERE id=?").run(JSON.stringify(rules.castOptions), card.id);
         }
       }

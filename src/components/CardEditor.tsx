@@ -1,3 +1,4 @@
+import { OwnedResourcesEditor } from './OwnedResourcesEditor';
 import { RegistrationRules, type RegistrationKind } from './RegistrationRules';
 import { AdvancedCardCostEditor } from './CardCostEditor';
 import type { ResourceController } from './ResourcePanel';
@@ -8,11 +9,13 @@ import { ACTION_NAMES, KIND_NAMES, RANGE_NAMES, ROLE_NAMES, normalizeText } from
 import { Modal } from './Modal';
 import { NewResourceDialog } from './NewResourceDialog';
 import { CardFace, DefaultCard } from './CardFace';
+import { CardTraits, ImageModeField } from './CardMetadataFields';
 import { Checks } from './FormChecks';
 import { BatchRegistration } from './BatchRegistration';
 import { TemplateBar } from './RegistrationTemplates';
 import { describeDraft, draftResourceView, type NewResourceDraft } from '../shared/resource-drafts';
-import { applyTemplate, batchDuplicates, cardFields, newBatchItem, templateFrom, type BatchCommon, type BatchItem } from '../shared/batch-registration';
+import { applyTemplate, batchDuplicates, cardFields, effectiveItem, itemRule, newBatchItem, templateFrom, type BatchAsset, type BatchCommon, type BatchItem } from '../shared/batch-registration';
+import { effectiveCard } from '../shared/casting';
 
 /** v1.3: forget images this dialog imported but did not save. The main process deletes only images imported during this
  *  run that no card, card image history or card back uses, so saved cards are never touched. Best effort. */
@@ -21,10 +24,10 @@ function discardImports(ids: string[]) {
   try { void Promise.resolve(window.desktop.discardImports(ids)).catch(() => undefined); } catch { /* bridge unavailable */ }
 }
 function draftFromCard(card?: CardDefinition): CardDraft {
-  return card ? { id: card.id, name: card.name, kind: card.kind, imageAssetId: card.imageAssetId, roles: card.roles, actions: card.actions, range: card.range, tags: card.tags, description: card.description, spellLevel: card.spellLevel } : { name: '', kind: 'other', roles: [], actions: ['action'], range: { kind: 'special' }, tags: [] };
+  return card ? { id: card.id, name: card.name, kind: card.kind, imageAssetId: card.imageAssetId, roles: card.roles, actions: card.actions, range: card.range, tags: card.tags, description: card.description, spellLevel: card.spellLevel, imageMode: card.imageMode, concentration: card.concentration, ritual: card.ritual, upcastEffect: card.upcastEffect, ownedResources: card.ownedResources } : { name: '', kind: 'other', roles: [], actions: ['action'], range: { kind: 'special' }, tags: [] };
 }
 /** v1.3 Phase 2: one batch item per image; a second copy of an image already in the list starts excluded. */
-function batchItemsFor(added: AssetPreview[], before: AssetPreview[]): Record<string, BatchItem> {
+function batchItemsFor(added: BatchAsset[], before: BatchAsset[]): Record<string, BatchItem> {
   const seen = new Set(before.map(asset => asset.sha256).filter(Boolean));
   const items: Record<string, BatchItem> = {};
   for (const asset of added) { items[asset.id] = newBatchItem(asset, !(asset.sha256 && seen.has(asset.sha256))); if (asset.sha256) seen.add(asset.sha256); }
@@ -35,7 +38,7 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   const [target] = useState(registrationTarget);
   const [destinationLabel] = useState(targetLabel);
   const [draft, setDraft] = useState<CardDraft>(() => ({ ...draftFromCard(card), ...(!card && initialAssets.length === 1 ? { name: initialAssets[0].name } : {}) }));
-  const [assets, setAssets] = useState(initialAssets);
+  const [assets, setAssets] = useState<BatchAsset[]>(initialAssets);
   // v1.3: every image imported while this dialog is open; the ones not saved are discarded when it closes.
   const imported = useRef(new Set(initialAssets.map(asset => asset.id)));
   const [linkDeck, setLinkDeck] = useState(true);
@@ -72,9 +75,13 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   /** The defaults of a batch (and what a template saves): the card fields, the basic use rule and the deck link. */
   const common: BatchCommon = { card: cardFields(draft), rule: { kind: ruleKind === 'advanced' ? 'unconfigured' : ruleKind, draft: ruleDraft, scope: ruleScope }, addToDeck: linkDeck };
 
+  const keepsSingleRegistration = ruleKind === 'advanced' && advancedRules?.castOptions.some(option => option.costs.some(cost => cost.requirement));
+  const singleRegistrationMessage = '이 카드의 고급 자원 요구를 보존하려면 먼저 카드 한 장을 저장하세요.';
+
   async function importFiles(files: File[]) {
     if (!files.length || busy || batchRunning) return;
     if (card && files.length > 1) { setError('교체할 이미지는 한 장만 선택해 주세요.'); return; }
+    if (!card && keepsSingleRegistration && assets.length + files.length > 1) { setError(singleRegistrationMessage); return; }
     if (!card && assets.length + files.length > 100) { setError('한 번에 최대 100장까지 등록할 수 있습니다.'); return; }
     setBusy(true); setError('');
     try {
@@ -100,6 +107,26 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   }
   /** Leave the dialog: images picked here and not saved are discarded (saved ones are skipped by the main process). */
   function finish() { discardImports([...imported.current]); imported.current.clear(); onClose(); }
+  function addImageless() {
+    if (keepsSingleRegistration) { setError(singleRegistrationMessage); return; }
+    if (assets.length >= 100) { setError('한 번에 최대 100장까지 등록할 수 있습니다.'); return; }
+    if (ruleKind === 'advanced') {
+      setRuleKind('unconfigured'); setAdvancedRules(undefined);
+      setTemplateNotes(['여러 장 등록에서는 고급 사용 규칙을 쓸 수 없어 ‘나중에 설정’으로 바꿨습니다.']);
+    }
+    const item = { id: crypto.randomUUID(), name: '이미지 없는 카드' };
+    if (!assets.length) {
+      const first = { id: crypto.randomUUID(), name: draft.name.trim() || '첫 번째 카드' };
+      const rows = [first, item];
+      const items = batchItemsFor(rows, []);
+      items[first.id].description = draft.description;
+      setAssets(rows); setBatch(items);
+      setNames(Object.fromEntries(rows.map(row => [row.id, row.name])));
+      return;
+    }
+    setAssets([...assets, item]); setBatch(current => ({ ...current, [item.id]: newBatchItem(item) }));
+    setNames(current => ({ ...current, ...(assets.length === 1 && draft.name.trim() ? { [assets[0].id]: draft.name.trim() } : {}), [item.id]: item.name }));
+  }
   function removeAsset(id: string) {
     const remaining = assets.filter(item => item.id !== id);
     setAssets(remaining);
@@ -135,8 +162,12 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   }
   async function submit(event: FormEvent) {
     event.preventDefault(); if (busy || saving.current || multiple) return;
-    const candidates = card ? [{ ...draft, imageAssetId: assets.at(-1)?.id ?? draft.imageAssetId }]
-      : assets.length ? [{ ...draft, imageAssetId: assets[0].id }] : [draft];
+    const picked = assets.at(-1);
+    const imageAssetId = draft.imageMode === 'none' ? undefined : picked?.thumbnailUrl ? picked.id : draft.imageAssetId;
+    if (draft.imageMode && draft.imageMode !== 'none' && !imageAssetId) { setError('선택한 표시 방식에 사용할 이미지 파일을 골라 주세요.'); return; }
+    const candidate = { ...draft, imageAssetId };
+    if (!imageAssetId) delete candidate.imageAssetId;
+    const candidates = [candidate];
     const parsed = candidates.map(value => cardDraftSchema.safeParse(value));
     const invalid = parsed.find(result => !result.success);
     if (invalid && !invalid.success) { setError(invalid.error.issues[0].message); return; }
@@ -166,7 +197,16 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   const replacement = card ? assets.at(-1) : undefined;
   const focused = multiple ? assets.find(asset => asset.id === focus) : undefined;
   const previewImage = replacement ?? single ?? focused;
-  const previewInfo = { ...draft, name: nameValue.trim() || '카드 이름' };
+  const pickedImages = assets.filter(asset => asset.thumbnailUrl);
+  const imageMode = draft.imageMode ?? (pickedImages.length || draft.imageAssetId ? 'full_card' : 'none');
+  const focusedItem = focused ? batch[focused.id] : undefined;
+  const focusedCard = focusedItem && focused ? effectiveItem(focusedItem, names[focused.id] ?? focused.name, common) : undefined;
+  let previewOptions = proposal?.castOptions ?? (card ? effectiveCard(card, controller?.snapshot).castOptions : undefined);
+  if (focusedCard && focusedItem) {
+    try { previewOptions = itemRule(focusedCard, focusedItem.ids).castOptions; } catch { previewOptions = undefined; }
+  }
+  const previewInfo = { ...(focusedCard?.card ?? draft), name: (focusedCard?.card.name ?? nameValue).trim() || '카드 이름', castOptions: previewOptions };
+  const previewMode = focusedCard ? focusedCard.card.imageMode ?? 'full_card' : imageMode;
   const duplicates = batchDuplicates(assets);
   const singleDuplicate = single ? duplicates.get(single.id) : undefined;
   const pickLabel = card ? card.imageAssetId || replacement ? '교체 이미지 선택' : '이미지 선택' : assets.length ? '이미지 더 선택' : '이미지 선택';
@@ -182,14 +222,17 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
       <div className="editor-layout">
         <aside className="editor-preview-column" aria-label="카드 미리보기">
           <div className="editor-preview" onDragOver={event => event.preventDefault()} onDrop={drop}>
-            {previewImage ? <img src={previewImage.thumbnailUrl} alt={replacement ? '교체 이미지 미리보기' : focused ? `${names[focused.id] ?? focused.name} 등록 미리보기` : `${nameValue || previewImage.name} 등록 미리보기`} draggable={false}/>
-              : multiple ? <div className="editor-preview-stack" role="img" aria-label={`이미지 ${assets.length}장`}>{assets.slice(0, 3).map(asset => <img key={asset.id} src={asset.thumbnailUrl} alt="" draggable={false}/>)}</div>
-              : card?.imageAssetId ? <CardFace card={card} original/>
+            {previewMode === 'illustration' && (previewImage?.thumbnailUrl || draft.imageAssetId) ? <CardFace card={{ ...ruleCard, ...previewInfo, castOptions: previewInfo.castOptions ?? ruleCard.castOptions, imageMode: 'illustration', imageAssetId: previewImage?.thumbnailUrl ? previewImage.id : draft.imageAssetId }} original={!!card && !previewImage}/>
+              : previewMode !== 'none' && previewImage?.thumbnailUrl ? <img src={previewImage.thumbnailUrl} alt={replacement ? '교체 이미지 미리보기' : focused ? `${names[focused.id] ?? focused.name} 등록 미리보기` : `${nameValue || previewImage.name} 등록 미리보기`} draggable={false}/>
+              : multiple && !focused && pickedImages.length > 0 && previewMode !== 'none' ? <div className="editor-preview-stack" role="img" aria-label={`이미지 ${pickedImages.length}장`}>{pickedImages.slice(0, 3).map(asset => <img key={asset.id} src={asset.thumbnailUrl} alt="" draggable={false}/>)}</div>
+              : previewMode !== 'none' && card?.imageAssetId ? <CardFace card={{...card,...draft, castOptions:card.castOptions}} original/>
               : <div className="card-face default-face" role="img" aria-label={`${previewInfo.name} 기본 카드 미리보기`}><DefaultCard card={previewInfo} placeholder={!nameValue.trim()}/></div>}
           </div>
           {singleDuplicate && <p className="batch-warning">같은 이미지가 이미 ‘{singleDuplicate.existing.join('’, ‘')}’ 카드에 있습니다{singleDuplicate.trashed ? '(휴지통 포함)' : ''}. 그대로 등록할 수도 있습니다.</p>}
           <div className="drop-zone" onDragOver={event => event.preventDefault()} onDrop={drop}>
             <label className="file-button">{pickLabel}<input type="file" aria-label={card ? '교체 이미지 파일' : '카드 이미지 파일'} accept=".png,.jpg,.jpeg,.webp" multiple={!card} disabled={locked} onChange={event => { void importFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} /></label>
+            <ImageModeField mode={imageMode} disabled={locked} onChange={imageMode => setDraft(current => ({ ...current, imageMode }))}/>
+            {!card && <button type="button" disabled={locked || assets.length >= 100} onClick={addImageless}>이미지 없는 카드 추가</button>}
             {single && <button type="button" disabled={locked} onClick={() => removeAsset(single.id)}>이미지 빼기</button>}
             {replacement && <button type="button" disabled={locked} onClick={() => removeAsset(replacement.id)}>교체 취소</button>}
             <p>{pickNote}</p>
@@ -210,13 +253,15 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
             </div>
             <Checks title="카드 역할" disabled={busy} choices={ROLE_NAMES} values={draft.roles} onChange={roles => setDraft({ ...draft, roles })} />
             <Checks title="카드 행동 경제" disabled={busy} choices={ACTION_NAMES} values={draft.actions} onChange={actions => setDraft({ ...draft, actions })} />
+            <CardTraits value={draft} disabled={busy} onChange={patch => setDraft(current => ({ ...current, ...patch }))}/>
+            <OwnedResourcesEditor definitions={draft.ownedResources} disabled={locked} onChange={ownedResources => setDraft(current => ({ ...current, ownedResources }))}/>
             <p className="muted editor-hint">유형은 카드의 종류, 역할은 효과입니다. 예: 공격 주문 = 유형 ‘주문’ · 역할 ‘공격’.</p>
           </section>
           <section className="editor-section editor-tags" aria-label="카드 태그 설정">
             <Checks title="카드 태그" disabled={busy} choices={Object.fromEntries(tags.map(tag => [tag.id, tag.name]))} values={draft.tags} onChange={selected => setDraft({ ...draft, tags: selected })} />
             <div className="inline-form"><label>새 태그<input maxLength={60} value={newTag} disabled={busy} onChange={event => setNewTag(event.target.value)} /></label><button type="button" disabled={busy || !newTag.trim()} onClick={() => void addTag()}>태그 추가</button></div>
           </section>
-          {!card&&<fieldset disabled={busy} className="registration-rules-shell"><RegistrationRules advanced={!multiple} kind={multiple&&ruleKind==='advanced'?'unconfigured':ruleKind} onKind={chooseRule} draft={{...ruleDraft,spellLevel:draft.spellLevel}} onChange={updateRule} scope={ruleScope} onScope={setRuleScope} characterId={characterId} snapshot={controller?.snapshot} busy={busy} onAdvanced={()=>setAdvancedOpen(true)} summary={proposal?describeUseRules(proposal.castOptions,proposal.bindings,ruleResources):ruleError?[ruleError]:[]} pending={draftView} pendingNote={newResource?describeDraft(newResource):undefined} characterName={characterName} onNewResource={characterId&&controller?.snapshot?()=>setResourceFormOpen(true):undefined} onDiscardPending={()=>{if(newResource&&ruleDraft.resourceId===newResource.draftId)updateRule({resourceId:''});setNewResource(undefined);}}/>{controller?.error&&<p role="alert">{controller.error}</p>}<button type="button" disabled={busy||!controller} onClick={()=>void controller?.refresh()}>연결 자원 다시 불러오기</button></fieldset>}
+          {!card&&<fieldset disabled={busy} className="registration-rules-shell"><RegistrationRules hasOwned={!!draft.ownedResources?.length} advanced={!multiple} kind={multiple&&ruleKind==='advanced'?'unconfigured':ruleKind} onKind={chooseRule} draft={{...ruleDraft,spellLevel:draft.spellLevel}} onChange={updateRule} scope={ruleScope} onScope={setRuleScope} characterId={characterId} snapshot={controller?.snapshot} busy={busy} onAdvanced={()=>setAdvancedOpen(true)} summary={proposal?describeUseRules(proposal.castOptions,proposal.bindings,ruleResources):ruleError?[ruleError]:[]} pending={draftView} pendingNote={newResource?describeDraft(newResource):undefined} characterName={characterName} onNewResource={characterId&&controller?.snapshot?()=>setResourceFormOpen(true):undefined} onDiscardPending={()=>{if(newResource&&ruleDraft.resourceId===newResource.draftId)updateRule({resourceId:''});setNewResource(undefined);}}/>{controller?.error&&<p role="alert">{controller.error}</p>}<button type="button" disabled={busy||!controller} onClick={()=>void controller?.refresh()}>연결 자원 다시 불러오기</button></fieldset>}
           <details className="editor-advanced"><summary>{multiple ? '세부 설정 · 사거리' : '세부 설정 · 사거리 / 설명'}</summary>
             <div className="form-columns"><label className="form-field">사거리<select aria-label="사거리" value={draft.range.kind} disabled={busy} onChange={event => setDraft({ ...draft, range: { ...draft.range, kind: event.target.value as CardDraft['range']['kind'] } })}>{Object.entries(RANGE_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label><label className="form-field">거리 (ft, 선택)<input type="number" min={0} max={100000} step={1} value={draft.range.feet ?? ''} disabled={busy} onChange={event => setDraft({ ...draft, range: { ...draft.range, feet: event.target.value === '' ? undefined : Number(event.target.value) } })} /></label></div>
             {!multiple && <label className="form-field">설명 (선택)<textarea maxLength={10000} value={draft.description ?? ''} disabled={busy} rows={3} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label>}

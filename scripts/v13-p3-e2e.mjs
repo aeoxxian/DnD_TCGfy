@@ -1,5 +1,5 @@
-// v1.3 Phase 3 checks (UI-P0 layout skeleton): three columns — IN PLAY over USED | card page over HAND | ledger over
-// DECK — at 1920×1080, 1366×768 and 1280×720 with 100/125/150% scaling (real device scale factor) and the minimum window;
+// Board checks: full-height IN PLAY | card page over HAND | ledger over USED and DECK,
+// at 1920×1080, 1366×768 and 1280×720 with forced Electron scaling, plus the default and minimum windows;
 // no overlaps or clipping, the Use seal and the recovery buttons fully visible, the IN PLAY card keeps its ratio, the
 // collapsed ledger keeps the deck, the 반응 행동 quick button, stable panels when filters change, and all four themes.
 // UI-P1: five to seven hand cards, DECK shuffle (display only), USED clear/undo (display only), card backs from
@@ -7,12 +7,13 @@
 // Runs on COPIES of repository-data. Modes: built bundle (default), `--dev` (Vite), or DND_TCG_EXECUTABLE.
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import sharp from 'sharp';
 import { createServer } from 'vite';
-import { assertLayout, measure } from './v13-board.mjs';
+import { assertLayout, inside, measure, overlap } from './v13-board.mjs';
+import { closeExtraFilters, openExtraFilters } from './navigation-helpers.mjs';
 
 const dev = process.argv.includes('--dev');
 const binary = process.env.DND_TCG_EXECUTABLE;
@@ -44,14 +45,16 @@ async function selectCard(page) {
   if (await card.getAttribute('aria-pressed') !== 'true') await card.click();
   await page.mouse.move(1, 1); await page.locator('.use-button').waitFor(); await page.waitForTimeout(300);
 }
-const SIZES = [[1920, 1080, 1], [1366, 768, 1], [1280, 720, 1], [1920, 1080, 1.25], [1366, 768, 1.25], [1280, 720, 1.25], [1280, 720, 1.5]];
+const SIZES = [1, 1.25, 1.5].flatMap(scale => [[1920, 1080], [1366, 768], [1280, 720]].map(([w, h]) => [w, h, scale]));
+SIZES.push([1440, 900, 1]);
 const results = {};
 for (const scale of [1, 1.25, 1.5]) {
   const { app, page, errors } = await launch(await freshData(), scale);
   for (const [w, h] of SIZES.filter(s => s[2] === scale)) {
     await resize(app, page, Math.round(w / scale), Math.round(h / scale)); await selectCard(page);
     const m = await measure(page); assertLayout(m, `${w}×${h} @${scale * 100}%`);
-    results[`${w}x${h}@${scale * 100}`] = { leftShare: +(m.zones.inPlay.w / m.grid.w).toFixed(3), viewport: `${m.vw}×${m.vh}` };
+    const widths = ['inPlay', 'page', 'ledger'].map(zone => m.zones[zone].w);
+    results[`${w}x${h}@${scale * 100}`] = { widths, inPlayCard: m.card, viewport: `${m.vw}×${m.vh}` };
   }
   if (scale === 1) {
     await resize(app, page, 860, 440); await selectCard(page);
@@ -59,7 +62,7 @@ for (const scale of [1, 1.25, 1.5]) {
   }
   assert.deepEqual(errors, []); await app.close();
 }
-check('Three columns at 1920×1080, 1366×768, 1280×720 × 100/125/150% and the 860×440 minimum: IN PLAY over USED | card page over HAND | ledger over DECK, no overlap or clipping, IN PLAY card at 1:1.458, Use seal, recovery buttons and both piles fully visible, no page scroll', results);
+check('24:52:24 after gaps and full-height IN PLAY at the nine size/scale combinations, default and minimum windows; fixed right pile row, whole cards and reachable controls', results);
 
 {
   const userData = await freshData();
@@ -71,24 +74,44 @@ check('Three columns at 1920×1080, 1366×768, 1280×720 × 100/125/150% and the
   assert.deepEqual(await quick.getByRole('button').allTextContents(), ['행동', '보너스 행동', '반응 행동']);
   const count = () => page.getByLabel('표시 카드 수', { exact: true }).textContent();
   const all = await count();
+  const actions = () => page.evaluate(async () => (await window.desktop.getBootstrap()).value.libraryState.actions);
+  const roleState = () => page.evaluate(async () => (await window.desktop.getBootstrap()).value.libraryState.roles);
+  const extra = page.locator('.extra-filters-toggle');
+  const reaction = quick.getByRole('button', { name: '반응 행동', exact: true });
+  const reactionBox = await reaction.boundingBox();
+  const extraBox = await extra.boundingBox();
+  assert(extraBox.x >= reactionBox.x + reactionBox.width && extraBox.x - reactionBox.x - reactionBox.width <= 12,
+    'extra filters immediately follow reaction');
+  await quick.getByRole('button', { name: '행동', exact: true }).click();
+  await quick.getByRole('button', { name: '보너스 행동', exact: true }).click();
+  assert.deepEqual(await actions(), ['bonus_action']);
+  await openExtraFilters(page);
+  const extraActions = page.locator('#extra-filters-panel').getByRole('group', { name: '행동 경제 필터' });
+  await extraActions.getByRole('button', { name: '행동', exact: true }).click();
+  assert.deepEqual((await actions()).sort(), ['action', 'bonus_action']);
+  assert.equal(await quick.locator('[aria-pressed="true"]').count(), 0, 'multi-action filter leaves quick shortcuts unpressed');
+  assert.match(await extra.getAttribute('title'), /또는/);
+  await closeExtraFilters(page);
+  const rolesBefore = await roleState();
   await quick.getByRole('button', { name: '반응 행동', exact: true }).click(); await page.waitForTimeout(300);
   assert.equal(await quick.getByRole('button', { name: '반응 행동', exact: true }).getAttribute('aria-pressed'), 'true');
   const state = await page.evaluate(async () => (await window.desktop.getBootstrap()).value.libraryState.actions);
   assert.deepEqual(state, ['reaction']);
+  assert.deepEqual(await roleState(), rolesBefore);
   const after = await measure(page);
   for (const name of ['page', 'hand', 'inPlay', 'ledger']) assert.deepEqual(after.zones[name], before.zones[name], `${name} does not move when a filter changes`);
   await quick.getByRole('button', { name: '반응 행동', exact: true }).click(); await page.waitForFunction(text => document.querySelector('[aria-label="표시 카드 수"]')?.textContent === text, all);
   await selectCard(page); // the filter may have hidden (and so deselected) the selected card
-  check('반응 행동 joins the quick action buttons, filters through the same setting, and changing filters moves no panel');
+  check('Quick actions replace or clear one action without moving panels; the adjacent popover supports multiple OR actions');
 
-  // Collapsing the ledger narrows the right column, keeps the deck and widens the centre.
+  // Folding the ledger keeps the hand and both piles in place.
   await page.getByRole('button', { name: '자원 패널 접기', exact: true }).click(); await page.waitForTimeout(400);
   const collapsed = await measure(page); assert(collapsed.collapsed);
   assertLayout(collapsed, 'collapsed ledger', { collapsed: true });
-  assert(collapsed.zones.page.w > before.zones.page.w + 80, 'the centre widens when the ledger is collapsed');
+  for (const zone of ['inPlay', 'hand', 'used', 'deck']) assert.deepEqual(collapsed.zones[zone], before.zones[zone], `${zone} stays in place`);
   await page.getByRole('button', { name: '자원 패널 펼치기', exact: true }).click(); await page.waitForTimeout(400);
   assertLayout(await measure(page), 'expanded again');
-  check('Collapsing the ledger narrows the right column but keeps the deck; expanding restores the layout');
+  check('Collapsing the ledger preserves the hand and both piles; expanding restores the ledger controls');
 
   const seals = {};
   for (const theme of ['oxblood', 'ebony', 'verdant', 'abyss']) {
@@ -133,14 +156,36 @@ const handOrder = page => page.locator('.cards-area .card-button').evaluateAll(b
   const [cardsBefore, decksBefore, settingsBefore] = [dbCards(), dbDecks(), JSON.stringify(readDb(userData, 'SELECT * FROM settings ORDER BY key'))];
   const original = await handOrder(page);
   const deck = page.getByRole('button', { name: /눌러서 손패 순서 섞기$/ });
+  const tooltip = page.locator('.deck-pile .pile-tooltip');
+  await deck.hover(); await tooltip.waitFor();
+  const hint = await tooltip.boundingBox();
+  const controls = await measure(page);
+  for (const button of [...controls.coins, controls.undo]) {
+    assert(!overlap({ x: hint.x, y: hint.y, r: hint.x + hint.width, b: hint.y + hint.height }, button),
+      'the pile hint keeps recovery and Undo uncovered');
+  }
   let shuffled = original;
   for (let i = 0; i < 6 && shuffled.join() === original.join(); i++) { await deck.click(); await page.waitForTimeout(250); shuffled = await handOrder(page); }
   assert.notDeepEqual(shuffled, original); assert.deepEqual([...shuffled].sort(), [...original].sort());
   assert.equal(dbCards(), cardsBefore); assert.equal(dbDecks(), decksBefore);
   assert.equal(JSON.stringify(readDb(userData, 'SELECT * FROM settings ORDER BY key')), settingsBefore, 'shuffling writes nothing');
-  await page.getByRole('button', { name: '원래 순서', exact: true }).click();
+  await deck.focus(); await page.keyboard.press('Shift+F10');
+  const restoreOrder = page.getByRole('group', { name: 'DECK 더미 메뉴' }).getByRole('button', { name: '원래 순서', exact: true });
+  await restoreOrder.waitFor();
+  assert(await restoreOrder.evaluate(el => el === document.activeElement), 'the context action receives keyboard focus');
+  const menuRect = await restoreOrder.boundingBox();
+  const board = await measure(page);
+  assert(inside({ x: menuRect.x, y: menuRect.y, r: menuRect.x + menuRect.width, b: menuRect.y + menuRect.height }, { x: 0, y: 0, r: board.vw, b: board.vh }));
+  await page.keyboard.press('Escape'); await restoreOrder.waitFor({ state: 'hidden' });
+  assert(await deck.evaluate(el => el === document.activeElement), 'Escape returns focus to the pile');
+  await page.mouse.move(1, 1); await tooltip.waitFor();
+  await page.keyboard.press('Shift+F10');
+  await restoreOrder.click();
   assert.deepEqual(await handOrder(page), original);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await deck.click(); await page.waitForTimeout(200);
+  assert.equal(await page.locator('.deck-pile .pile > img').last().evaluate(el => getComputedStyle(el).animationName), 'none',
+    'reduced motion disables the shuffle animation');
   await app.close(); ({ app, page, errors } = await launch(userData)); await resize(app, page, 1366, 768);
   assert.deepEqual(await handOrder(page), original, 'a restart shows the registration order again');
   check('DECK pile shuffles the hand order only (cards, deck rows and settings untouched); 원래 순서 and a restart bring back the registration order');
@@ -161,11 +206,15 @@ const handOrder = page => page.locator('.cards-area .card-button').evaluateAll(b
   await page.waitForFunction(() => !document.querySelector('.use-button')?.disabled); await page.getByRole('button', { name: '사용 확정', exact: true }).click();
   await page.waitForFunction(n => /최근 (\d+)건/.exec(document.querySelector('.used-pile .pile-button')?.getAttribute('aria-label') ?? '')?.[1] === String(n), before + 1);
   const events = () => readDb(userData, 'SELECT count(*) AS n FROM play_events')[0].n; const eventsBefore = events();
+  const usedPile = page.locator('.used-pile .pile-button');
+  await usedPile.click({ button: 'right' });
   await page.getByRole('button', { name: '최근 사용 더미 비우기', exact: true }).click();
   await page.waitForFunction(() => /최근 0건/.test(document.querySelector('.used-pile .pile-button')?.getAttribute('aria-label') ?? ''));
   assert.equal(events(), eventsBefore, 'clearing the pile keeps every play event');
+  await usedPile.focus(); await page.keyboard.press('Shift+F10');
   await page.getByRole('button', { name: '되돌리기', exact: true }).click();
   await page.waitForFunction(n => /최근 (\d+)건/.exec(document.querySelector('.used-pile .pile-button')?.getAttribute('aria-label') ?? '')?.[1] === String(n), before + 1);
+  await usedPile.click({ button: 'right' });
   await page.getByRole('button', { name: '최근 사용 더미 비우기', exact: true }).click();
   await page.waitForFunction(() => /최근 0건/.test(document.querySelector('.used-pile .pile-button')?.getAttribute('aria-label') ?? ''));
   assert(JSON.parse(readDb(userData, "SELECT value_json FROM settings WHERE key='used_view'")[0].value_json)[hero.id]);
@@ -191,29 +240,130 @@ const handOrder = page => page.locator('.cards-area .card-button').evaluateAll(b
   await app.close();
 }
 {
-  // Transparent PNG (memo 1): no dark backing, alpha-following shadow, the card-back overlay masked to the image.
   const userData = await freshData();
-  const { app, page, errors } = await launch(userData); await resize(app, page, 1366, 768);
-  const png = join(run, 'transparent-card.png');
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="420" height="612"><rect x="24" y="24" width="372" height="564" rx="60" fill="#2a3b5c" stroke="#e2c98f" stroke-width="10"/><circle cx="210" cy="250" r="90" fill="#d9a441"/></svg>';
-  await writeFile(png, await sharp(Buffer.from(svg)).png().toBuffer());
-  await page.locator('.top-actions').getByRole('button', { name: '카드 등록', exact: true }).click();
-  const form = page.getByRole('dialog', { name: '카드 등록', exact: true }); await form.waitFor();
-  await form.getByLabel('카드 이미지 파일').setInputFiles(png); await form.getByRole('img', { name: /등록 미리보기$/ }).waitFor();
-  await form.getByLabel('카드 이름', { exact: true }).fill('투명 검수 카드');
-  await form.getByRole('button', { name: '카드 저장', exact: true }).click(); await form.waitFor({ state: 'hidden' });
-  const button = page.getByRole('button', { name: '투명 검수 카드 카드 선택', exact: true }); await button.scrollIntoViewIfNeeded();
-  const face = button.locator('.card-face'); await page.waitForFunction(el => el.classList.contains('has-alpha'), await face.elementHandle());
-  await page.waitForTimeout(400); // the face's shadow eases out (200 ms transition) once the image is known to be see-through
-  const look = await face.evaluate(el => ({ bg: getComputedStyle(el).backgroundColor, shadow: getComputedStyle(el).boxShadow, filter: getComputedStyle(el.querySelector('img')).filter, overlay: (() => { const o = el.querySelector('.card-unusable-back'); return o ? getComputedStyle(o).maskImage : null; })() }));
-  assert.equal(look.bg, 'rgba(0, 0, 0, 0)'); assert.equal(look.shadow, 'none'); assert.match(look.filter, /drop-shadow/);
-  assert(look.overlay && look.overlay.includes('url('), `the card-back overlay is masked to the image: ${look.overlay}`);
-  await button.click(); await page.mouse.move(1, 1); await page.waitForTimeout(300);
-  assert.match(await face.evaluate(el => getComputedStyle(el.querySelector('img')).filter), /drop-shadow/);
-  const opaque = page.locator('.cards-area .card-item .card-face.image-face:not(.has-alpha)').first();
-  assert.notEqual(await opaque.evaluate(el => getComputedStyle(el).boxShadow), 'none', 'opaque cards keep the box shadow');
-  assert.deepEqual(errors, []); await app.close();
-  check('A transparent PNG card has no dark backing; its shadow, selection glow and the unusable card-back overlay follow the image shape; opaque cards keep their box shadow');
+  const { app, page, errors } = await launch(userData);
+  try {
+    await resize(app, page, 1366, 768);
+    const transparent = join(run, 'transparent-card.png');
+    const opaque = join(run, 'opaque-card.png');
+    const jpeg = join(run, 'opaque-card.jpg');
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="420" height="612"><rect x="24" y="24" width="372" height="564" rx="60" fill="#2a3b5c" stroke="#e2c98f" stroke-width="10"/><circle cx="210" cy="250" r="90" fill="#d9a441"/></svg>';
+    await sharp(Buffer.from(svg)).png().toFile(transparent);
+    await sharp(Buffer.from(svg)).flatten({ background: '#2a3b5c' }).png().toFile(opaque);
+    await sharp(Buffer.from(svg)).flatten({ background: '#2a3b5c' }).jpeg().toFile(jpeg);
+    const names = ['알파 검수 투명 PNG', '알파 검수 불투명 PNG', '알파 검수 JPEG', '알파 검수 기본 카드'];
+    await page.evaluate(() => {
+      const input = document.createElement('input');
+      input.type = 'file'; input.multiple = true; input.id = 'alpha-fixtures';
+      document.body.append(input);
+    });
+    await page.locator('#alpha-fixtures').setInputFiles([transparent, opaque, jpeg]);
+    const fixtures = await page.evaluate(async names => {
+      const ok = result => { if (!result.ok) throw new Error(result.error); return result.value; };
+      const assets = ok(await window.desktop.importImages([...document.getElementById('alpha-fixtures').files])).assets;
+      if (assets.length !== 3) throw new Error('Missing PNG/JPEG fixtures');
+      const boot = ok(await window.desktop.getBootstrap());
+      const hero = boot.profiles.find(profile => profile.id === boot.libraryState.activeCharacterId);
+      let snapshot = ok(await window.desktop.getResources(hero.id));
+      const change = async action => {
+        snapshot = ok(await window.desktop.changeResource({ characterId: hero.id, requestId: crypto.randomUUID(), expectedRevision: snapshot.revision, action })).snapshot;
+      };
+      const resourceName = '알파 검수 회복 횟수';
+      await change({ type: 'create_resource', scope: 'character',
+        template: { name: resourceName, unit: '회', kind: 'counter', capacity: { type: 'fixed', value: 1 }, recovery: [{ triggers: ['short_rest'], amount: { type: 'full' } }] } });
+      const resource = snapshot.resources.find(entry => entry.name === resourceName);
+      await change({ type: 'adjust', resourceId: resource.id, delta: -1 });
+      const cards = names.map((name, index) => ({ name, imageAssetId: assets[index]?.id, kind: 'other', roles: ['utility'],
+        actions: ['action'], range: { kind: 'self' }, tags: [] }));
+      const library = ok(await window.desktop.saveCards({ cards, registrationTarget: { characterId: hero.id, deckId: hero.activeDeckId },
+        initialRules: { requestId: crypto.randomUUID(), configured: true, scope: 'character', characterId: hero.id, expectedRevision: snapshot.revision,
+          castOptions: [{ id: crypto.randomUUID(), label: '일반 사용', costs: [{ type: 'fixed', costKey: 'alpha-count', amount: 1 }] }],
+          bindings: [{ costKey: 'alpha-count', resourceInstanceId: resource.id }] } }));
+      return { card: { ...cards[0], id: library.cards.find(card => card.name === cards[0].name).id }, opaqueId: assets[1].id };
+    }, names);
+
+    await page.reload(); await page.waitForSelector('.board');
+    await page.locator('#card-name-search').fill('알파 검수');
+    const cardButton = name => page.getByRole('button', { name: `${name} 카드 선택`, exact: true });
+    const face = name => cardButton(name).locator('.card-face');
+    await face(names[0]).and(page.locator('.has-alpha')).waitFor();
+    await page.mouse.move(1, 1);
+    for (const [index, name] of names.entries()) {
+      const surface = face(name);
+      const back = surface.locator('.card-unusable-back');
+      await surface.scrollIntoViewIfNeeded();
+      await cardButton(name).locator('.card-resource-note', { hasText: '자원 부족' }).waitFor();
+      await page.waitForFunction(el => el.complete && el.naturalWidth > 0, await back.elementHandle());
+      const alpha = index === 0;
+      if (index < 3) await page.waitForFunction(el => el.complete && el.naturalWidth > 0,
+        await surface.locator('img:not(.card-unusable-back)').elementHandle());
+      if (alpha) await page.waitForFunction(el => getComputedStyle(el).boxShadow === 'none', await surface.elementHandle());
+      const appearance = await surface.evaluate(el => ({ alpha: el.classList.contains('has-alpha'),
+        shadow: getComputedStyle(el).boxShadow, front: el.querySelector('img:not(.card-unusable-back)')?.currentSrc,
+        mask: getComputedStyle(el.querySelector('.card-unusable-back')).maskImage }));
+      assert.equal(appearance.alpha, alpha);
+      assert.equal(!!appearance.front, index < 3);
+      if (alpha) {
+        assert.equal(appearance.shadow, 'none');
+        assert.match(appearance.mask, /url\("#/);
+      } else assert.equal(appearance.mask, 'none');
+      const capture = async (suffix) => {
+        const png = await surface.screenshot({ animations: 'disabled', path: join(run, `overlay-${index}-${suffix}.png`) });
+        return sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      };
+      const visible = await capture('visible');
+      await back.evaluate(el => { el.style.opacity = '0'; });
+      const hidden = await capture('hidden');
+      await back.evaluate(el => { el.style.removeProperty('opacity'); });
+      assert.deepEqual(visible.info, hidden.info);
+      const { width, height, channels } = visible.info;
+      function diff(x0, x1, y0, y1) {
+        let changed = 0; let sampled = 0;
+        for (let y = Math.ceil(y0 * height); y < y1 * height; y++) {
+          for (let x = Math.ceil(x0 * width); x < x1 * width; x++) {
+            const offset = (y * width + x) * channels;
+            const delta = visible.data.subarray(offset, offset + 3).reduce((sum, value, channel) => sum + Math.abs(value - hidden.data[offset + channel]), 0);
+            if (delta > 10) changed++;
+            sampled++;
+          }
+        }
+        return changed / sampled;
+      }
+      assert(diff(.25, .75, .25, .75) > .25, `${name}: the back visibly changes the interior`);
+      if (alpha) assert(diff(.01, .035, .2, .8) < .03, 'the left transparent edge remains unchanged');
+    }
+
+    const loadedFace = face(names[0]);
+    const asset = readDb(userData, 'SELECT relative_path FROM assets WHERE id=?', fixtures.card.imageAssetId)[0];
+    const localImage = join(userData, asset.relative_path);
+    const missingImage = localImage + '.missing';
+    await rename(localImage, missingImage);
+    try {
+      await page.reload(); await page.waitForSelector('.board');
+      await loadedFace.locator('.dc-broken').waitFor();
+      await cardButton(names[0]).locator('.card-resource-note', { hasText: '자원 부족' }).waitFor();
+    } finally {
+      await rename(missingImage, localImage);
+    }
+    await page.reload(); await page.waitForSelector('.board');
+    await loadedFace.and(page.locator('.has-alpha')).waitFor();
+    await page.evaluate(async ({ card, opaqueId }) => {
+      const result = await window.desktop.saveCards({ cards: [{ ...card, imageAssetId: opaqueId }] });
+      if (!result.ok) throw new Error(result.error);
+    }, fixtures);
+    await page.reload(); await page.waitForSelector('.board');
+    await loadedFace.locator('img').first().waitFor();
+    assert(!await loadedFace.evaluate(el => el.classList.contains('has-alpha')), 'an opaque replacement drops the previous mask');
+    await cardButton(names[0]).click(); await page.mouse.move(1, 1);
+    await page.locator('.in-play-slot .detail-card').waitFor();
+    await page.getByRole('button', { name: '짧은 휴식', exact: true }).click();
+    await page.getByRole('button', { name: '회복 확정', exact: true }).click();
+    for (const name of names) await face(name).locator('.card-unusable-back').waitFor({ state: 'detached' });
+    assert.deepEqual(errors, []);
+    check('Real pixel comparison: overlay paints transparent PNG, opaque PNG, JPEG and generated face; the transparent edge stays clear and shortage labels survive broken images, replacement and resource recovery');
+  } finally {
+    await app.close();
+  }
 }
 
 if (server) await server.close();
