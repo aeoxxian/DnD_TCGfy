@@ -81,19 +81,28 @@ async function configureWizard(level) {
   await modal.getByRole('button', { name: '클래스 변경 확정', exact: true }).click();
   await modal.waitFor({ state: 'hidden' });
 }
-async function declareCounter(form, key) {
+async function defineResource(form,name,type) {
+  await form.getByRole('button',{name:'새 자원 정의',exact:true}).click();
+  await form.getByLabel('정의 이름').fill(name);
+  await form.getByLabel('정의 종류').selectOption(type);
+  await form.getByRole('button',{name:'정의 등록',exact:true}).click();
+  await form.getByRole('option',{name:new RegExp(name)}).waitFor({state:'attached'});
+  return page.evaluate(async name=>(await window.desktop.getResourceDefinitions()).value.find(item=>item.name===name),name);
+}
+async function declareCounter(form,name) {
   await form.getByRole('radio', { name: '사용 횟수', exact: true }).check();
   await form.getByLabel('등록 규칙 적용 범위').selectOption('shared');
-  await form.getByLabel('등록 자원 식별 키', { exact: true }).fill(key);
-  assert.equal(await form.getByLabel('등록 사용할 자원', { exact: true }).inputValue(), '');
+  await form.getByLabel('연결 방식',{exact:true}).selectOption('automatic');
+  const def=await defineResource(form,name,'uses');
+  assert.equal(await form.getByLabel('등록 사용할 자원',{exact:true}).count(),0);
+  return def;
 }
-async function addCounter(name, key) {
+async function addCounter(name, configure) {
   await openManagement(page, '자원 관리');
-  await dialog('자원 관리').getByRole('button', { name: '새 자원 만들기', exact: true }).click();
-  const form = dialog('새 자원');
-  await form.getByLabel('자원 이름', { exact: true }).fill(name);
-  await form.getByLabel('자동 연결 식별 키', { exact: true }).fill(key);
-  await save(form, '자원 저장');
+  await dialog('자원 관리').getByRole('button', { name: `${name} 템플릿 장착`, exact: true }).click();
+  const form = dialog(configure?'자원 설정 후 장착':'템플릿 장착');
+  if(configure) await form.getByLabel('최대치').fill('5');
+  await save(form, configure?'자원 저장':'장착 확정');
   await dialog('자원 관리').getByRole('button', { name: '자원 관리 닫기', exact: true }).click();
 }
 async function waitOwnedAmount(remaining) {
@@ -135,12 +144,11 @@ try {
   pass('RES-001 · III까지 보유한 캐릭터가 등록 화면에서 I~IX를 선택하고 V 카드 저장, V 획득 후 자동 사용, 소진 표시');
 
   form = await openRegistration('검수 · 사용자 정의 V');
-  await declareCounter(form, 'audit:temporary');
+  await declareCounter(form, '임시 횟수');
   await form.getByText('고급 사용 규칙', { exact: true }).click();
   await form.getByRole('button', { name: '등록 고급 규칙 편집', exact: true }).click();
   const advanced = dialog('등록 카드 고급 사용 규칙');
-  await advanced.getByLabel('자원 식별 키 1-1', { exact: true }).fill('audit:tier');
-  await advanced.locator('label').filter({ hasText: '요구 자원 종류' }).locator('select').selectOption('track');
+  const customTrack=await defineResource(advanced,'사용자 정의 트랙','generic');
   const trackLevel = advanced.getByLabel('트랙 레벨 1-1', { exact: true });
   assert.deepEqual(await trackLevel.locator('option').evaluateAll(options => options.map(option => option.value)), ['', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
   await trackLevel.selectOption('5');
@@ -149,9 +157,9 @@ try {
   await form.getByText('이 카드의 고급 자원 요구를 보존하려면 먼저 카드 한 장을 저장하세요.', { exact: true }).waitFor();
   await save(form);
   await tile('검수 · 사용자 정의 V').click();
-  await page.getByText('필요한 자원 ‘audit:tier’을(를) 보유하지 않았습니다.', { exact: true }).waitFor();
+  await page.getByText('필요한 자원을 보유하지 않았습니다.', { exact: true }).waitFor();
   const custom = (await boot()).cards.find(card => card.name === '검수 · 사용자 정의 V');
-  assert.deepEqual(custom.castOptions[0].costs[0].requirement, { kind: 'track', key: 'audit:tier' });
+  assert.deepEqual(custom.castOptions[0].costs[0].requirement, { kind: 'track', key: customTrack.key, slotKind:'generic' });
   assert.equal(custom.castOptions[0].costs[0].slotLevel, 5);
   pass('RES-001 · 사용자 정의 V 트랙을 미보유 상태로 등록하고 일괄 화면 전환 시 입력 유실 방지');
 
@@ -232,7 +240,7 @@ try {
 
   const templateName = '검수 자원 템플릿';
   form = await openRegistration('검수 · 사용자 정의 요구');
-  await declareCounter(form, 'audit:pool');
+  const pool=await declareCounter(form, '공유 집중 A');
   await form.getByText('카드 고유 자원', { exact: true }).click();
   await form.getByRole('button', { name: '+ 고유 자원 추가', exact: true }).click();
   await fields(form).getByLabel('고유 자원 1 이름').fill('템플릿 빛');
@@ -244,8 +252,8 @@ try {
   await form.getByText(`‘${templateName}’ 템플릿을 저장했습니다.`).waitFor();
   await save(form);
   await tile('검수 · 사용자 정의 요구').click();
-  await page.getByText('필요한 자원 ‘audit:pool’을(를) 보유하지 않았습니다.', { exact: true }).waitFor();
-  await addCounter('공유 집중 A', 'audit:pool');
+  await page.getByText('필요한 자원을 보유하지 않았습니다.', { exact: true }).waitFor();
+  await addCounter('공유 집중 A', true);
   await useButton().click();
   await page.waitForFunction(async id => {
     const result = await window.desktop.getResources(id);
@@ -254,10 +262,10 @@ try {
   }, characterId);
   await page.getByRole('button', { name: '직전 자원 변경 실행 취소', exact: true }).click();
   await page.waitForFunction(async id => (await window.desktop.getResources(id)).value.resources.find(item => item.name === '공유 집중 A')?.remaining === 5, characterId);
-  await addCounter('공유 집중 B', 'audit:pool');
+  await addCounter('공유 집중 A', false);
   await page.getByText('같은 자원 후보가 여러 개입니다. 카드 사용 규칙에서 직접 연결해 주세요.', { exact: true }).waitFor();
   assert.equal(await useButton().isEnabled(), false);
-  assert.deepEqual((await snapshot()).resources.filter(item => item.template.matchKey === 'audit:pool').map(item => item.remaining), [5, 5]);
+  assert.deepEqual((await snapshot()).resources.filter(item => item.templateId === pool.id).map(item => item.remaining), [5, 5]);
   pass('RES-002/003 · 사용자 정의 키 획득 후 동시 차감·Undo, 후보 둘이면 확정 비활성화와 무차감');
 
   await app.close();
@@ -283,7 +291,7 @@ try {
   assert.deepEqual(base.ownedResources, original.ownedResources);
   assert.deepEqual(individual.ownedResources, [{ ...original.ownedResources[0], name: '개별 빛', maximum: 8 }]);
   for (const card of [base, individual]) {
-    assert.deepEqual(card.castOptions[0].costs[0].requirement, { kind: 'counter', key: 'audit:pool' });
+    assert.deepEqual(card.castOptions[0].costs[0].requirement, { kind: 'counter', key: pool.key });
     assert.equal((await snapshot()).resources.some(item => item.ownerCardName === card.name), false);
   }
   assert.deepEqual(errors, []);

@@ -51,6 +51,12 @@ export class LibraryStore {
     if (!row) throw new UserInputError('등록된 카드를 찾을 수 없습니다.');
     return this.readCard(row);
   }
+  trashedCards(): CardDefinition[] {
+    return (this.db.prepare('SELECT c.* FROM card_trash t JOIN card_definitions c ON c.id=t.card_id ORDER BY c.rowid')
+      .all() as unknown as CardRow[]).flatMap(row => {
+        try { return [this.readCard(row)]; } catch { return []; }
+      });
+  }
   getLibrary(): Library {
     const warnings: string[] = [];
     const cards: CardDefinition[] = [];

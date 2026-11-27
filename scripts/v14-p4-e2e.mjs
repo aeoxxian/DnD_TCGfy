@@ -210,7 +210,7 @@ try {
   await manager().getByRole('status').filter({ hasText: /기본 덱 \(2\).*덱을 추가했습니다/ }).waitFor();
   await manager().getByRole('button', { name: '덱 JSON 교환 닫기', exact: true }).click();
   const received = await boot();
-  assert.equal(received.schemaVersion, 10);
+  assert.equal(received.schemaVersion, 11);
   const deck = received.decks.find(item => item.name === '기본 덱 (2)');
   const card = received.cards.find(item => item.name === cardName);
   assert.equal(received.decks.find(item => item.id === target.activeDeckId).cardIds.length, 0);
@@ -243,10 +243,10 @@ try {
   await openManagement(page, '덱 JSON 교환');
   await manager().getByRole('button', { name: '덱 JSON 파일 선택', exact: true }).click();
   preview = getPreview();
-  await preview.getByText(/이미 가져온 파일입니다/).waitFor();
+  await preview.getByText(/이 파일로 만든 기존 덱/).waitFor();
   await screenshot('04-repeat-import.png');
   await preview.getByRole('button', { name: '기존 덱 확인', exact: true }).click();
-  await manager().getByRole('status').filter({ hasText: /덱을 이미 가져왔습니다/ }).waitFor();
+  await manager().getByRole('status').filter({ hasText: /카드 0장을 추가했습니다/ }).waitFor();
   assert.deepEqual(await snap(target.id), spent);
   assert.equal((await boot()).decks.length, 2);
   const returnedPath = join(run, 'round-trip.json');
@@ -282,7 +282,7 @@ try {
   await useDialog('open', jsonPath);
   await openManagement(page, '덱 JSON 교환');
   await manager().getByRole('button', { name: '덱 JSON 파일 선택', exact: true }).click();
-  await getPreview().getByText(/이미 가져온 파일입니다/).waitFor();
+  await getPreview().getByText(/이 파일로 만든 기존 덱/).waitFor();
   assert.deepEqual(errors, []);
   pass('기존 전체 ZIP 백업을 별도 프로필로 복원했을 때 가져온 덱, 5/7 잔여량, 사용 기록과 중복 가져오기 기록 유지');
   await writeFile(join(run, 'report.json'), JSON.stringify({ outcome: 'PASS', target: binary ? 'packaged-exe' : 'built-bundle', checks, errors, fromPath, toPath }, null, 2));

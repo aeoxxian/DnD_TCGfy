@@ -103,12 +103,13 @@ function stableOrder(value: unknown): unknown {
 }
 
 function cardIdentity(card: ExchangeCard, tagNames: Map<string,string>) {
-  const { ref, tags, castOptions, characterRules, ownedResources, ...metadata } = card;
+  const { ref, tags, castOptions, characterRules, ownedResources, costStatus, ...metadata } = card;
   void ref;
   const rules = remapRules(castOptions, characterRules, (prefix,index) => prefix + index);
-  const common = { ...metadata, tags: tags.map(tag => normalizeText(tagNames.get(tag) ?? tag)).sort(),
-    ownedResources: ownedResources?.map(({id,...definition}) => { void id; return definition; }), castOptions: rules.castOptions };
-  return { common: digest(stableOrder(common)), full: digest(stableOrder({ ...common, characterRules: rules.characterRules })) };
+  const design = { ...metadata, tags: tags.map(tag => normalizeText(tagNames.get(tag) ?? tag)).sort(),
+    ownedResources: ownedResources?.map(({id,...definition}) => { void id; return definition; }) };
+  return { design:digest(stableOrder(design)),
+    full:digest(stableOrder({ ...design, costStatus, castOptions:rules.castOptions, characterRules:rules.characterRules })) };
 }
 
 type AppendChoice = { card: ExchangeCard; existingId?: string };
@@ -116,6 +117,7 @@ interface ExchangePlan {
   identity: string;
   existing?: { id: string; name: string };
   choices: AppendChoice[];
+  matches?: Map<string,string>;
   preview: Omit<DeckPreview,'token'>;
   fingerprint: string;
 }
@@ -221,33 +223,55 @@ export class DeckExchange {
     const memberIds = (db.prepare('SELECT card_id FROM deck_cards WHERE deck_id=? ORDER BY position').all(targetId) as { card_id: string }[]).map(row => row.card_id);
     const members = new Set(memberIds);
     const receipt = db.prepare('SELECT 1 FROM deck_exchange_appends WHERE deck_id=? AND digest=?').get(targetId,identity);
+    const prior = db.prepare('SELECT card_ref,card_id FROM deck_exchange_cards WHERE deck_id=? AND digest=?')
+      .all(targetId,identity) as { card_ref: string; card_id: string | null }[];
+    const remembered = new Map(prior.map(row=>[row.card_ref,row.card_id]));
     const library = this.library.getLibrary();
     const localTags = new Map(library.tags.map(tag => [tag.id,tag.name]));
     const importedTags = new Map(deck.tags.map(tag => [tag.ref,tag.name]));
-    const cardsByCommon = new Map<string,{ id: string; full: string }[]>();
+    const cardsByDesign = new Map<string,{ card: CardDefinition; full: string; label: string }[]>();
+    const liveCards = new Map(library.cards.map(card=>[card.id,card]));
+    const trash = this.library.trashedCards();
+    const trashIds = new Set(trash.map(card=>card.id));
+    const trashIdentity = new Set(trash.map(card=>cardIdentity(this.portableCard(card,snapshot,'local',card.tags),localTags).design));
     const localNames = new Set(library.cards.map(card => normalizeText(card.name)));
     for (const card of library.cards) {
-      const key = cardIdentity(this.portableCard(card,snapshot,'local',card.tags),localTags);
-      const matches = cardsByCommon.get(key.common) ?? [];
-      matches.push({id:card.id,full:key.full});
-      cardsByCommon.set(key.common,matches);
+      const portable = this.portableCard(card,snapshot,'local',card.tags);
+      const key = cardIdentity(portable,localTags);
+      const matches = cardsByDesign.get(key.design) ?? [];
+      const labels = (portable.characterRules??portable.castOptions).map(option=>option.label).join(' / ');
+      matches.push({card,full:key.full,label:`${card.name} · ${labels}`});
+      cardsByDesign.set(key.design,matches);
     }
     const choices: AppendChoice[] = [];
     const added: string[] = [];
     const duplicates: string[] = [];
     const conflicts: NonNullable<DeckPreview['append']>['conflicts'] = [];
+    const trashed: string[] = [];
     const seen = new Set<string>();
+    const matches = new Map<string,string>();
     for (const card of deck.cards) {
       const key = cardIdentity(card,importedTags);
-      const same = cardsByCommon.get(key.common) ?? [];
+      const same = cardsByDesign.get(key.design) ?? [];
       const exact = same.filter(item => item.full === key.full);
-      if (receipt || seen.has(key.full) || exact.some(item => members.has(item.id))) {
+      const rememberedId = remembered.get(card.ref);
+      const previous = rememberedId ? liveCards.get(rememberedId) : undefined;
+      const member = (previous && members.has(previous.id) ? previous : undefined) ?? exact.find(item=>members.has(item.card.id))?.card;
+      const existing = previous ?? (exact.length === 1 ? exact[0].card : undefined);
+      if (member || seen.has(key.full)) {
         duplicates.push(card.name);
-      } else if (exact.length === 1 && !same.some(item => members.has(item.id))) {
-        choices.push({card,existingId:exact[0].id});
+        if (member) matches.set(card.ref,member.id);
+      } else if (rememberedId && trashIds.has(rememberedId)) {
+        trashed.push(card.name);
+      } else if (existing) {
+        choices.push({card,existingId:existing.id});
         added.push(card.name);
       } else if (same.length) {
-        conflicts.push({card:card.name,detail:'같은 카드 정의의 후보가 여러 개이거나 캐릭터 비용이 다릅니다. 기존 설정을 보존하고 건너뜁니다.'});
+        conflicts.push({card:card.name,ref:card.ref,detail:'같은 정의의 후보가 여러 개이거나 비용 규칙이 다릅니다. 기존 비용을 유지해 연결하거나 별도 카드로 등록할 수 있습니다.',
+          candidates:same.map((item,index)=>({id:item.card.id,label:same.length>1?`${item.label} (${index+1})`:item.label,inDeck:members.has(item.card.id)})),
+          copyNotices:noticesFor(card,!!card.image&&images.has(card.image.sha256),snapshot)});
+      } else if (rememberedId !== null && trashIdentity.has(key.design)) {
+        trashed.push(card.name);
       } else {
         if (localNames.has(normalizeText(card.name))) conflicts.push({card:card.name,detail:'같은 이름의 다른 정의가 있습니다. 별도 카드로 추가합니다.'});
         choices.push({card});
@@ -255,11 +279,15 @@ export class DeckExchange {
       }
       seen.add(key.full);
     }
-    const notices = choices.flatMap(({card}) => noticesFor(card,!!card.image && images.has(card.image.sha256),snapshot));
-    const preview = {characterName,name:target.name,cards:deck.cards.map(card => card.name),notices,existing:!!receipt,
-      duplicateCardNames:duplicates.length,renamed:false,append:{added,duplicates,conflicts}};
-    return {identity,choices,preview,existing:receipt?{id:targetId,name:target.name}:undefined,
-      fingerprint:digest({preview,memberIds,choices:choices.map(item=>[item.card.ref,item.existingId]),images:[...images]})};
+    const notices = choices.filter(choice=>!choice.existingId).flatMap(({card}) => noticesFor(card,!!card.image && images.has(card.image.sha256),snapshot));
+    const linkedChoices=choices.filter(choice=>choice.existingId);
+    const linked=linkedChoices.map(choice=>choice.card.name);
+    const linkedIds=linkedChoices.map(choice=>choice.existingId!);
+    const created=choices.filter(choice=>!choice.existingId).map(choice=>choice.card.name);
+    const preview = {characterName,name:target.name,cards:deck.cards.map(card => card.name),notices,existing:!!receipt&&!choices.length&&!conflicts.some(item=>item.ref),
+      duplicateCardNames:duplicates.length,renamed:false,append:{added,linked,linkedIds,created,duplicates,conflicts,trashed}};
+    return {identity,choices,matches,preview,existing:{id:targetId,name:target.name},
+      fingerprint:digest({preview,memberIds,matches:[...matches],remembered:[...remembered],choices:choices.map(item=>[item.card.ref,item.existingId]),images:[...images]})};
   }
 
   private plan(characterId: string, deck: DeckDocument, images: Map<string, string>, targetId?: string): ExchangePlan {
@@ -274,17 +302,21 @@ export class DeckExchange {
       .get(characterId, identity) as { id: string; name: string } | undefined;
     if (existing && db.prepare('SELECT 1 FROM deck_trash WHERE deck_id=?').get(existing.id))
       throw new UserInputError('이미 가져온 덱이 휴지통에 있습니다. 먼저 덱을 복원해 주세요.');
+    if (existing) {
+      const plan = this.appendPlan(existing.id,characterId,profile.name,deck,identity,images,snapshot);
+      return {...plan,preview:{...plan.preview,existing:!plan.choices.length&&!plan.preview.append?.conflicts.some(item=>item.ref)}};
+    }
     const deckNames = new Set((db.prepare('SELECT name FROM decks WHERE character_id=?').all(characterId) as { name: string }[]).map(item => normalizeText(item.name)));
-    let name = existing?.name ?? deck.name;
-    for (let n = 2; !existing && deckNames.has(normalizeText(name)); n++) {
+    let name = deck.name;
+    for (let n = 2; deckNames.has(normalizeText(name)); n++) {
       const suffix = ` (${n})`;
       name = deck.name.slice(0, 100 - suffix.length) + suffix;
     }
     const cardNames = new Set((db.prepare('SELECT name FROM card_definitions WHERE archived_at IS NULL').all() as { name: string }[]).map(card => normalizeText(card.name)));
     const duplicateCardNames = deck.cards.filter(card => cardNames.has(normalizeText(card.name))).length;
     const notices = deck.cards.flatMap(card => noticesFor(card, !!card.image && images.has(card.image.sha256), snapshot));
-    const preview = { characterName: profile.name, name, cards: deck.cards.map(card => card.name), notices, existing: !!existing, duplicateCardNames, renamed: !existing && name !== deck.name };
-    return { identity, existing, choices:deck.cards.map(card=>({card})), preview, fingerprint: digest({ preview, existing, images: [...images] }) };
+    const preview = { characterName: profile.name, name, cards: deck.cards.map(card => card.name), notices, existing: false, duplicateCardNames, renamed: name !== deck.name };
+    return { identity, choices:deck.cards.map(card=>({card})), preview, fingerprint: digest({ preview, images: [...images] }) };
   }
 
   async inspect(characterId: string, path: string, deckId?: string): Promise<DeckPreview> {
@@ -298,7 +330,7 @@ export class DeckExchange {
   }
 
   async apply(input: unknown): Promise<DeckImportResult> {
-    const { token, characterId, deckId } = deckApplySchema.parse(input);
+    const { token, characterId, deckId, decisions = {} } = deckApplySchema.parse(input);
     const draft = this.draft;
     if (!draft || draft.token !== token || draft.characterId !== characterId || draft.deckId !== deckId) throw new UserInputError('가져올 파일과 캐릭터를 다시 확인해 주세요.');
     const { deck } = draft;
@@ -306,29 +338,53 @@ export class DeckExchange {
     if (this.draft !== draft) throw new UserInputError('미리보기가 변경됐습니다. 다시 확인해 주세요.');
     const result = transaction(this.library.db, () => {
       const plan = this.plan(characterId, deck, images, deckId);
-      if (!plan.existing && plan.fingerprint !== draft.fingerprint) throw new UserInputError('대상 덱, 자원 또는 이미지가 변경됐습니다. 파일을 다시 열어 확인해 주세요.');
-      // A receipt returns the existing import for this character, without rewriting its current state.
-      if (plan.existing) return { deckId: plan.existing.id, name: plan.existing.name, replayed: true, notices: plan.preview.notices };
+      if (plan.fingerprint !== draft.fingerprint) throw new UserInputError('대상 덱, 자원 또는 이미지가 변경됐습니다. 파일을 다시 열어 확인해 주세요.');
       const db = this.library.db;
+      const destination = plan.existing?.id ?? randomUUID();
+      const members = new Set(db.prepare('SELECT card_id FROM deck_cards WHERE deck_id=?').all(destination).map(row=>String(row.card_id)));
+      const summary = { linked: [] as string[], created: [] as string[], duplicates:[...(plan.preview.append?.duplicates??[])],
+        trashed:[...(plan.preview.append?.trashed??[])], skipped:[] as string[] };
+      const choices = new Map(plan.choices.map(choice=>[choice.card.ref,choice]));
+      const conflicts = new Map(plan.preview.append?.conflicts.filter(item=>item.ref).map(item=>[item.ref!,item]));
+      for (const ref of Object.keys(decisions)) if (!conflicts.has(ref)) throw new UserInputError('미리보기의 충돌 항목을 다시 확인해 주세요.');
+      for (const card of deck.cards) {
+        if (!conflicts.has(card.ref)) continue;
+        const decision = decisions[card.ref];
+        if (!decision || decision.mode==='skip') { summary.skipped.push(card.name); continue; }
+        if (decision.mode==='link' && !conflicts.get(card.ref)?.candidates?.some(candidate=>candidate.id===decision.cardId))
+          throw new UserInputError('연결할 카드를 다시 선택해 주세요.');
+        choices.set(card.ref,{card,existingId:decision.mode==='link'?decision.cardId:undefined});
+      }
       const now = new Date().toISOString();
       const existingTags = new Map((db.prepare('SELECT id,name FROM tags ORDER BY rowid').all() as { id: string; name: string }[])
         .map(tag => [normalizeText(tag.name), tag.id]));
-      const usedTags = new Set(plan.choices.filter(choice=>!choice.existingId).flatMap(({card})=>card.tags));
-      const tagIds = new Map(deck.tags.filter(tag=>!deckId||usedTags.has(tag.ref)).map(tag => {
+      const usedTags = new Set([...choices.values()].filter(choice=>!choice.existingId).flatMap(({card})=>card.tags));
+      const tagIds = new Map(deck.tags.filter(tag=>usedTags.has(tag.ref)).map(tag => {
         const existing = existingTags.get(normalizeText(tag.name));
         const id = existing ?? randomUUID();
         if (!existing) db.prepare('INSERT INTO tags(id,name,created_at,updated_at) VALUES (?,?,?,?)').run(id, tag.name, now, now);
         return [tag.ref, id];
       }));
-      const destination = deckId ?? randomUUID();
-      if (!deckId) db.prepare('INSERT INTO decks(id,character_id,name) VALUES (?,?,?)').run(destination, characterId, plan.preview.name);
+      if (!plan.existing) db.prepare('INSERT INTO decks(id,character_id,name) VALUES (?,?,?)').run(destination, characterId, plan.preview.name);
       const insertCard = db.prepare('INSERT INTO card_definitions(id,name,image_asset_id,kind,spell_level,attributes_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)');
       const insertTag = db.prepare('INSERT INTO card_tags(card_id,tag_id) VALUES (?,?)');
       const insertMember = db.prepare('INSERT INTO deck_cards(deck_id,card_id,position) VALUES (?,?,?)');
       const insertOverride = db.prepare('INSERT INTO character_cost_overrides VALUES (?,?,?,?)');
       let position = Number(db.prepare('SELECT COALESCE(MAX(position),-1)+1 AS position FROM deck_cards WHERE deck_id=?').get(destination)!.position);
-      for (const {card,existingId} of plan.choices) {
-        if (existingId) { insertMember.run(destination,existingId,position++); continue; }
+      const remember = db.prepare('INSERT INTO deck_exchange_cards VALUES (?,?,?,?) ON CONFLICT(deck_id,digest,card_ref) DO UPDATE SET card_id=excluded.card_id');
+      for (const [ref,id] of plan.matches??[]) remember.run(destination,plan.identity,ref,id);
+      const notices = [...plan.preview.notices];
+      for (const fileCard of deck.cards) {
+        const choice = choices.get(fileCard.ref);
+        if (!choice) continue;
+        const {card,existingId} = choice;
+        if (existingId) {
+          if (members.has(existingId)) summary.duplicates.push(card.name);
+          else { insertMember.run(destination,existingId,position++); members.add(existingId); summary.linked.push(card.name); }
+          remember.run(destination,plan.identity,card.ref,existingId);
+          continue;
+        }
+        notices.push(...(conflicts.get(card.ref)?.copyNotices??[]));
         const { image, tags, castOptions, characterRules, ownedResources, ...fields } = card;
         const rules = remapRules(castOptions, characterRules, () => randomUUID());
         const id = randomUUID();
@@ -346,10 +402,13 @@ export class DeckExchange {
         for (const tagId of row.tags) insertTag.run(id, tagId);
         if (rules.characterRules) insertOverride.run(characterId, id, JSON.stringify(rules.characterRules), now);
         insertMember.run(destination, id, position++);
+        remember.run(destination,plan.identity,card.ref,id);
+        summary.created.push(card.name);
       }
-      if (deckId) db.prepare('INSERT INTO deck_exchange_appends VALUES (?,?)').run(destination,plan.identity);
-      else db.prepare('INSERT INTO deck_exchange_imports VALUES (?,?,?)').run(characterId,plan.identity,destination);
-      return { deckId:destination, name:plan.preview.name, replayed:false, notices:plan.preview.notices, added:deckId?plan.choices.length:undefined };
+      const added = summary.linked.length+summary.created.length;
+      if (deckId && added) db.prepare('INSERT INTO deck_exchange_appends VALUES (?,?) ON CONFLICT DO NOTHING').run(destination,plan.identity);
+      else if (!plan.existing) db.prepare('INSERT INTO deck_exchange_imports VALUES (?,?,?)').run(characterId,plan.identity,destination);
+      return { deckId:destination, name:plan.preview.name, replayed:!!plan.existing&&!added, notices, added, summary };
     });
     return { ...result, library: this.library.getLibrary() };
   }

@@ -16,7 +16,7 @@ const userData = join(run, 'user-data');
 await cp(upgraded, userData, { recursive: true });
 const file = join(userData, 'data', 'app.sqlite3');
 const db = new DatabaseSync(file, { readOnly: true });
-assert.equal(db.prepare('PRAGMA user_version').get().user_version, 10);
+assert.equal(db.prepare('PRAGMA user_version').get().user_version, 11);
 db.close();
 const hash = async () => createHash('sha256').update(await readFile(file)).digest('hex');
 const before = await hash();
@@ -44,5 +44,5 @@ try {
   await exited;
 }
 assert.equal(await hash(), before, 'v9 database remains byte-for-byte identical');
-await writeFile(join(run, 'report.json'), JSON.stringify({ outcome: 'PASS', message: expected, schemaVersion: 10, dbSha256: before, run }, null, 2));
+await writeFile(join(run, 'report.json'), JSON.stringify({ outcome: 'PASS', message: expected, schemaVersion: 11, dbSha256: before, run }, null, 2));
 console.log(run);

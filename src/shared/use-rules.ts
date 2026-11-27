@@ -26,7 +26,7 @@ export function automaticCost(cost: Cost, resource?: ResourceView, suppliedKey?:
   const track = cost.type === 'slot' || cost.slotLevel !== undefined;
   const compatible = cost.type === 'slot' ? family === slotKind : track ? !!family : resource?.kind === 'counter';
   const key = suppliedKey ?? (compatible && resource?.overrides.scope === 'character' && !resource.retired && !resource.inactive
-    ? resource.template.matchKey ?? (resource.presetKey?.startsWith('2014:') ? resource.template.key : undefined)
+    ? resource.template.matchKey ?? resource.template.key
     : undefined);
   const parsed = resourceMatchKeySchema.safeParse(key?.trim());
   if (!parsed.success) return;
@@ -35,16 +35,19 @@ export function automaticCost(cost: Cost, resource?: ResourceView, suppliedKey?:
 }
 
 export function inferredAutomaticCost(cardId: string, cost: Cost, resource: ResourceView | undefined, resources: ResourceView[]) {
-  const candidate = automaticCost(cost, resource);
-  if (!candidate) return;
-  try {
-    if (resolveCostResource(cardId, candidate, resources, []).id === resource?.id) return candidate;
-  } catch { /* A missing or ambiguous match requires an explicit key. */ }
+  const initial = automaticCost(cost,resource);
+  if (!initial || !resource) return;
+  for (const candidate of [initial,automaticCost(cost,resource,resource.template.key)]) {
+    if (!candidate) continue;
+    try {
+      if (resolveCostResource(cardId,candidate,resources,[]).id===resource.id) return candidate;
+    } catch { /* A missing or ambiguous match requires a definition choice. */ }
+  }
 }
 
 export type BasicRuleKind='none'|'slots'|'uses'|'points';
 export interface BasicRuleDraft {
-  kind:BasicRuleKind; resourceId:string; resourceKey?:string; amount:number; variable:boolean; min:number; max:number; step:number;
+  kind:BasicRuleKind; resourceId:string; resourceKey?:string; connectionMode?:'automatic'|'manual'; amount:number; variable:boolean; min:number; max:number; step:number;
   family:'standard'|'pact'; automatic:boolean; spellLevel?:number; homebrew:boolean; belowBase:boolean; allowUpcast?:boolean; minLevel?:number; maxLevel?:number;
 }
 export const emptyBasicRule=(card:CardDefinition):BasicRuleDraft=>({kind:'none',resourceId:'',amount:1,variable:false,min:1,max:5,step:1,family:'standard',automatic:true,spellLevel:card.spellLevel,homebrew:false,belowBase:false});
@@ -77,7 +80,7 @@ export function buildBasicRule(card:CardDefinition,draft:BasicRuleDraft,ids:{opt
     if(card.kind!=='spell'||draft.spellLevel===undefined)throw new Error('기본 주문 레벨을 지정해 주세요.');
     if(!Number.isInteger(draft.spellLevel)||draft.spellLevel<0||draft.spellLevel>9)throw new Error('기본 주문 레벨은 0~9입니다.');
     const key=draft.resourceKey?.trim();
-    if(key&&!resourceMatchKeySchema.safeParse(key).success)throw new Error('자원 식별 키를 확인해 주세요.');
+    if(key&&!resourceMatchKeySchema.safeParse(key).success)throw new Error('선택한 자원 정의를 확인해 주세요.');
     if(!draft.automatic&&draft.spellLevel!==0&&!draft.resourceId&&!key)throw new Error('사용할 슬롯 자원을 선택해 주세요.');
     if(([draft.minLevel,draft.maxLevel].some(level=>level!==undefined&&(!Number.isInteger(level)||level<1||level>9))||draft.minLevel!==undefined&&draft.maxLevel!==undefined&&draft.minLevel>draft.maxLevel))throw new Error('시전 레벨의 최소·최대 범위를 확인해 주세요.');
     const oldCost=card.castOptions.find(option=>option.id===ids.optionId)?.costs.find(cost=>cost.costKey===ids.costKey);
@@ -87,7 +90,7 @@ export function buildBasicRule(card:CardDefinition,draft:BasicRuleDraft,ids:{opt
     if(!draft.automatic&&draft.resourceId&&draft.spellLevel!==0)bindings.push({costKey:ids.costKey,resourceInstanceId:draft.resourceId});
   }else if(draft.kind==='uses'||draft.kind==='points'){
     const key=draft.resourceKey?.trim();
-    if(!draft.resourceId&&!key)throw new Error('사용할 자원을 선택하거나 자원 식별 키를 입력해 주세요.');
+    if(!draft.resourceId&&!key)throw new Error('사용할 자원 또는 자원 정의를 선택해 주세요.');
     const parsed=key?resourceMatchKeySchema.safeParse(key):undefined;
     if(parsed&&!parsed.success)throw new Error(parsed.error.issues[0].message);
     const requirement=parsed?.success?{kind:'counter' as const,key:parsed.data}:undefined;
@@ -104,7 +107,7 @@ export function buildBasicRule(card:CardDefinition,draft:BasicRuleDraft,ids:{opt
 }
 export function describeUseRules(options:CastOption[],bindings:{costKey:string;resourceInstanceId:string}[],resources:ResourceView[]):string[]{
   return options.map(option=>`${option.label}: ${option.costs.length?option.costs.map(cost=>{
-    const id=bindings.find(binding=>binding.costKey===cost.costKey)?.resourceInstanceId;const resource=resources.find(resource=>resource.id===id);const name=resource?.name??(cost.reconnect?'가져온 비용 · 직접 연결 필요':cost.requirement?`자원 키 ${cost.requirement.key}`:'기존 연결 확인 필요');
+    const id=bindings.find(binding=>binding.costKey===cost.costKey)?.resourceInstanceId;const resource=resources.find(resource=>resource.id===id);const name=resource?.name??(cost.reconnect?'가져온 비용 · 직접 연결 필요':cost.requirement?resources.find(item=>item.template.key===cost.requirement!.key||item.template.matchKey===cost.requirement!.key)?.name??'선택한 자원 정의 · 자동 연결':'기존 연결 확인 필요');
     if(cost.type==='slot')return `${cost.slotSelection==='standard'?'일반 주문':cost.slotSelection==='pact'?'계약 마법':'사용자 정의'} 슬롯 1개 · 사용할 때 레벨 선택${cost.autoBind?' · 클래스에서 자동 연결':` · ${name}`}`;
     const amount=cost.type==='fixed'?String(cost.amount):`${cost.min}~${cost.max} (간격 ${cost.step})`;
     return `${name}${cost.slotLevel!==undefined?` ${cost.slotLevel}레벨`:''} ${amount}${resource?.unit??''}`;

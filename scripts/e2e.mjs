@@ -118,7 +118,7 @@ try {
   });
   assert.equal(resolve(runtime.userData), resolve(userData)); if (binary) assert.equal(runtime.packaged, true); assert.equal(runtime.appVersion,JSON.parse(await readFile('package.json','utf8')).version);
   assert.equal(runtime.sandbox, true); assert.equal(runtime.nodeIntegration, false); assert.equal(runtime.contextIsolation, true); assert.equal(runtime.webSecurity, true);
-  let data = await state(); const toVersion = data.schemaVersion; assert.equal(toVersion, 10); assert.deepEqual(data.settings, initialSettings);
+  let data = await state(); const toVersion = data.schemaVersion; assert.equal(toVersion, 11); assert.deepEqual(data.settings, initialSettings);
   assert.deepEqual(data.cards[0].castOptions, legacyCard.castOptions); assert.equal(data.cards[0].id, 'p0-card');
   assert.equal(data.tags[0].id, 'legacy-tag'); assert.equal(data.decks[0].cardIds[0], 'p0-card');
   assert.equal((await readdir(join(userData, 'backups'))).filter(name => name.startsWith('before-')).length, 1);

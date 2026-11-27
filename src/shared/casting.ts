@@ -24,7 +24,7 @@ export function resolveCostResource(cardId: string, cost: Cost, resources: Resou
       && (item.template.matchKey === requirement.key || item.template.key === requirement.key));
     const matches = keyed.filter(item => requirement.kind === 'counter' ? item.kind === 'counter'
       : item.kind === 'slot_track' && (item.template.slotKind ?? 'generic') === family);
-    if (!keyed.length) throw new ResourceRequirementError(`필요한 자원 ‘${requirement.key}’을(를) 보유하지 않았습니다.`, 'missing');
+    if (!keyed.length) throw new ResourceRequirementError('필요한 자원을 보유하지 않았습니다.', 'missing');
     if (!matches.length) throw new Error('식별 키에 맞는 자원의 종류가 다릅니다.');
     if (matches.length > 1) throw new Error('같은 자원 후보가 여러 개입니다. 카드 사용 규칙에서 직접 연결해 주세요.');
     resource = matches[0];

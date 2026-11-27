@@ -33,7 +33,7 @@ it('rolls back a failed v1.3 migration, keeps an intact v6 backup, and recovers 
   fixture.close();
   expect(() => new AppStore(failed)).toThrow('deck_exchange_imports');
   expect(read(dbPath(failed))).toEqual(baseline);
-  const names = readdirSync(join(failed, 'backups')).filter(name => !oldBackups.has(name) && name.startsWith('before-v6-to-v10-'));
+  const names = readdirSync(join(failed, 'backups')).filter(name => !oldBackups.has(name) && name.startsWith('before-v6-to-v11-'));
   expect(names).toHaveLength(1);
   expect(read(join(failed, 'backups', names[0]))).toEqual(baseline);
   const db = new DatabaseSync(dbPath(failed), { readOnly: true });
@@ -43,7 +43,7 @@ it('rolls back a failed v1.3 migration, keeps an intact v6 backup, and recovers 
   cpSync(source, recovered, { recursive: true });
   const store = new AppStore(recovered);
   expect(snapshot(store.db)).toEqual(baseline.rows);
-  expect(store.db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
+  expect(store.db.prepare('PRAGMA user_version').get()?.user_version).toBe(11);
   expect(store.db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
   for (const row of baseline.rows.assets) {
     const path = String(row.relative_path);

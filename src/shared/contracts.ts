@@ -269,6 +269,7 @@ export const IPC = {
   importImages: 'assets:import', discardImports: 'assets:discard', assetAlpha: 'assets:alpha', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
   createProfile: 'profiles:create', changeProfileTrash: 'profiles:trash', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
   previewClass: 'classes:preview', getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
+  getResourceDefinitions: 'resources:definitions', createResourceDefinition: 'resources:definition:create',
   exportDeck: 'deck-exchange:export', inspectDeck: 'deck-exchange:inspect', importDeck: 'deck-exchange:import',
   exportBackup: 'backup:export', inspectBackup: 'backup:inspect', applyBackup: 'backup:apply', discardBackup: 'backup:discard', getBackupStatus: 'backup:status',
 } as const;

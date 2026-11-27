@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Library } from '../shared/contracts';
-import type { DeckNotice, DeckPreview } from '../shared/deck-exchange';
+import type { DeckNotice, DeckPreview, DeckImportResult } from '../shared/deck-exchange';
 import { Modal } from './Modal';
 
 function Notices({ notices }: { notices: DeckNotice[] }) {
@@ -17,12 +17,22 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
   const [mode, setMode] = useState<'new'|'append'>('new');
   const [targetId, setTargetId] = useState('');
   const [preview, setPreview] = useState<DeckPreview>();
-  const [complete, setComplete] = useState<{ text: string; notices: DeckNotice[] }>();
+  const [choices,setChoices] = useState<Record<string,string>>({});
+  const [complete, setComplete] = useState<{ text: string; notices: DeckNotice[]; summary?: DeckImportResult['summary'] }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const targets = library.decks.filter(deck=>deck.characterId===characterId);
   const target = targets.find(deck=>deck.id===targetId) ?? targets[0];
   const destination = { characterId, ...(mode==='append'&&target?{deckId:target.id}:{}) };
+  const resolvedLinks = new Set(preview?.append?.linkedIds??[]);
+  let resolvedCopies = 0;
+  for (const conflict of preview?.append?.conflicts??[]) {
+    const selected = conflict.ref ? choices[conflict.ref] : undefined;
+    if (selected==='copy') resolvedCopies++;
+    const candidate=conflict.candidates?.find(item=>selected===`link:${item.id}`);
+    if (candidate&&!candidate.inDeck) resolvedLinks.add(candidate.id);
+  }
+  const plannedAdded=(preview?.append?.created.length??0)+resolvedCopies+resolvedLinks.size;
   function clearPreview() { setPreview(undefined); setError(''); setComplete(undefined); }
 
   async function run(action: 'export' | 'inspect' | 'apply') {
@@ -40,17 +50,18 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
       } else if (action === 'inspect') {
         const result = await window.desktop.inspectDeck(destination);
         if (!result.ok) { setError(result.error); return; }
-        if (!('canceled' in result.value)) setPreview(result.value);
+        if (!('canceled' in result.value)) { setChoices({}); setPreview(result.value); }
       } else if (preview) {
-        const result = await window.desktop.importDeck({ token: preview.token, ...destination });
+        const decisions = Object.fromEntries(Object.entries(choices).map(([ref,value]) => [ref,
+          value==='copy'?{mode:'copy' as const}:value==='skip'?{mode:'skip' as const}:{mode:'link' as const,cardId:value.slice(5)}]));
+        const result = await window.desktop.importDeck({ token: preview.token, ...destination, decisions });
         if (!result.ok) { setError(result.error); return; }
         setPreview(undefined);
         onLibrary(result.value.library);
-        const text = mode==='append' ? result.value.replayed ? '이 파일을 이미 반영했습니다. 덱과 자원은 그대로입니다.'
-          : `‘${result.value.name}’ 덱에 카드 ${result.value.added}장을 추가했습니다.`
-          : result.value.replayed ? `‘${result.value.name}’ 덱을 이미 가져왔습니다. 기존 덱을 그대로 사용하세요.`
+        const summary = result.value.summary;
+        const text = preview.append ? `‘${result.value.name}’ 덱에 카드 ${result.value.added}장을 추가했습니다. 기존 연결 ${summary?.linked.length??0}장, 신규 등록 ${summary?.created.length??0}장 · 중복 ${summary?.duplicates.length??0}장, 휴지통 ${summary?.trashed.length??0}장, 건너뛴 충돌 ${summary?.skipped.length??0}장.`
           : `‘${result.value.name}’ 덱을 추가했습니다. 상단에서 캐릭터와 새 덱을 선택하세요.`;
-        setComplete({ text, notices: result.value.notices });
+        setComplete({ text, notices: result.value.notices, summary });
       }
     } catch { setError('덱 교환 결과를 확인하지 못했습니다. 파일과 저장 공간을 확인해 주세요.'); }
     finally { setBusy(false); }
@@ -81,13 +92,25 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
     {preview && <section className="registration-summary" aria-label="덱 불러오기 미리보기">
       <h3>{preview.characterName} · {preview.name}</h3>
       {preview.append ? <>
-        {preview.existing&&<p>이 덱에 이미 반영한 파일입니다.</p>}
-        <h4>신규 추가 {preview.append.added.length}장</h4>
-        {preview.append.added.length>0&&<ol>{preview.append.added.map((name,index)=><li key={index}>{name}</li>)}</ol>}
+        <p>{mode==='new'?'이 파일로 만든 기존 덱을 확인합니다. ':''}현재 덱에 빠진 카드만 추가합니다.</p>
+        <h4>추가 예정 {plannedAdded}장</h4>
+        {preview.append.linked.length>0&&<p>기존 카드 연결 · {preview.append.linked.join(' · ')}</p>}
+        {preview.append.created.length>0&&<p>새 카드 등록 · {preview.append.created.join(' · ')}</p>}
         <h4>중복 {preview.append.duplicates.length}장</h4>
         {preview.append.duplicates.length>0&&<ul>{preview.append.duplicates.map((name,index)=><li key={index}>{name}</li>)}</ul>}
         <h4>충돌 {preview.append.conflicts.length}장</h4>
-        {preview.append.conflicts.length>0&&<ul>{preview.append.conflicts.map(({card,detail},index)=><li key={index}>{card} · {detail}</li>)}</ul>}
+        {preview.append.conflicts.length>0&&<ul>{preview.append.conflicts.map(({card,detail,ref,candidates,copyNotices},index)=><li key={ref??index}>{card} · {detail}
+          {ref&&<label className="form-field">{card} 가져오기 방법<select value={choices[ref]??'skip'} disabled={busy}
+            onChange={event=>setChoices({...choices,[ref]:event.target.value})}>
+            <option value="skip">건너뛰기</option>
+            {candidates?.map(candidate=><option key={candidate.id} value={`link:${candidate.id}`}>{candidate.label} · {candidate.inDeck?'이미 이 덱에 있음':'기존 설정 유지'}</option>)}
+            <option value="copy">JSON의 비용으로 별도 등록</option>
+          </select></label>}
+          {ref&&choices[ref]==='copy'&&<Notices notices={copyNotices??[]}/>}
+        </li>)}</ul>}
+        {preview.append.trashed.length>0&&<><h4>휴지통 {preview.append.trashed.length}장</h4>
+          <p>카드 휴지통에서 다음 카드를 복원한 뒤 파일을 다시 선택하면 연결할 수 있습니다.</p>
+          <ul>{preview.append.trashed.map((name,index)=><li key={index}>{name}</li>)}</ul></>}
       </> : <p>{preview.existing ? '이 캐릭터가 이미 가져온 파일입니다. 기존 덱과 잔여량을 그대로 사용합니다.' : `카드 ${preview.cards.length}장을 새 덱으로 추가합니다.`}</p>}
       {preview.renamed && <p>같은 이름의 덱이 있어 새 이름을 붙였습니다.</p>}
       {!preview.append && !preview.existing && preview.duplicateCardNames > 0 && <p>라이브러리에 이름이 같은 카드 {preview.duplicateCardNames}장이 있습니다. 새 카드로 등록합니다.</p>}
@@ -95,10 +118,15 @@ export function DeckExchangeManager({ library, activeDeckId, onClose, onLibrary 
       <Notices notices={preview.notices}/>
       <div className="modal-actions">
         <button disabled={busy} onClick={() => setPreview(undefined)}>미리보기 닫기</button>
-        <button className="primary" disabled={busy||!!preview.append&&!preview.existing&&!preview.append.added.length} onClick={() => void run('apply')}>{preview.existing ? '기존 덱 확인' : preview.append ? '기존 덱에 추가 확정' : '새 덱 불러오기 확정'}</button>
+        <button className="primary" disabled={busy} onClick={() => void run('apply')}>{preview.append
+          ? plannedAdded ? '기존 덱에 추가 확정' : '기존 덱 확인'
+          : '새 덱 불러오기 확정'}</button>
       </div>
     </section>}
-    {complete && <section aria-label="덱 교환 결과"><p role="status">{complete.text}</p><Notices notices={complete.notices}/></section>}
+    {complete && <section aria-label="덱 교환 결과"><p role="status">{complete.text}</p>
+      {!!complete.summary?.trashed.length&&<p>휴지통에서 복원할 카드 · {complete.summary.trashed.join(' · ')}</p>}
+      {!!complete.summary?.skipped.length&&<p>건너뛴 충돌 카드 · {complete.summary.skipped.join(' · ')}</p>}
+      <Notices notices={complete.notices}/></section>}
     {error && <p className="error-banner" role="alert">{error}</p>}
   </Modal>;
 }

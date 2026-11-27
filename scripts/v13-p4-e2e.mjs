@@ -309,7 +309,7 @@ const deckBefore = data.decks.find(d => d.id === druid.activeDeckId).cardIds.len
   for (const row of originalCards) assert.equal(now.get(row.id), JSON.stringify(row), `original card ${row.name} unchanged`);
   assert.equal(readDb(userData, 'PRAGMA integrity_check')[0].integrity_check, 'ok');
   assert.deepEqual(readDb(userData, 'PRAGMA foreign_key_check'), []);
-  assert.equal(readDb(userData, 'PRAGMA user_version')[0].user_version, 10, 'schema v10 after patch migration');
+  assert.equal(readDb(userData, 'PRAGMA user_version')[0].user_version, 11, 'schema v11 after patch migration');
   check('Data: every original image file and card row is byte-identical; integrity_check ok, no foreign key problems, schema v7 after migration', { originalImages: Object.keys(originalAssets).length, originalCards: originalCards.length });
 }
 

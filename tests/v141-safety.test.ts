@@ -98,3 +98,28 @@ it('keeps legacy homebrew and pact ranges when their flags are independent',()=>
   expect(castingLevels(card,{...rule,casting:{mode:'homebrew',allowBelowBase:true,allowUpcast:false,minSlotLevel:2,maxSlotLevel:6}})).toEqual([2,3]);
   expect(castingLevels(card,{...rule,casting:{mode:'pact',allowBelowBase:false,allowUpcast:true,maxSlotLevel:5}})).toEqual([3,4,5]);
 });
+
+it('selects named definitions before character creation, attaches the same definition later and converts a legacy keyless binding',()=>{
+  const f=fixture();
+  try {
+    const first=f.resources.createDefinition({name:'은빛 점수',type:'points'});
+    const unrelated=f.resources.createDefinition({name:'은빛 점수',type:'points'});
+    expect(first.key).not.toBe(unrelated.key);
+    expect(f.resources.definitions().filter(item=>item.name===first.name)).toHaveLength(2);
+    expect(f.library.getLibrary().profiles).toEqual([]);
+    expect(f.store.db.prepare('SELECT id FROM resource_instances').all()).toEqual([]);
+    const hero=f.makeProfile('은빛');
+    expect(()=>f.change(hero.id,{type:'attach',templateId:first.id,scope:'character'})).toThrow(/최대량/);
+    f.change(hero.id,{type:'create_resource',scope:'character',template:{id:first.id,name:first.name,unit:'점',kind:'counter',
+      capacity:{type:'fixed',value:6},recovery:[{triggers:['dawn'],amount:{type:'full'}}]}});
+    const pool=f.resources.snapshot(hero.id).resources[0];
+    expect(pool.templateId).toBe(first.id);
+    expect(pool.template.matchKey).toBeUndefined();
+    expect(inferredAutomaticCost('card',{type:'fixed',costKey:'cost',amount:2},pool,[pool])?.requirement?.key).toBe(first.key);
+    expect(()=>resolveCostResource('card',{type:'fixed',costKey:'cost',amount:2,requirement:{kind:'counter',key:unrelated.key}},[pool],[])).toThrow(/보유하지/);
+    f.change(hero.id,{type:'attach',templateId:first.id,scope:'character'});
+    const both=f.resources.snapshot(hero.id).resources;
+    expect(inferredAutomaticCost('card',{type:'fixed',costKey:'cost',amount:2},pool,both)).toBeUndefined();
+    expect(both.map(item=>item.remaining)).toEqual([6,6]);
+  } finally {f.store.close();}
+});

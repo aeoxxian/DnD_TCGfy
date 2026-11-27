@@ -156,6 +156,8 @@ else {
     safeHandler(IPC.getEditHistory, input => edits.history(input));
     safeHandler(IPC.previewClass, input => resources.previewClass(input));
     safeHandler(IPC.getResources, input => resources.snapshot(input));
+    safeHandler(IPC.getResourceDefinitions, input => { z.undefined().parse(input); return resources.definitions(); });
+    safeHandler(IPC.createResourceDefinition, input => resources.createDefinition(input));
     safeHandler(IPC.previewResource, input => resources.preview(input));
     safeHandler(IPC.changeResource, input => resources.change(input));
     mainWindow = new BrowserWindow({

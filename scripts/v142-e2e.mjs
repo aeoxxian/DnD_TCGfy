@@ -6,7 +6,7 @@ import { openManagement, putInDeck, showWholeLibrary } from './navigation-helper
 
 const root=resolve('artifacts');
 await mkdir(root,{recursive:true});
-const run=await mkdtemp(join(root,'v141-windows-'));
+const run=await mkdtemp(join(root,'v142-windows-'));
 const profile=join(run,'profile');
 const dialogPath=join(run,'deck.json');
 const steps=[];
@@ -35,21 +35,20 @@ async function create(name) {
   await profiles.getByLabel('관리할 캐릭터').getByRole('option',{name,exact:true}).waitFor({state:'attached'});
   return (await boot()).profiles.find(profile=>profile.name===name);
 }
-async function addResource(id,name,key) {
-  return page.evaluate(async ({id,name,key})=>{
-    const before=await window.desktop.getResources(id);
-    const result=await window.desktop.changeResource({characterId:id,requestId:crypto.randomUUID(),expectedRevision:before.value.revision,
-      action:{type:'create_resource',scope:'character',template:{name,kind:'counter',matchKey:key,unit:'점',capacity:{type:'fixed',value:6},recovery:[{triggers:['dawn'],amount:{type:'full'}}]}}});
-    if(!result.ok)throw new Error(result.error);return result.value.snapshot.resources.find(item=>item.name===name);
-  },{id,name,key});
+async function define(form,name) {
+  await button(form,'새 자원 정의').click();
+  await form.getByLabel('정의 이름').fill(name);
+  await button(form,'정의 등록').click();
+  await form.getByRole('option',{name:new RegExp(name)}).waitFor({state:'attached'});
+  return page.evaluate(async name=>(await window.desktop.getResourceDefinitions()).value.find(item=>item.name===name),name);
 }
 
 try {
   page=await app.firstWindow();
   await app.evaluate(({ BrowserWindow })=>BrowserWindow.getAllWindows()[0].setContentSize(1366,850));
   await page.locator('.board').waitFor();
-  assert.equal((await boot()).appVersion,'1.4.1');
-  assert.equal((await boot()).schemaVersion,10);
+  assert.equal((await boot()).appVersion,'1.4.2');
+  assert.equal((await boot()).schemaVersion,11);
   assert.equal((await boot()).profiles.length,0);
 
   let form=await register('범위 검증 주문');
@@ -66,7 +65,7 @@ try {
   await form.getByLabel('등록 최대 슬롯 레벨').fill('5');
   await enhancement.check();
   await form.getByLabel('등록 슬롯 계열').selectOption('pact');
-  await form.getByLabel('등록 슬롯 자원 식별 키').fill('qa:pact');
+  const pact=await define(form,'황혼의 계약');
   await range.scrollIntoViewIfNeeded();
   await screenshot('01-slot-range');
   await save(form);
@@ -74,21 +73,22 @@ try {
   assert.equal(spell.upcastEffect,true);
   assert.deepEqual(spell.castOptions[0].casting,{mode:'homebrew',allowUpcast:true,allowBelowBase:true,minSlotLevel:2,maxSlotLevel:5});
   assert.equal(spell.castOptions[0].costs[0].requirement.slotKind,'pact');
+  assert.equal(spell.castOptions[0].costs[0].requirement.key,pact.key);
   steps.push('FIX-01: default, fixed, custom, enhancement, pact and downcasting');
 
   form=await register('외부 불씨');
   await form.getByRole('radio',{name:'포인트 자원',exact:true}).check();
-  await form.getByLabel('등록 자원 식별 키').fill('qa:spark');
+  const spark=await define(form,'연결할 불씨');
   await form.getByLabel('등록 사용할 양').fill('2');
   assert.equal(await form.getByLabel('등록 사용할 자원').count(),0);
-  await form.getByLabel('등록 자원 식별 키').scrollIntoViewIfNeeded();
+  await form.getByLabel('등록 자원 정의').scrollIntoViewIfNeeded();
   await screenshot('02-library-requirement');
   await save(form);
   await select('외부 불씨');
   await openManagement(page,'정보 수정');
   form=dialog('카드 정보 수정');
   await form.getByRole('radio',{name:'포인트 자원',exact:true}).check();
-  await form.getByLabel('등록 자원 식별 키').fill('qa:spark');
+  await form.getByLabel('등록 자원 정의').selectOption(spark.id);
   await form.getByLabel('등록 사용할 양').fill('3');
   await save(form,'수정 저장');
   await openManagement(page,'캐릭터·덱');
@@ -98,8 +98,15 @@ try {
   await page.getByLabel('활성 캐릭터').selectOption(character.id);
   await select('외부 불씨');
   await page.getByText(/필요한 자원.*보유하지/).first().waitFor();
-  const resource=await addResource(character.id,'연결할 불씨','qa:spark');
-  await page.reload();await page.locator('.board').waitFor();await select('외부 불씨');
+  await openManagement(page,'자원 관리');
+  await button(dialog('자원 관리'),'연결할 불씨 템플릿 장착').click();
+  const activation=dialog('자원 설정 후 장착');
+  await activation.getByLabel('최대치').fill('6');
+  await save(activation,'자원 저장');
+  const resource=(await snapshot(character.id)).resources.find(item=>item.templateId===spark.id);
+  assert(resource);
+  await close('자원 관리');
+  await select('외부 불씨');
   await button(page,'사용 확정').click();
   await page.waitForFunction(async ({characterId,id})=>(await window.desktop.getResources(characterId)).value.resources.find(r=>r.id===id).remaining===3,{characterId:character.id,id:resource.id});
   steps.push('FIX-02: library register/edit, unavailable before acquisition, correct auto charge afterward');
@@ -107,17 +114,20 @@ try {
   // Make the same card manual first, then convert it with the app's editor.
   await openManagement(page,'카드 사용 규칙');
   form=dialog('카드 사용 규칙');
+  await form.getByLabel('연결 방식').selectOption('manual');
   await form.getByLabel('사용할 자원',{exact:true}).selectOption(resource.id);
   await save(form,'사용 규칙 저장');
   await openManagement(page,'카드 사용 규칙');
   await button(dialog('카드 사용 규칙'),'수동 비용을 자동 연결로 전환').click();
   form=dialog('카드 사용 규칙');
-  await button(form,'자동 연결로 전환').click();
-  assert.equal(await form.getByLabel('연결 자원 1-1').inputValue(),'');
-  assert.equal(await form.getByLabel('자원 식별 키 1-1').inputValue(),'qa:spark');
-  await form.getByLabel('자원 식별 키 1-1').scrollIntoViewIfNeeded();
+  assert.equal(await form.getByLabel('연결 방식').inputValue(),'automatic');
+  await form.getByRole('option',{name:/연결할 불씨/}).waitFor({state:'attached'});
+  assert.equal(await form.getByLabel('사용할 자원 정의').inputValue(),spark.id);
+  assert.equal(await form.getByLabel('사용할 자원',{exact:true}).count(),0);
+  assert.equal(await form.getByLabel('한 번에 사용할 양').inputValue(),'3');
+  await form.getByLabel('사용할 자원 정의').scrollIntoViewIfNeeded();
   await screenshot('03-manual-to-automatic');
-  await save(form,'고급 사용 규칙 저장');
+  await save(form,'사용 규칙 저장');
   const converted=await snapshot(character.id);
   assert.equal(converted.bindings.length,0);
   assert.equal(converted.resources.find(r=>r.id===resource.id).remaining,3);
@@ -184,13 +194,13 @@ try {
   await exchange.getByLabel('추가할 덱').selectOption(recipient.activeDeckId);
   await button(exchange,'덱 JSON 파일 선택').click();
   let preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
-  await preview.getByRole('heading',{name:'신규 추가 1장'}).waitFor();
+  await preview.getByRole('heading',{name:'추가 예정 1장'}).waitFor();
   await preview.getByRole('heading',{name:'중복 1장'}).waitFor();
   await preview.getByRole('heading',{name:'충돌 1장'}).waitFor();
   await preview.getByText(/같은 원본 이미지가 없습니다/).waitFor();
   await preview.getByText(/직접 연결해야 하는 비용/).waitFor();
   await screenshot('07-deck-append');
-  await preview.getByRole('heading',{name:'신규 추가 1장'}).evaluate(element=>element.scrollIntoView({block:'start'}));
+  await preview.getByRole('heading',{name:'추가 예정 1장'}).evaluate(element=>element.scrollIntoView({block:'start'}));
   await screenshot('08-deck-append-notices');
   await button(preview,'기존 덱에 추가 확정').click();
   await exchange.getByText(/덱에 카드 1장을 추가했습니다/).waitFor();
@@ -200,6 +210,30 @@ try {
   preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
   await button(preview,'기존 덱 확인').click();
   assert.deepEqual((await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds,order);
+  await page.evaluate(async ({deckId,firstId})=>{
+    const result=await window.desktop.setDeckCards({deckId,cardIds:[firstId]});
+    if(!result.ok)throw new Error(result.error);
+  },{deckId:recipient.activeDeckId,firstId:order[0]});
+  await button(exchange,'덱 JSON 파일 선택').click();
+  preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
+  await preview.getByRole('heading',{name:'추가 예정 1장'}).waitFor();
+  await button(preview,'기존 덱에 추가 확정').click();
+  await exchange.getByText(/기존 연결 1장/).waitFor();
+  assert.deepEqual((await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds,order);
+  const differing={...original.cards[0],ref:'other-rules',characterRules:[{id:'other',label:'JSON 전용 비용',costs:[]}]};
+  await writeFile(dialogPath,JSON.stringify({...original,cards:[differing]}));
+  await button(exchange,'덱 JSON 파일 선택').click();
+  preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
+  const conflict=preview.getByLabel('외부 불씨 가져오기 방법');
+  await conflict.selectOption('copy');
+  await preview.getByRole('heading',{name:'추가 예정 1장'}).waitFor();
+  await conflict.scrollIntoViewIfNeeded();
+  await screenshot('09-conflict-choice');
+  await button(preview,'기존 덱에 추가 확정').click();
+  await exchange.getByText(/신규 등록 1장/).waitFor();
+  const afterConflict=(await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds;
+  assert.deepEqual(afterConflict.slice(0,2),order);
+  assert.equal(afterConflict.length,3);
   await close('덱 JSON 교환');
   await showWholeLibrary(page);
   assert.equal((await boot()).cards.find(card=>card.id===order[1]).description,'서로 다른 카드');

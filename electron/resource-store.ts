@@ -6,7 +6,7 @@ import { LibraryStore } from './library-store';
 import { UserInputError } from './errors';
 import { transaction } from './migrations';
 import { cardSchema, idSchema } from '../src/shared/contracts';
-import { templateDraftSchema, overrideSchema, resourceInteger, previewRequestSchema, resourceRequestSchema,
+import { templateDraftSchema, resourceDefinitionSchema, overrideSchema, resourceInteger, previewRequestSchema, resourceRequestSchema,
   type ResourceSnapshot, type ResourceTemplate, type ResourceView, type ResourceEvent, type ResourceChange,
   type ResourceOverrides, type ResourcePlan, type ResourcePreview, type ResourceResult, type TemplateDraft } from '../src/shared/resources';
 import { ClassStore, type ClassUndo } from './class-store';
@@ -39,7 +39,8 @@ export class ResourceStore {
   private template(row: TemplateRow): ResourceTemplate {
     const raw = JSON.parse(row.definition_json);
     const draft = templateDraftSchema.parse({ id: row.id, name: row.name, kind: row.kind, unit: raw.unit ?? '점', unlimited:raw.unlimited, matchKey:raw.matchKey, slotKind:raw.slotKind, capacity: raw.capacity, slotCapacity: raw.slotCapacity, slotCapacityByClassLevel: raw.slotCapacityByClassLevel, recovery: raw.recovery ?? [] });
-    return { ...draft, id: row.id, key: row.key, source: row.source, version: row.version };
+    return { ...draft, id: row.id, key: row.key, source: row.source, version: row.version,
+      ...(raw.definitionOnly === true ? {definitionOnly:true} : {}) };
   }
   private getTemplate(id: string): ResourceTemplate {
     const row = this.db.prepare('SELECT * FROM resource_templates WHERE id=?').get(id) as unknown as TemplateRow | undefined;
@@ -137,12 +138,27 @@ export class ResourceStore {
       catch (error) { if (!(error instanceof ResourceError || error instanceof UserInputError)) throw error; return { changes: [], label: '사용 불가', canUse: false, canOverride: false, reason: error.message, revision: snapshot.revision, quote: this.quote(snapshot, action) }; }
     } catch (error) { if (error instanceof ResourceError) throw new UserInputError(error.message); throw error; }
   }
-  private saveTemplate(draft: TemplateDraft): string {
+  definitions(): ResourceTemplate[] {
+    return (this.db.prepare("SELECT * FROM resource_templates WHERE archived_at IS NULL AND key NOT LIKE 'card-owned:%' ORDER BY name,rowid")
+      .all() as unknown as TemplateRow[]).flatMap(row=>{
+        try{return [this.template(row)];}catch{return [];}
+      });
+  }
+  createDefinition(input: unknown): ResourceTemplate {
+    const { name, type } = resourceDefinitionSchema.parse(input);
+    const counter = type==='uses'||type==='points';
+    const draft = templateDraftSchema.parse(counter
+      ? {name,kind:'counter',unit:type==='uses'?'회':'점',capacity:{type:'fixed',value:0},recovery:[]}
+      : {name,kind:'slot_track',unit:'슬롯',slotKind:type,slotCapacity:{},recovery:[]});
+    return transaction(this.db,()=>this.getTemplate(this.saveTemplate(draft,true)));
+  }
+  private saveTemplate(draft: TemplateDraft, definitionOnly = false): string {
     const existing = draft.id ? this.db.prepare('SELECT * FROM resource_templates WHERE id=? AND archived_at IS NULL').get(draft.id) as unknown as TemplateRow | undefined : undefined;
     if (draft.id && !existing) throw new UserInputError('템플릿을 찾을 수 없습니다.');
     if (existing?.key.startsWith('card-owned:')) throw new UserInputError('고유 자원 정의는 카드 정보에서 수정하세요.');
     if (existing && this.db.prepare('SELECT id FROM resource_instances WHERE template_id=? AND archived_at IS NULL').get(existing.id)) throw new UserInputError('장착 중인 템플릿은 복제해서 편집해 주세요. 현재량은 변경하지 않았습니다.');
-    const id = existing?.id ?? randomUUID(); const template = { ...draft, id, key: existing?.key ?? `user_${id}`, source: existing?.source ?? 'user', version: (existing?.version ?? 0) + 1 };
+    const id = existing?.id ?? randomUUID(); const template = { ...draft, id, key: existing?.key ?? `user_${id}`, source: existing?.source ?? 'user', version: (existing?.version ?? 0) + 1,
+      ...(definitionOnly ? {definitionOnly:true} : {}) };
     this.db.prepare(`INSERT INTO resource_templates(id,key,name,kind,definition_json,source,version) VALUES (?,?,?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,definition_json=excluded.definition_json,version=excluded.version`).run(id,template.key,template.name,template.kind,JSON.stringify(template),template.source,template.version);
     return id;
@@ -150,6 +166,7 @@ export class ResourceStore {
   private attach(characterId: string, templateId: string, overrides: ResourceOverrides): void {
     if (!this.db.prepare("SELECT id FROM resource_templates WHERE id=? AND archived_at IS NULL AND key NOT LIKE 'card-owned:%'").get(templateId)) throw new UserInputError('보관 해제된 템플릿은 새로 장착할 수 없습니다.');
     this.checkScope(overrides); const template = this.getTemplate(templateId); const max = maximums(template, this.profile(characterId), overrides);
+    if (template.definitionOnly) throw new UserInputError('먼저 자원의 최대량과 회복 조건을 설정해 주세요.');
     const state = template.kind === 'counter' ? { remaining: max.capacity } : { remainingByLevel: max.capacityByLevel };
     this.db.prepare('INSERT INTO resource_instances(id,character_id,template_id,overrides_json,current_state_json) VALUES (?,?,?,?,?)').run(randomUUID(),characterId,templateId,JSON.stringify(overrides),JSON.stringify(state));
   }
@@ -175,7 +192,14 @@ export class ResourceStore {
         }else if(action.type==='clear_cost_override'){
           this.getCard(action.cardId);this.db.prepare('DELETE FROM character_cost_overrides WHERE character_id=? AND card_id=?').run(characterId,action.cardId);label='캐릭터 전용 비용 해제 · 공통 정의 사용';
         }else if (action.type === 'create_resource') {
-          if (action.template.id) throw new UserInputError('새 자원은 새 템플릿으로 만듭니다. 기존 템플릿은 장착을 이용하세요.');
+          if (action.template.id) {
+            const previous = this.getTemplate(action.template.id);
+            if (!previous.definitionOnly) throw new UserInputError('기존 템플릿은 장착을 이용하세요.');
+            if (previous.kind!==action.template.kind || (previous.slotKind??'generic')!==(action.template.slotKind??'generic') ||
+                previous.matchKey!==action.template.matchKey || action.scope!=='character') {
+              throw new UserInputError('등록한 공유 자원의 종류를 유지해 주세요.');
+            }
+          }
           const templateId = this.saveTemplate(action.template); this.attach(characterId, templateId, { scope: action.scope, ownerCardId: action.ownerCardId }); label = `${action.template.name} 자원 생성`;
         } else if (action.type === 'save_template') { this.saveTemplate(action.template); label = `${action.template.name} 템플릿 저장`;
         } else if (action.type === 'archive_template') {

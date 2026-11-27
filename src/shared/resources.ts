@@ -30,7 +30,11 @@ export const templateDraftSchema = z.strictObject({
   }
 });
 export type TemplateDraft = z.infer<typeof templateDraftSchema>;
-export interface ResourceTemplate extends Omit<TemplateDraft, 'id'> { id: string; key: string; source: 'class_2014' | 'user'; version: number }
+export interface ResourceTemplate extends Omit<TemplateDraft, 'id'> { id: string; key: string; source: 'class_2014' | 'user'; version: number; definitionOnly?: boolean }
+export const resourceDefinitionSchema = z.strictObject({
+  name: z.string().trim().min(1).max(100),
+  type: z.enum(['uses','points','standard','pact','generic']),
+});
 export const scopeSchema = z.enum(['character','card','item']);
 export const overrideSchema = z.strictObject({ unlimitedOverride: z.boolean().optional(), nameOverride: z.string().trim().min(1).max(100).optional(), capacityOverride: resourceInteger.optional(), slotCapacityOverride: z.record(levelKey, resourceInteger).optional(), scope: scopeSchema.default('character'), ownerCardId: idSchema.optional() });
 export type ResourceOverrides = z.infer<typeof overrideSchema>;
@@ -75,6 +79,8 @@ export interface ResourcePlan { changes: ResourceChange[]; label: string; canUse
 export interface ResourcePreview extends ResourcePlan { revision: number; quote: string }
 export interface ResourceResult { snapshot: ResourceSnapshot; replayed: boolean; eventId?: string }
 export interface ResourceBridge {
+  getResourceDefinitions(): Promise<import('./contracts').Result<ResourceTemplate[]>>;
+  createResourceDefinition(input: z.infer<typeof resourceDefinitionSchema>): Promise<import('./contracts').Result<ResourceTemplate>>;
   previewClass(input: {characterId:string; configuration:ClassInput}): Promise<import('./contracts').Result<ClassPreview>>;
   getResources(characterId: string): Promise<import('./contracts').Result<ResourceSnapshot>>;
   previewResource(input: PreviewRequest): Promise<import('./contracts').Result<ResourcePreview>>;

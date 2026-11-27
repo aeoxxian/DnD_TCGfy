@@ -9,6 +9,7 @@ import { DeckExchange, parseDeckDocument, readDeckDocument } from '../electron/d
 import { LibraryStore } from '../electron/library-store';
 import { migrations } from '../electron/migrations';
 import { ResourceStore } from '../electron/resource-store';
+import { TrashStore } from '../electron/trash-store';
 import { AppStore } from '../electron/store';
 import { planUse } from '../src/shared/resource-engine';
 import type { CastOption } from '../src/shared/contracts';
@@ -112,7 +113,57 @@ describe('v1.4 P4 deck JSON', () => {
       expect(replay.existing).toBe(true);
       expect((await f.exchange.apply({characterId:source.id,deckId:target.id,token:replay.token})).replayed).toBe(true);
       expect(f.library.getLibrary()).toEqual(result.library);
+      const again = async () => {
+        const plan=await f.exchange.inspect(source.id,path,target.id);
+        return f.exchange.apply({characterId:source.id,deckId:target.id,token:plan.token});
+      };
+      const override: CastOption[] = [{id:'renewed',label:'현지 수정 비용 유지',costs:[]}];
+      change(f,source.id,{type:'save_costs',scope:'character',cardId:source.c.id,castOptions:override,bindings:[]});
+      f.library.setDeckCards({deckId:target.id,cardIds:[memberIds[1]]});
+      const missing = await again();
+      expect(missing.summary).toMatchObject({linked:[source.c.name,doc.cards[0].name],created:[],duplicates:[edited.name]});
+      expect(missing.library.decks.find(deck=>deck.id===target.id)!.cardIds).toEqual([memberIds[1],memberIds[0],memberIds[2]]);
+      expect(f.resources.snapshot(source.id).costOverrides?.find(rule=>rule.cardId===source.c.id)?.castOptions).toEqual(override);
+      expect(f.resources.snapshot(source.id).resources.find(resource=>resource.id===before.id)?.remaining).toBe(before.remaining);
+      const usedEvents = f.store.db.prepare("SELECT * FROM play_events WHERE event_type='card_used'").all();
+      f.library.archiveCard(memberIds[1]);
+      expect((await again()).summary).toMatchObject({trashed:[edited.name],created:[]});
+      const trash = new TrashStore(f.store);
+      const restore = { type:'restore' as const,cardIds:[memberIds[1]] };
+      const restoreReview = trash.preview(restore);
+      trash.change({requestId:randomUUID(),action:restore,quote:restoreReview.quote,confirmed:true});
+      expect((await again()).summary?.duplicates).toContain(edited.name);
+      f.library.archiveCard(memberIds[1]);
+      const purge = { type:'purge' as const,cardIds:[memberIds[1]] };
+      const purgeReview = trash.preview(purge);
+      trash.change({requestId:randomUUID(),action:purge,quote:purgeReview.quote,confirmed:true,phrase:'영구 삭제'});
+      const readded=await again();
+      expect(readded.summary?.created).toEqual([edited.name]);
+      expect(readded.library.decks.find(deck=>deck.id===target.id)!.cardIds).not.toContain(memberIds[1]);
+      expect(f.store.db.prepare("SELECT * FROM play_events WHERE event_type='card_used'").all()).toEqual(usedEvents);
     } finally { f.store.close(); }
+  });
+
+  it('asks how to resolve differing character rules and never overwrites the existing card', async () => {
+    const f=fixture();
+    try {
+      const s=seed(f); const path=join(f.path,'conflicts.json'); await f.exchange.export(s.deckId,path);
+      const document=await readDeckDocument(path); const card=document.cards[1];
+      writeFileSync(path,JSON.stringify({...document,cards:[card]}));
+      change(f,s.id,{type:'save_costs',scope:'character',cardId:s.c.id,castOptions:[{id:'local',label:'현지 비용',costs:[]}],bindings:[]});
+      change(f,s.id,{type:'save_costs',scope:'shared',confirmShared:true,cardId:s.c.id,castOptions:[{id:'changed',label:'현지 공통 비용',costs:[]}],bindings:[]});
+      const first=f.library.createDeck({characterId:s.id,name:'기존 비용 보존'}).decks.at(-1)!;
+      const second=f.library.createDeck({characterId:s.id,name:'별도 복사'}).decks.at(-1)!;
+      for (const [destination,mode] of [[first,'link'],[second,'copy']] as const) {
+        const preview=await f.exchange.inspect(s.id,path,destination.id);
+        expect(preview.append?.conflicts[0]).toMatchObject({ref:card.ref,candidates:[{id:s.c.id}]});
+        const result=await f.exchange.apply({token:preview.token,characterId:s.id,deckId:destination.id,
+          decisions:{[card.ref]:mode==='link'?{mode,cardId:s.c.id}:{mode}}});
+        expect(result.added).toBe(1);
+        expect(result.library.decks.find(d=>d.id===destination.id)!.cardIds.includes(s.c.id)).toBe(mode==='link');
+      }
+      expect(f.resources.snapshot(s.id).costOverrides?.find(rule=>rule.cardId===s.c.id)?.castOptions[0].label).toBe('현지 비용');
+    } finally{f.store.close();}
   });
 
   it('rolls back appended cards and rejects changes after preview', async () => {
@@ -170,7 +221,7 @@ describe('v1.4 P4 deck JSON', () => {
       change(target, character.id, { ...action, quote: target.resources.preview({ characterId: character.id, action }).quote });
       const spent = target.resources.snapshot(character.id);
       expect(spent.resources[0].remaining).toBe(5);
-      expect(() => planUse(effective, effective.castOptions[0].id, spent.resources, [], {})).toThrow('pool:standard');
+      expect(() => planUse(effective, effective.castOptions[0].id, spent.resources, [], {})).toThrow('필요한 자원을 보유하지 않았습니다.');
       const roundTrip = join(target.path, 'round-trip.json');
       await target.exchange.export(added.deckId, roundTrip);
       expect(await readDeckDocument(roundTrip)).toEqual(portable);
@@ -282,7 +333,7 @@ describe('v1.4 P4 deck JSON', () => {
     try {
       expect(f.library.getLibrary().profiles[0]).toMatchObject({ id: 'old', level: 5 });
       const migrationBackup = readdirSync(join(path, 'backups'));
-      expect(migrationBackup).toEqual([expect.stringMatching(/^before-v8-to-v10-/)]);
+      expect(migrationBackup).toEqual([expect.stringMatching(/^before-v8-to-v11-/)]);
       const backupDb = new DatabaseSync(join(path, 'backups', migrationBackup[0]), { readOnly: true });
       expect(backupDb.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 8 });
       backupDb.close();

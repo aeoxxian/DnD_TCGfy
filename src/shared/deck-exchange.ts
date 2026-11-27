@@ -40,15 +40,23 @@ export const deckDocumentSchema = z.strictObject({
 export type DeckDocument = z.infer<typeof deckDocumentSchema>;
 export const deckSelectionSchema = z.strictObject({ deckId: idSchema });
 export const deckTargetSchema = z.strictObject({ characterId: idSchema, deckId: idSchema.optional() });
-export const deckApplySchema = deckTargetSchema.extend({ token: z.uuid() });
+export const deckApplySchema = deckTargetSchema.extend({
+  token: z.uuid(), decisions: z.record(alias, z.strictObject({ mode: z.enum(['skip','link','copy']), cardId: idSchema.optional() })).optional(),
+});
 
 export interface DeckNotice { card: string; kind: 'image' | 'reconnect'; detail: string }
+export interface DeckConflict {
+  card: string; detail: string; ref?: string; candidates?: { id: string; label: string; inDeck: boolean }[]; copyNotices?: DeckNotice[];
+}
 export interface DeckPreview {
   token: string; characterName: string; name: string; cards: string[]; notices: DeckNotice[];
   existing: boolean; duplicateCardNames: number; renamed: boolean;
-  append?: { added: string[]; duplicates: string[]; conflicts: { card: string; detail: string }[] };
+  append?: { added: string[]; linked: string[]; linkedIds: string[]; created: string[]; duplicates: string[]; conflicts: DeckConflict[]; trashed: string[] };
 }
-export interface DeckImportResult { library: Library; name: string; deckId: string; replayed: boolean; notices: DeckNotice[]; added?: number }
+export interface DeckImportResult {
+  library: Library; name: string; deckId: string; replayed: boolean; notices: DeckNotice[]; added?: number;
+  summary?: { linked: string[]; created: string[]; duplicates: string[]; trashed: string[]; skipped: string[] };
+}
 type Canceled = { canceled: true };
 export interface DeckExchangeBridge {
   exportDeck(input: z.infer<typeof deckSelectionSchema>): Promise<Result<Canceled | { path: string; cards: number; notices: DeckNotice[] }>>;

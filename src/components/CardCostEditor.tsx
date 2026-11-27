@@ -1,5 +1,6 @@
 import { BatchReview } from './BatchEdits';
 import type { EditAction } from '../shared/bulk';
+import { ResourceDefinitionPicker, useResourceDefinitions } from './ResourceDefinitionPicker';
 import { automaticCost, inferredAutomaticCost, proposeSlotConversion } from '../shared/use-rules';
 import { useState, type FormEvent } from 'react';
 import type { CardDefinition, CastOption } from '../shared/contracts';
@@ -8,12 +9,13 @@ import type { ResourceController } from './ResourcePanel';
 import { Modal } from './Modal';
 
 export function AdvancedCardCostEditor({card,controller,onSaved,onClose,onBasic,initialScope,onDraft,libraryOnly=false}:{card:CardDefinition;controller:ResourceController;onSaved:()=>Promise<void>;onClose:()=>void;onBasic:()=>void;initialScope?:'shared'|'character';libraryOnly?:boolean;onDraft?:(value:{scope:'shared'|'character';castOptions:CastOption[];bindings:{costKey:string;resourceInstanceId:string}[]})=>void}){
+  const catalog=useResourceDefinitions();
   const snapshot=controller.snapshot!;const [revision]=useState(snapshot.revision);
   const hasOverride=snapshot.costOverrides?.some(value=>value.cardId===card.id);
   const [scope,setScope]=useState<'shared'|'character'>(initialScope??(hasOverride?'character':'shared'));
   const [options,setOptions]=useState<CastOption[]>(()=>structuredClone(initialScope==='shared'?card.castOptions:effectiveCard(card,snapshot).castOptions));
   const [bindings,setBindings]=useState<Record<string,string>>(()=>Object.fromEntries(snapshot.bindings.filter(binding=>binding.cardId===card.id).map(binding=>[binding.costKey,binding.resourceInstanceId])));
-  const [conversionKey,setConversionKey]=useState<{costKey:string; key:string}>();
+  const [modeByCost,setModeByCost]=useState<Record<string,'manual'|'automatic'>>({});
   const [confirmShared,setConfirmShared]=useState(false);const [restore,setRestore]=useState(false);
   const [manage,setManage]=useState(false);const [selectedOptions,setSelectedOptions]=useState<string[]>([]);const [selectedCosts,setSelectedCosts]=useState<string[]>([]);const [batch,setBatch]=useState<EditAction>();
   const persisted=scope==='shared'?card.castOptions:effectiveCard(card,snapshot).castOptions;
@@ -27,12 +29,15 @@ export function AdvancedCardCostEditor({card,controller,onSaved,onClose,onBasic,
   }
   const affected=snapshot.sharedCostUsers?.[card.id]??0;const sharedChanged=card.costStatus==='unconfigured'||JSON.stringify(options)!==JSON.stringify(card.castOptions);
   function changeOption(index:number,option:CastOption){clearSelected();setOptions(current=>current.map((value,i)=>i===index?option:value));setConfirmShared(false);}
+  const incomplete=options.some(option=>option.costs.some(cost=>modeByCost[cost.costKey]==='automatic'
+    ? !!bindings[cost.costKey]||!cost.requirement&&!(cost.type==='slot'&&(cost.autoBind||card.spellLevel===0))
+    : modeByCost[cost.costKey]==='manual'&&!bindings[cost.costKey]));
   async function saved(){await onSaved();onClose();}
-  async function submit(event:FormEvent){event.preventDefault();const keys=new Set(options.flatMap(option=>option.costs.map(cost=>cost.costKey)));if(onDraft){onDraft({scope,castOptions:options,bindings:Object.entries(bindings).filter(([key,id])=>keys.has(key)&&id).map(([costKey,resourceInstanceId])=>({costKey,resourceInstanceId}))});return;}if(await controller.perform({type:'save_costs',scope,confirmShared,expectedCardVersion:card.updatedAt,cardId:card.id,castOptions:options,bindings:Object.entries(bindings).filter(([key,id])=>keys.has(key)&&id).map(([costKey,resourceInstanceId])=>({costKey,resourceInstanceId}))},revision))await saved();}
+  async function submit(event:FormEvent){event.preventDefault();if(incomplete)return;const keys=new Set(options.flatMap(option=>option.costs.map(cost=>cost.costKey)));if(onDraft){onDraft({scope,castOptions:options,bindings:Object.entries(bindings).filter(([key,id])=>keys.has(key)&&id).map(([costKey,resourceInstanceId])=>({costKey,resourceInstanceId}))});return;}if(await controller.perform({type:'save_costs',scope,confirmShared,expectedCardVersion:card.updatedAt,cardId:card.id,castOptions:options,bindings:Object.entries(bindings).filter(([key,id])=>keys.has(key)&&id).map(([costKey,resourceInstanceId])=>({costKey,resourceInstanceId}))},revision))await saved();}
   function casting(index:number,mode:string){const option=options[index];let costs:CastOption['costs']=option.costs.filter(cost=>cost.type!=='slot');const old=option.costs.find(cost=>cost.type==='slot');if(mode==='standard'||mode==='pact')costs=[...costs,{type:'slot',costKey:old?.costKey??crypto.randomUUID(),slotSelection:mode,autoBind:old?.type==='slot'?old.autoBind:undefined}];if(mode==='homebrew')costs=option.costs;changeOption(index,{...option,costs,casting:mode==='none'?undefined:{mode:mode as 'standard'|'pact'|'homebrew',allowUpcast:true,allowBelowBase:false}});}
   return <Modal title={onDraft?'등록 카드 고급 사용 규칙':'카드 사용 규칙'} wide onClose={onClose}><form onSubmit={event=>void submit(event)}>
     <button type="button" onClick={onBasic}>기본 화면으로 돌아가기 · 미저장 변경 취소</button><details open className="advanced-rule-editor"><summary>고급 설정</summary><p className="manager-help">공통 정의와 캐릭터별 연결은 별도입니다. 과거 사용의 비용 기록은 변경하지 않습니다. 비용이 없으면 무소모 카드입니다.</p>
-    <label className="form-field">비용 편집 범위<select aria-label="비용 편집 범위" disabled={controller.busy} value={scope} onChange={event=>{const scope=event.target.value as 'shared'|'character';clearSelected();setManage(false);setScope(scope);setOptions(structuredClone(scope==='shared'?card.castOptions:effectiveCard(card,snapshot).castOptions));setConfirmShared(false);}}><option value="shared">공통 카드 정의</option><option value="character" disabled={libraryOnly}>현재 캐릭터 전용 재정의</option></select></label>
+    <label className="form-field">비용 편집 범위<select aria-label="비용 편집 범위" disabled={controller.busy} value={scope} onChange={event=>{const scope=event.target.value as 'shared'|'character';clearSelected();setManage(false);setScope(scope);setModeByCost({});setOptions(structuredClone(scope==='shared'?card.castOptions:effectiveCard(card,snapshot).castOptions));setConfirmShared(false);}}><option value="shared">공통 카드 정의</option><option value="character" disabled={libraryOnly}>현재 캐릭터 전용 재정의</option></select></label>
     {scope==='shared'&&<p className="registration-note">다른 캐릭터 {affected}명이 이 카드를 덱 또는 비용 연결로 참조합니다. 전용 재정의는 공통 비용을 따라 바뀌지 않습니다. 자원 연결은 현재 캐릭터에만 저장합니다.</p>}
     {!onDraft&&<div className="batch-actions"><button type="button" disabled={controller.busy||dirty} aria-pressed={manage} onClick={()=>{setManage(!manage);clearSelected();}}>{manage?'비용 선택 관리 종료':'비용 선택 관리'}</button>{dirty&&<small>미저장 변경을 저장하거나 취소한 후 선택 관리할 수 있습니다.</small>}</div>}
     {manage&&<section className="batch-tools" aria-label="비용 선택 관리"><p>사용 방식 {selectedOptions.length}/{options.length}개 · 비용 {selectedCosts.length}/{options.reduce((n,o)=>n+o.costs.length,0)}개 선택 · {scope==='shared'?'공통 카드 정의':'현재 캐릭터 전용'}</p><div className="batch-actions"><button type="button" onClick={()=>setSelectedOptions(options.map(o=>o.id))}>사용 방식 전체 선택</button><button type="button" onClick={()=>setSelectedCosts(options.flatMap(o=>o.costs.map((_,i)=>`${o.id}:${i}`)))}>비용 전체 선택</button><button type="button" onClick={clearSelected}>비용·방식 선택 해제</button><button type="button" disabled={dirty||!selectedOptions.length} onClick={()=>bulkOptions(options.filter(o=>!selectedOptions.includes(o.id)),'remove_options')}>선택 사용 방식 제거</button><button type="button" disabled={dirty||!selectedCosts.length} onClick={()=>bulkOptions(options.map(o=>({...o,costs:o.costs.filter((_,i)=>!selectedCosts.includes(`${o.id}:${i}`))})), 'remove_costs')}>선택 비용 제거</button><button type="button" disabled={dirty||!options.some(o=>o.costs.length)} onClick={()=>bulkOptions(options.map(o=>({...o,costs:[],casting:undefined})),'clear_costs')}>현재 카드 모든 비용 제거</button></div>{conversion?<><p>동일 자원의 슬롯 1개를 대안으로 사용하는 방식입니다. 전환 후 기본 주문 레벨 이상 모든 보유 슬롯을 사용 시 선택할 수 있습니다.</p><button type="button" disabled={dirty} onClick={()=>bulkOptions(conversion.castOptions,'convert_slots',conversion.bindings)}>자동 슬롯 선택으로 전환 미리보기</button></>:<p>자동 변환을 확정할 수 없는 설정은 그대로 보존합니다. 기본 화면에서 수동 전환하고 변경 내용을 확인해 주세요.</p>}</section>}
@@ -44,18 +49,46 @@ export function AdvancedCardCostEditor({card,controller,onSaved,onClose,onBasic,
         const allowed=snapshot.resources.filter(resource=>!resource.ownedDefinitionId&&(resource.overrides.scope!=='card'||resource.overrides.ownerCardId===card.id)&&(cost.type!=='slot'||resource.kind==='slot_track'&&(resource.template.slotKind??'generic')===cost.slotSelection));
         const replace=(next:typeof cost)=>changeOption(index,{...option,costs:option.costs.map((value,i)=>i===costIndex?next:value)});
         const automatic = resource && inferredAutomaticCost(card.id,cost,resource,snapshot.resources);
-        const selecting=conversionKey?.costKey===cost.costKey;
+        const autoMode=libraryOnly||(modeByCost[cost.costKey]??(bindings[cost.costKey]?'manual':cost.requirement||(cost.type==='slot'&&cost.autoBind)?'automatic':'manual'))==='automatic';
         function applyAutomatic(key: string) {
           const next = options.map(item=>({...item,costs:item.costs.map(value=>value.costKey===cost.costKey?automaticCost(value,resource,key):value)}));
           if(next.some(item=>item.costs.some(value=>!value)))return;
-          setOptions(next as CastOption[]);setBindings({...bindings,[cost.costKey]:''});setConfirmShared(false);setConversionKey(undefined);
+          setOptions(next as CastOption[]);setBindings({...bindings,[cost.costKey]:''});setConfirmShared(false);setModeByCost({...modeByCost,[cost.costKey]:'automatic'});
         }
         return <div className="cost-row" key={cost.costKey}>{cost.reconnect&&!resource&&<p className="muted">가져온 비용에 사용할 자원을 직접 선택해 주세요.</p>}{manage&&<label className="batch-select"><input type="checkbox" aria-label={`비용 ${index+1}-${costIndex+1} 선택`} checked={selectedCosts.includes(`${option.id}:${costIndex}`)} onChange={e=>setSelectedCosts(e.target.checked?[...selectedCosts,`${option.id}:${costIndex}`]:selectedCosts.filter(id=>id!==`${option.id}:${costIndex}`))}/>비용 선택</label>}
-          {!libraryOnly&&<label>연결 자원 {index+1}-{costIndex+1}<select aria-label={`연결 자원 ${index+1}-${costIndex+1}`} disabled={controller.busy} value={bindings[cost.costKey]??''} onChange={event=>{setBindings({...bindings,[cost.costKey]:event.target.value});if(cost.type==='slot')replace({...cost,autoBind:false});else if(!cost.requirement&&!cost.reconnect)replace({...cost,slotLevel:undefined});}}><option value="">미연결</option>{bindings[cost.costKey]&&!allowed.some(resource=>resource.id===bindings[cost.costKey])&&<option value={bindings[cost.costKey]}>기존 연결 · 삭제/종류 확인</option>}{allowed.map(resource=><option key={resource.id} value={resource.id}>{resource.name} · {resource.unit}</option>)}</select></label>}
-          {bindings[cost.costKey]&&!libraryOnly&&<div><button type="button" onClick={()=>automatic?applyAutomatic(automatic.requirement!.key):setConversionKey({costKey:cost.costKey,key:''})}>자동 연결로 전환</button>{selecting&&<div className="inline-confirm"><p>현재 연결에서 고유한 공유 자원 키를 확인할 수 없습니다. 사용할 자원의 키를 입력하세요. 후보가 여러 개면 차감하지 않습니다.</p><label>전환할 자원 식별 키<input maxLength={128} value={conversionKey.key} onChange={event=>setConversionKey({...conversionKey,key:event.target.value})}/></label><button type="button" disabled={!automaticCost(cost,resource,conversionKey.key)} onClick={()=>applyAutomatic(conversionKey.key)}>자동 연결 적용</button><button type="button" onClick={()=>setConversionKey(undefined)}>취소</button></div>}</div>}
-          <label>자동 연결할 자원 식별 키<input aria-label={`자원 식별 키 ${index+1}-${costIndex+1}`} maxLength={128} pattern="[A-Za-z0-9][A-Za-z0-9:_\-]*" required={cost.type==='slot'&&cost.slotSelection==='generic'&&!bindings[cost.costKey]} value={cost.requirement?.key??''} onChange={event=>replace({...cost,requirement:event.target.value?{...cost.requirement,key:event.target.value,kind:cost.type==='slot'||cost.slotLevel!==undefined||cost.requirement?.kind==='track'?'track':'counter'}:undefined})}/></label>
-          {cost.type!=='slot'&&cost.requirement&&<label>요구 자원 종류<select value={cost.requirement.kind} onChange={event=>{const kind=event.target.value as 'counter'|'track';replace({...cost,slotLevel:kind==='counter'?undefined:cost.slotLevel,requirement:{key:cost.requirement!.key,kind,slotKind:kind==='track'?cost.requirement!.slotKind:undefined}});}}><option value="counter">횟수 / 포인트</option><option value="track">레벨별 트랙</option></select></label>}
-          {cost.type==='slot'&&cost.slotSelection!=='generic'&&!cost.requirement&&<label className="checkbox-line"><input type="checkbox" checked={cost.autoBind??false} onChange={event=>{replace({...cost,autoBind:event.target.checked});if(event.target.checked)setBindings({...bindings,[cost.costKey]:''});}}/>클래스 슬롯 자동 연결</label>}
+
+          {!libraryOnly&&<label>연결 방식<select aria-label={`연결 방식 ${index+1}-${costIndex+1}`} value={autoMode?'automatic':'manual'} onChange={event=>{
+            if(event.target.value==='automatic'&&automatic){applyAutomatic(automatic.requirement!.key);return;}
+            setModeByCost({...modeByCost,[cost.costKey]:event.target.value as 'manual'|'automatic'});
+          }}><option value="manual">직접 지정</option><option value="automatic">자동 연결</option></select></label>}
+          {!autoMode&&<label>연결 자원 {index+1}-{costIndex+1}<select aria-label={`연결 자원 ${index+1}-${costIndex+1}`} disabled={controller.busy}
+            value={bindings[cost.costKey]??''} onChange={event=>{
+              const id=event.target.value;setBindings({...bindings,[cost.costKey]:id});
+              const selected=allowed.find(item=>item.id===id);
+              if(cost.type==='slot')replace({...cost,autoBind:false,requirement:undefined});
+              else replace({...cost,slotLevel:selected?.kind==='slot_track'?cost.slotLevel:undefined,requirement:undefined});
+            }}>
+            <option value="">미연결</option>{bindings[cost.costKey]&&!allowed.some(item=>item.id===bindings[cost.costKey])&&<option value={bindings[cost.costKey]}>기존 연결 · 삭제/종류 확인</option>}
+            {allowed.map(item=><option key={item.id} value={item.id}>{item.name} · {item.unit}</option>)}
+          </select></label>}
+          {autoMode&&<>
+            {bindings[cost.costKey]&&<p className="muted">자동 연결로 바꾸려면 아래에서 자원 정의를 선택하세요. 후보가 여러 개면 직접 지정할 수 있습니다.</p>}
+            <ResourceDefinitionPicker catalog={catalog} value={bindings[cost.costKey]?undefined:cost.requirement?.key}
+              label={`비용 ${index+1}-${costIndex+1} 자원 정의`}
+              types={cost.type==='slot'?[cost.slotSelection]:undefined}
+              defaultType={cost.type==='slot'?cost.slotSelection:cost.requirement?.slotKind??'uses'}
+              disabled={controller.busy} onChange={(key,template)=>{
+                if(!key||!template)return;
+                if(bindings[cost.costKey]&&cost.type!=='slot'&&((resource?.kind==='slot_track'||cost.slotLevel!==undefined)!==(template.kind==='slot_track')))return;
+                if(bindings[cost.costKey]&&options.flatMap(item=>item.costs).filter(item=>item.costKey===cost.costKey).length>1){applyAutomatic(key);return;}
+                setBindings({...bindings,[cost.costKey]:''});
+                const requirement={key,kind:template.kind==='slot_track'?'track' as const:'counter' as const,slotKind:template.kind==='slot_track'?template.slotKind??'generic':undefined};
+                if(cost.type==='slot')replace({...cost,requirement,reconnect:undefined,autoBind:false});
+                else replace({...cost,requirement,reconnect:undefined,slotLevel:template.kind==='slot_track'?cost.slotLevel:undefined});
+              }}/>
+            {cost.type==='slot'&&cost.slotSelection!=='generic'&&<label className="checkbox-line"><input type="checkbox"
+              checked={!!cost.autoBind&&!bindings[cost.costKey]} onChange={event=>{replace({...cost,autoBind:event.target.checked,requirement:undefined,reconnect:undefined});if(event.target.checked)setBindings({...bindings,[cost.costKey]:''});}}/>클래스 슬롯 자동 연결</label>}
+          </>}
           <label>소모 방식<select aria-label={`소모 방식 ${index+1}-${costIndex+1}`} disabled={controller.busy} value={cost.type==='slot'?`slot:${cost.slotSelection}`:cost.type} onChange={event=>{const value=event.target.value;replace(value==='fixed'?{type:'fixed',costKey:cost.costKey,amount:1}:value==='variable'?{type:'variable',costKey:cost.costKey,min:1,max:5,step:1}:{type:'slot',costKey:cost.costKey,slotSelection:value==='slot:pact'?'pact':value==='slot:generic'?'generic':'standard'});}}><option value="fixed">고정</option><option value="variable">선택형</option>{card.kind==='spell'&&<><option value="slot:standard">일반 주문 슬롯 1개</option><option value="slot:pact">계약 슬롯 1개</option><option value="slot:generic">사용자 정의 슬롯 1개</option></>}</select></label>
           {cost.type==='fixed'?<label>소모량<input aria-label={`소모량 ${index+1}-${costIndex+1}`} required type="number" min={0} max={1000000} step={1} value={cost.amount} onChange={event=>replace({...cost,amount:Number(event.target.value)})}/></label>:cost.type==='variable'?(['min','max','step']as const).map(field=><label key={field}>{{min:'최소',max:'최대',step:'간격'}[field]}<input aria-label={`${field} ${index+1}-${costIndex+1}`} required type="number" min={field==='step'?1:0} max={1000000} step={1} value={cost[field]} onChange={event=>replace({...cost,[field]:Number(event.target.value)})}/></label>):<p className="muted">사용 시 적법한 슬롯 레벨만 선택합니다. 소마법은 슬롯을 소비하지 않습니다.</p>}
           {cost.type!=='slot'&&(resource?.kind==='slot_track'||cost.requirement?.kind==='track')&&<label>트랙 레벨<select aria-label={`트랙 레벨 ${index+1}-${costIndex+1}`} value={cost.slotLevel??''} required={cost.requirement?.kind==='track'} onChange={event=>replace({...cost,slotLevel:event.target.value?Number(event.target.value):undefined})}><option value="">레벨 선택</option>{(cost.requirement?.kind==='track'||cost.reconnect?Array.from({length:9},(_,level)=>String(level+1)):Object.keys(resource?.capacityByLevel??{})).map(level=><option key={level} value={level}>{level}레벨</option>)}</select></label>}
@@ -69,6 +102,7 @@ export function AdvancedCardCostEditor({card,controller,onSaved,onClose,onBasic,
     {scope==='shared'&&affected>0&&sharedChanged&&<label className="checkbox-line"><input type="checkbox" aria-label="공통 비용 변경 영향 확인" checked={confirmShared} onChange={event=>setConfirmShared(event.target.checked)}/>다른 캐릭터의 공통 비용에 영향을 주는 변경을 확인했습니다.</label>}
     {hasOverride&&<><button type="button" onClick={()=>setRestore(true)}>공통 비용으로 복귀</button>{restore&&<div className="inline-confirm"><p>현재 캐릭터의 비용 재정의를 해제합니다. 기존 자원 연결이 공통 비용과 맞는지 다시 확인하세요.</p><button type="button" disabled={controller.busy} onClick={async()=>{if(await controller.perform({type:'clear_cost_override',cardId:card.id},revision))await saved();}}>전용 비용 해제 확인</button></div>}</>}
     </details>
-    {controller.error&&<p role="alert" className="error-banner">{controller.error}</p>}<div className="modal-actions"><button type="button" disabled={controller.busy} onClick={onClose}>취소</button><button disabled={controller.busy||(scope==='shared'&&affected>0&&sharedChanged&&!confirmShared)}>{onDraft?'등록 규칙에 적용':'고급 사용 규칙 저장'}</button></div>
+    {incomplete&&<p role="status">변경한 연결 방식에 사용할 자원을 선택하세요.</p>}
+    {controller.error&&<p role="alert" className="error-banner">{controller.error}</p>}<div className="modal-actions"><button type="button" disabled={controller.busy} onClick={onClose}>취소</button><button disabled={controller.busy||incomplete||(scope==='shared'&&affected>0&&sharedChanged&&!confirmShared)}>{onDraft?'등록 규칙에 적용':'고급 사용 규칙 저장'}</button></div>
   </form>{batch&&<BatchReview action={batch} onClose={()=>setBatch(undefined)} onSaved={async()=>{await controller.refresh();await saved();}}/>}</Modal>;
 }

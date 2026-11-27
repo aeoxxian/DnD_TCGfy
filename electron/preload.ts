@@ -40,6 +40,8 @@ const bridge: DesktopBridge = {
   setDeckCards: input => ipcRenderer.invoke(IPC.setDeckCards, input),
   previewClass: input => ipcRenderer.invoke(IPC.previewClass,input),
   getResources: characterId => ipcRenderer.invoke(IPC.getResources, characterId),
+  getResourceDefinitions: () => ipcRenderer.invoke(IPC.getResourceDefinitions),
+  createResourceDefinition: input => ipcRenderer.invoke(IPC.createResourceDefinition,input),
   previewResource: input => ipcRenderer.invoke(IPC.previewResource, input),
   changeResource: input => ipcRenderer.invoke(IPC.changeResource, input),
 };
