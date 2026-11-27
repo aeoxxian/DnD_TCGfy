@@ -47,7 +47,7 @@ try {
   page=await app.firstWindow();
   await app.evaluate(({ BrowserWindow })=>BrowserWindow.getAllWindows()[0].setContentSize(1366,850));
   await page.locator('.board').waitFor();
-  assert.equal((await boot()).appVersion,'1.4.2');
+  assert.equal((await boot()).appVersion,JSON.parse(await readFile('package.json','utf8')).version);
   assert.equal((await boot()).schemaVersion,11);
   assert.equal((await boot()).profiles.length,0);
 
@@ -181,8 +181,8 @@ try {
 
   await page.getByLabel('활성 캐릭터').selectOption(recipient.id);
   await app.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},dialogPath);
-  await openManagement(page,'덱 JSON 교환');
-  const exchange=dialog('덱 JSON 교환');
+  await openManagement(page,'덱 JSON·ZIP 교환');
+  const exchange=dialog('덱 JSON·ZIP 교환');
   await button(exchange,'덱 JSON 내보내기').click();
   await exchange.getByText(/덱 JSON을 저장했습니다/).waitFor();
   const original=JSON.parse(await readFile(dialogPath,'utf8'));
@@ -192,7 +192,7 @@ try {
   await writeFile(dialogPath,JSON.stringify({...original,cards:[original.cards[0],newCard]}));
   await exchange.getByLabel('가져오는 방식').selectOption('append');
   await exchange.getByLabel('추가할 덱').selectOption(recipient.activeDeckId);
-  await button(exchange,'덱 JSON 파일 선택').click();
+  await button(exchange,'덱 JSON 또는 ZIP 파일 선택').click();
   let preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
   await preview.getByRole('heading',{name:'추가 예정 1장'}).waitFor();
   await preview.getByRole('heading',{name:'중복 1장'}).waitFor();
@@ -206,7 +206,7 @@ try {
   await exchange.getByText(/덱에 카드 1장을 추가했습니다/).waitFor();
   const order=(await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds;
   assert.equal(order.length,2);
-  await button(exchange,'덱 JSON 파일 선택').click();
+  await button(exchange,'덱 JSON 또는 ZIP 파일 선택').click();
   preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
   await button(preview,'기존 덱 확인').click();
   assert.deepEqual((await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds,order);
@@ -214,7 +214,7 @@ try {
     const result=await window.desktop.setDeckCards({deckId,cardIds:[firstId]});
     if(!result.ok)throw new Error(result.error);
   },{deckId:recipient.activeDeckId,firstId:order[0]});
-  await button(exchange,'덱 JSON 파일 선택').click();
+  await button(exchange,'덱 JSON 또는 ZIP 파일 선택').click();
   preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
   await preview.getByRole('heading',{name:'추가 예정 1장'}).waitFor();
   await button(preview,'기존 덱에 추가 확정').click();
@@ -222,7 +222,7 @@ try {
   assert.deepEqual((await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds,order);
   const differing={...original.cards[0],ref:'other-rules',characterRules:[{id:'other',label:'JSON 전용 비용',costs:[]}]};
   await writeFile(dialogPath,JSON.stringify({...original,cards:[differing]}));
-  await button(exchange,'덱 JSON 파일 선택').click();
+  await button(exchange,'덱 JSON 또는 ZIP 파일 선택').click();
   preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
   const conflict=preview.getByLabel('외부 불씨 가져오기 방법');
   await conflict.selectOption('copy');
@@ -234,7 +234,7 @@ try {
   const afterConflict=(await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds;
   assert.deepEqual(afterConflict.slice(0,2),order);
   assert.equal(afterConflict.length,3);
-  await close('덱 JSON 교환');
+  await close('덱 JSON·ZIP 교환');
   await showWholeLibrary(page);
   assert.equal((await boot()).cards.find(card=>card.id===order[1]).description,'서로 다른 카드');
   steps.push('FIX-06: append preview with duplicate/conflict/missing image/reconnect and idempotent replay');

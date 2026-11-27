@@ -234,13 +234,23 @@ export class LibraryStore {
     return this.getLibrary();
   }
   setDeckCards(input: unknown): Library {
-    const { deckId, cardIds } = deckCardsSchema.parse(input);
+    const { deckId, cardIds, operation } = deckCardsSchema.parse(input);
     if (!this.db.prepare('SELECT id FROM decks WHERE id=? AND id NOT IN (SELECT deck_id FROM deck_trash) AND character_id NOT IN (SELECT profile_id FROM profile_trash)').get(deckId)) throw new UserInputError('덱을 찾을 수 없습니다.');
     if (new Set(cardIds).size !== cardIds.length) throw new UserInputError('덱에 같은 카드를 두 번 넣을 수 없습니다.');
     transaction(this.db, () => {
+      if (operation === 'remove') {
+        const remove = this.db.prepare('DELETE FROM deck_cards WHERE deck_id=? AND card_id=?');
+        for (const id of cardIds) remove.run(deckId,id);
+        return;
+      }
       const existing = new Set((this.db.prepare('SELECT card_id FROM deck_cards WHERE deck_id=?').all(deckId) as { card_id: string }[]).map(row => row.card_id));
       // Preserve already-linked archived references while editing other deck cards.
       for (const id of cardIds) if (!existing.has(id)) this.getCard(id);
+      if (operation === 'add') {
+        const add = this.db.prepare('INSERT INTO deck_cards VALUES (?,?,(SELECT COALESCE(MAX(position),-1)+1 FROM deck_cards WHERE deck_id=?)) ON CONFLICT(deck_id,card_id) DO NOTHING');
+        for (const id of cardIds) add.run(deckId,id,deckId);
+        return;
+      }
       this.db.prepare('DELETE FROM deck_cards WHERE deck_id=?').run(deckId);
       cardIds.forEach((id, position) => this.db.prepare('INSERT INTO deck_cards(deck_id,card_id,position) VALUES (?,?,?)').run(deckId, id, position));
     });

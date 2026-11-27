@@ -37,7 +37,7 @@ describe('v1.1 Phase 2 selection management bar', () => {
     expect(details.querySelector('summary')!.textContent).toBe('선택 카드 일괄 작업');
     expect(details.hasAttribute('open')).toBe(false);
     const trash = details.querySelector<HTMLButtonElement>('.batch-trash button')!;
-    expect(trash.textContent).toBe('선택 카드 휴지통으로 이동');
+    expect(trash.textContent).toBe('선택한 라이브러리 원본을 휴지통으로 이동');
     expect(view.container.querySelectorAll('.trash-move')).toHaveLength(1);
     expect(details.querySelector('.batch-trash-scope')!.textContent).toBe('대상 2장 · 범위: 활성 덱 ‘기본 덱’의 현재 필터 결과 9장 중 선택한 카드');
     fireEvent.click(trash);

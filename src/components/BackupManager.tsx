@@ -15,7 +15,7 @@ export function BackupManager({ onClose, onLibrary }: { onClose: () => void; onL
   const [error, setError] = useState('');
   const [exported, setExported] = useState<BackupExportResult>();
   const [preview, setPreview] = useState<RestorePreview>();
-  const [mode, setMode] = useState<'replace' | 'copy'>('copy');
+  const [mode, setMode] = useState<'replace' | 'copy' | 'images'>('copy');
   const [phrase, setPhrase] = useState('');
   const [done, setDone] = useState('');
   const token = useRef<string | undefined>(undefined);
@@ -48,9 +48,12 @@ export function BackupManager({ onClose, onLibrary }: { onClose: () => void; onL
     if (!result.ok) { setError(result.error); return; }
     token.current = undefined; setPreview(undefined);
     if (result.value.mode === 'copy') { onLibrary(result.value.library); setDone(`카드 ${result.value.added}장을 새로 추가했습니다 (이미지 ${result.value.images}개, 새 태그 ${result.value.tagsCreated}개). 자원 연결은 카드 사용 규칙에서 다시 지정해 주세요.`); }
-    else setDone('앱을 다시 시작해 복원을 마칩니다. 이전 데이터는 앱 데이터 폴더의 backups 안에 보존됩니다.');
+    else if (result.value.mode === 'images') {
+      onLibrary(result.value.library);
+      setDone(`원본 이미지를 카드 ${result.value.recovered}장에 다시 연결했습니다. 아직 원본을 찾지 못한 카드 ${result.value.remaining}장.`);
+    } else setDone('앱을 다시 시작해 복원을 마칩니다. 이전 데이터는 앱 데이터 폴더의 backups 안에 보존됩니다.');
   });
-  const canApply = !!preview && !busy && (mode === 'copy' ? preview.backup.counts.cards > 0 : phrase.trim() === '복원');
+  const canApply = !!preview && !busy && (mode === 'images' || (mode === 'copy' ? preview.backup.counts.cards > 0 : phrase.trim() === '복원'));
 
   return <Modal title="데이터 백업·복원" wide onClose={onClose}>
     <div className="backup-manager">
@@ -83,11 +86,12 @@ export function BackupManager({ onClose, onLibrary }: { onClose: () => void; onL
           {preview.warnings.length > 0 && <ul className="restore-warnings">{preview.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
           {preview.sharedCardIds > 0 && <p className="muted">현재 라이브러리와 같은 카드 {preview.sharedCardIds}장이 들어 있습니다. 이 라이브러리의 이전 백업으로 보입니다.</p>}
           <fieldset className="restore-mode"><legend>복원 방식</legend>
+            <label><input type="radio" name="restore-mode" checked={mode === 'images'} onChange={() => setMode('images')}/><span><strong>끊어진 원본 이미지만 복구</strong><small>내용이 정확히 일치하는 원본을 찾아 카드에 다시 연결합니다. 현재 카드, 덱, 자원 및 사용 기록은 그대로 유지합니다.</small></span></label>
             <label><input type="radio" name="restore-mode" checked={mode === 'copy'} onChange={() => setMode('copy')}/><span><strong>카드만 새로 복제해 추가</strong><small>현재 데이터는 그대로 두고 백업의 카드 {preview.backup.counts.cards}장을 이미지·태그와 함께 새 카드로 추가합니다.{preview.duplicateNames ? ` 이름이 같은 카드 ${preview.duplicateNames}장은 두 장이 됩니다.` : ''} 캐릭터·덱·자원·기록은 가져오지 않습니다.</small></span></label>
             <label><input type="radio" name="restore-mode" checked={mode === 'replace'} onChange={() => setMode('replace')}/><span><strong>현재 데이터를 백업으로 교체</strong><small>현재 데이터는 지우지 않고 앱 데이터 폴더의 backups/replaced-… 폴더로 옮겨 보존한 뒤, 앱을 다시 시작하며 백업 내용으로 바꿉니다.</small></span></label>
           </fieldset>
           {mode === 'replace' && <label className="form-field">교체하려면 <strong>복원</strong>을 입력하세요<input value={phrase} onChange={event => setPhrase(event.target.value)} aria-label="교체 확인 문구"/></label>}
-          <div className="modal-actions"><button disabled={busy} onClick={() => void cancel()}>취소</button><button className={mode === 'replace' ? 'danger' : 'primary'} disabled={!canApply} onClick={() => void apply()}>{mode === 'replace' ? '교체하고 다시 시작' : '카드 추가'}</button></div>
+          <div className="modal-actions"><button disabled={busy} onClick={() => void cancel()}>취소</button><button className={mode === 'replace' ? 'danger' : 'primary'} disabled={!canApply} onClick={() => void apply()}>{mode === 'replace' ? '교체하고 다시 시작' : mode === 'images' ? '이미지 복구' : '카드 추가'}</button></div>
         </div>}
         {done && <p role="status" className="backup-result">{done}</p>}
       </section>

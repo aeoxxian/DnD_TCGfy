@@ -224,7 +224,7 @@ export const profileTrashSchema = z.strictObject({ kind: z.enum(['profile','deck
 export interface ProfileTrashEntry { kind: 'profile'|'deck'; id: string; name: string; characterName?: string }
 export const createDeckSchema = z.strictObject({ characterId: idSchema, name: z.string().trim().min(1).max(100) });
 export const selectDeckSchema = z.strictObject({ characterId: idSchema, deckId: idSchema });
-export const deckCardsSchema = z.strictObject({ deckId: idSchema, cardIds: z.array(idSchema).max(5000) });
+export const deckCardsSchema = z.strictObject({ deckId: idSchema, cardIds: z.array(idSchema).max(5000), operation: z.enum(['add','remove']).optional() });
 export const importPathsSchema = z.array(z.string().min(1).max(32767)).min(1).max(100);
 /** v1.3: images picked in a registration that was cancelled or removed from its list (see AssetService.takeSessionImports). */
 export const discardImportsSchema = z.array(idSchema).max(200);

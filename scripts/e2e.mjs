@@ -233,7 +233,7 @@ try {
   await dialog.getByRole('button', { name: '캐릭터와 덱 닫기' }).click(); await countVisible(0);
   await putInDeck('반응의 카드', '카드 플레이어 A · 보조 덱');
   await selectCharacter(playerA.id); await countVisible(1); assert.equal(await page.locator('.deck-label strong').textContent(), '보조 덱');
-  await selectCard('반응의 카드'); await page.getByRole('button',{name:'관리',exact:true}).click(); assert.equal(await page.getByRole('dialog',{name:'관리 메뉴',exact:true}).getByRole('group',{name:'덱에 넣기·빼기'}).count(), 0); await page.getByRole('button',{name:'활성 덱에서 빼기',exact:true}).waitFor(); await page.keyboard.press('Escape');
+  await selectCard('반응의 카드'); await page.getByRole('button',{name:'관리',exact:true}).click(); assert.equal(await page.getByRole('dialog',{name:'관리 메뉴',exact:true}).getByRole('group',{name:'덱에 넣기·빼기'}).count(), 0); await page.getByRole('button',{name:'현재 덱에서만 제거',exact:true}).waitFor(); await page.keyboard.press('Escape');
   data = await state(); assert.deepEqual(data.decks.find(deck => deck.id === playerA.activeDeckId).cardIds, [first.id]); assert.deepEqual(data.decks.find(deck => deck.id === playerB.activeDeckId).cardIds, [first.id]);
   recordCheck('Two characters share one card with independent decks; extra deck creation/selection/membership; v1.2 whole-library deck building and character deck scope');
 
@@ -260,7 +260,7 @@ try {
   await dialog.getByRole('button', { name: '독립 태그 태그 삭제', exact: true }).click(); await dialog.getByRole('button', { name: '태그 삭제 확인' }).click();
   await dialog.getByLabel('독립 태그 태그 이름', { exact: true }).waitFor({ state: 'hidden' }); await dialog.getByRole('button', { name: '공통 태그 관리 닫기' }).click();
   data = await state(); assert(!data.libraryState.tagIds.includes(independentTag.id)); assert(!data.cards.find(card => card.id === second.id).tags.includes(independentTag.id)); assert(data.cards.find(card => card.id === first.id).tags.includes(sharedTag.id));
-  await showAll(); await selectCard('DROPPED');await openManagement(page,'선택 관리');await openManagement(page,'휴지통으로 이동');
+  await showAll(); await selectCard('DROPPED');await openManagement(page,'선택 관리');await openManagement(page,'라이브러리 원본을 휴지통으로 이동');
   const archiveDialog=page.getByRole('dialog',{name:'휴지통 이동 확인',exact:true});await archiveDialog.getByRole('button',{name:'휴지통으로 이동 확정',exact:true}).click();await archiveDialog.waitFor({state:'hidden'});await waitCount(21);await page.getByRole('button',{name:'선택 관리 종료',exact:true}).click();
   recordCheck('Explicit common-tag deletion clears only that tag and its saved filter; archive preserves original data and references');
 

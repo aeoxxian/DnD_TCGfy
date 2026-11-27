@@ -14,6 +14,7 @@ import type { AppStore } from './store';
 import { inspectDatabase } from './store';
 import { SCHEMA_VERSION, transaction } from './migrations';
 import { UserInputError } from './errors';
+import type { AssetService, PreparedOriginal } from './assets';
 
 const MB = 2 ** 20;
 export const LIMITS = { entries: 20000, assetBytes: 64 * MB, dbBytes: 2048 * MB, manifestBytes: 16 * MB, totalBytes: 8192 * MB, ratio: 200 };
@@ -174,6 +175,8 @@ export class BackupService {
       let manifest: BackupManifest; let total = 0;
       try {
         const entries = await readEntries(zip);
+        if (entries.some(entry=>entry.fileName==='deck.json') && !entries.some(entry=>entry.fileName===DB_ENTRY))
+          throw new UserInputError('덱 교환 ZIP입니다. 관리 → 덱 JSON·ZIP 교환에서 열어 주세요.');
         const names = new Set<string>(); const files = new Map<string, Entry>();
         for (const entry of entries) {
           const name = entry.fileName;
@@ -267,6 +270,44 @@ export class BackupService {
   async discard(token: string): Promise<true> {
     if (/^[0-9a-f-]{36}$/.test(token)) await rm(join(this.restoreRoot, 'staging', token), { recursive: true, force: true });
     return true;
+  }
+
+  /** Recover only byte-identical originals; do not import backup card definitions or play state. */
+  async recoverImages(token: string, assets: AssetService) {
+    const staging = this.staged(token);
+    const source = new DatabaseSync(join(staging, 'data', 'app.sqlite3'), { readOnly: true });
+    const originals = new Map<string,string>();
+    try {
+      for (const row of source.prepare('SELECT sha256,relative_path FROM assets ORDER BY id').all()) {
+        const path = String(row.relative_path);
+        if (ASSET_ENTRY.test(path) && existsSync(join(staging,path))) originals.set(String(row.sha256),join(staging,path));
+      }
+    } finally { source.close(); }
+    const missing = await assets.missingOriginals();
+    const wanted = new Set(missing.map(row=>row.sha));
+    const local = await assets.findOriginals(wanted);
+    const prepared = new Map<string,PreparedOriginal>();
+    try {
+      for (const sha of wanted) {
+        const path = originals.get(sha);
+        if (path && !local.has(sha) && existsSync(path)) prepared.set(sha,await assets.prepareOriginal(path,sha));
+      }
+      const recovered = transaction(assets.library.db,()=>{
+        let count = 0;
+        for (const row of missing) {
+          let id = local.get(row.sha);
+          const image = prepared.get(row.sha);
+          if (!id && image) {
+            id = assets.storeOriginal(image);
+            local.set(row.sha,id);
+          }
+          if (id && assets.linkOriginal(row,id)) count++;
+        }
+        return count;
+      });
+      await this.discard(token).catch(()=>undefined);
+      return { recovered, remaining:(await assets.missingOriginals()).length };
+    } finally { await assets.cleanPrepared(prepared.values()); }
   }
 
   /** Schedule a full replacement. The swap itself runs at the next start, before the database is opened. */

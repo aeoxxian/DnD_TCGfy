@@ -20,6 +20,24 @@ export function moveCardsToTrash(db:DatabaseSync,ids:string[],batchId:string) {
   }
 }
 
+/** Restore the original card and its recorded memberships inside the caller's transaction. */
+export function restoreCardFromTrash(db:DatabaseSync,id:string): string[] {
+  const entry=db.prepare('SELECT decks_json FROM card_trash WHERE card_id=?').get(id);
+  if(!entry || !db.prepare('SELECT 1 FROM card_definitions WHERE id=? AND archived_at IS NOT NULL').get(id))
+    throw new UserInputError('휴지통의 카드가 바뀌었습니다. 다시 확인해 주세요.');
+  const warnings:string[]=[];
+  for(const deck of JSON.parse(String(entry.decks_json)) as TrashDeck[]){
+    if(!db.prepare('SELECT id FROM decks WHERE id=? AND character_id=?').get(deck.id,deck.characterId)){
+      warnings.push(`“${deck.name}” 덱이 없어 해당 덱 연결은 복원하지 못했습니다.`);
+      continue;
+    }
+    db.prepare('INSERT INTO deck_cards VALUES (?,?,(SELECT COALESCE(MAX(position),-1)+1 FROM deck_cards WHERE deck_id=?)) ON CONFLICT(deck_id,card_id) DO NOTHING').run(deck.id,id,deck.id);
+  }
+  db.prepare('UPDATE card_definitions SET archived_at=NULL WHERE id=?').run(id);
+  db.prepare('DELETE FROM card_trash WHERE card_id=?').run(id);
+  return warnings;
+}
+
 export class TrashStore {
   readonly db;
   constructor(store:AppStore){this.db=store.db;}
@@ -85,13 +103,7 @@ export class TrashStore {
       if(p.requiresPhrase&&request.phrase!=='영구 삭제')throw new UserInputError('확인 문구 “영구 삭제”를 정확히 입력해 주세요.');
       const warnings:string[]=[];const now=new Date().toISOString();
       if(request.action.type==='move')moveCardsToTrash(this.db,p.ids,request.requestId);
-      else if(request.action.type==='restore')for(const id of p.ids){
-        for(const deck of this.decks(id,true)){
-          if(!this.db.prepare('SELECT id FROM decks WHERE id=? AND character_id=?').get(deck.id,deck.characterId)){warnings.push(`“${deck.name}” 덱이 없어 카드만 복원했습니다.`);continue;}
-          if(!this.db.prepare('SELECT 1 FROM deck_cards WHERE deck_id=? AND card_id=?').get(deck.id,id))this.db.prepare('INSERT INTO deck_cards VALUES (?,?,(SELECT COALESCE(MAX(position),-1)+1 FROM deck_cards WHERE deck_id=?))').run(deck.id,id,deck.id);
-        }
-        this.db.prepare('UPDATE card_definitions SET archived_at=NULL WHERE id=?').run(id);this.db.prepare('DELETE FROM card_trash WHERE card_id=?').run(id);
-      }
+      else if(request.action.type==='restore')for(const id of p.ids)warnings.push(...restoreCardFromTrash(this.db,id));
       else {
         const assets=this.assets(p.ids);const batches=this.batches(p.ids);
         for(const id of p.ids){const row=this.card(id,true);this.preserveHistory(id,row);

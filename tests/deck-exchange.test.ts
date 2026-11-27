@@ -2,6 +2,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import sharp from 'sharp';
+import { ZipFile } from 'yazl';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { describe, expect, it } from 'vitest';
 import { AssetService } from '../electron/assets';
 import { BackupService, applyPendingRestore } from '../electron/backup';
@@ -23,8 +27,9 @@ const fixture = (path = mkdtempSync(join(root, 'case-'))) => {
   const store = new AppStore(path);
   const library = new LibraryStore(store);
   const resources = new ResourceStore(store);
-  const exchange = new DeckExchange(library, resources, new AssetService(path, library));
-  return { path, store, library, resources, exchange };
+  const assets = new AssetService(path, library);
+  const exchange = new DeckExchange(library, resources, assets);
+  return { path, store, library, resources, assets, exchange };
 };
 type Fixture = ReturnType<typeof fixture>;
 const newProfile = (f: Fixture, name: string) => {
@@ -127,11 +132,13 @@ describe('v1.4 P4 deck JSON', () => {
       expect(f.resources.snapshot(source.id).resources.find(resource=>resource.id===before.id)?.remaining).toBe(before.remaining);
       const usedEvents = f.store.db.prepare("SELECT * FROM play_events WHERE event_type='card_used'").all();
       f.library.archiveCard(memberIds[1]);
-      expect((await again()).summary).toMatchObject({trashed:[edited.name],created:[]});
+      const archived = await f.exchange.inspect(source.id,path,target.id);
+      expect(archived.restorable).toMatchObject([{ref:edited.ref,id:memberIds[1],decks:[expect.stringContaining('기존 덱')]}]);
+      expect(f.library.trashedCards().map(card=>card.id)).toContain(memberIds[1]);
+      const skipped = await f.exchange.apply({characterId:source.id,deckId:target.id,token:archived.token,decisions:{[edited.ref]:{mode:'skip'}}});
+      expect(skipped.summary).toMatchObject({trashed:[edited.name],created:[],restored:[]});
+      expect((await again()).summary).toMatchObject({restored:[edited.name],created:[]});
       const trash = new TrashStore(f.store);
-      const restore = { type:'restore' as const,cardIds:[memberIds[1]] };
-      const restoreReview = trash.preview(restore);
-      trash.change({requestId:randomUUID(),action:restore,quote:restoreReview.quote,confirmed:true});
       expect((await again()).summary?.duplicates).toContain(edited.name);
       f.library.archiveCard(memberIds[1]);
       const purge = { type:'purge' as const,cardIds:[memberIds[1]] };
@@ -142,6 +149,90 @@ describe('v1.4 P4 deck JSON', () => {
       expect(readded.library.decks.find(deck=>deck.id===target.id)!.cardIds).not.toContain(memberIds[1]);
       expect(f.store.db.prepare("SELECT * FROM play_events WHERE event_type='card_used'").all()).toEqual(usedEvents);
     } finally { f.store.close(); }
+  });
+
+  it('moves a shared card only out of the selected deck and restores both recorded memberships through the same JSON preview', async ()=>{
+    const f=fixture();
+    try {
+      const s=seed(f);
+      const other=newProfile(f,'다른 캐릭터');
+      const file=join(f.path,'shared.json');
+      await f.exchange.export(s.deckId,file);
+      f.library.setDeckCards({deckId:other.activeDeckId,cardIds:[s.c.id],operation:'add'});
+      f.library.setDeckCards({deckId:s.deckId,cardIds:[s.c.id],operation:'remove'});
+      expect(f.library.getLibrary().decks.find(deck=>deck.id===other.activeDeckId)?.cardIds).toEqual([s.c.id]);
+      expect(f.library.getLibrary().cards.find(card=>card.id===s.c.id)!.imageAssetId).toBe('source-image');
+      f.library.setDeckCards({deckId:s.deckId,cardIds:[s.c.id],operation:'add'});
+      const state=f.resources.snapshot(s.id);
+      f.library.archiveCard(s.c.id);
+      const preview=await f.exchange.inspect(s.id,file,s.deckId);
+      expect(preview.restorable?.[0].decks).toEqual(expect.arrayContaining(['다른 캐릭터 · 기본 덱','보내는 캐릭터 · 교환 덱']));
+      const result=await f.exchange.apply({characterId:s.id,deckId:s.deckId,token:preview.token});
+      expect(result.summary?.restored).toEqual([s.c.name]);
+      expect(result.library.decks.find(deck=>deck.id===other.activeDeckId)?.cardIds).toEqual([s.c.id]);
+      expect(f.library.getLibrary().cards.find(card=>card.id===s.c.id)!.imageAssetId).toBe('source-image');
+      expect(f.resources.snapshot(s.id).events).toEqual(state.events);
+      expect(f.resources.snapshot(s.id).resources.find(item=>item.ownedDefinitionId)?.remaining).toBe(5);
+    } finally { f.store.close(); }
+  });
+
+  it('preserves exact RGBA originals in ZIP, repairs the existing JSON card, and rolls back a failed ZIP import', async ()=>{
+    const source=fixture();
+    const other=fixture();
+    try {
+      const src=newProfile(source,'ZIP 보내기');
+      const dst=newProfile(other,'ZIP 받기');
+      const png=await sharp({create:{width:37,height:61,channels:4,background:{r:13,g:24,b:35,alpha:0.45}}}).png().toBuffer();
+      const hash=createHash('sha256').update(png).digest('hex');
+      const original=await source.assets.prepareOriginal(png,hash);
+      const assetId=source.assets.storeOriginal(original);
+      source.library.saveCards({cards:[{...info,name:'PNG 원본',tags:[],imageMode:'illustration',imageAssetId:assetId,ownedResources:[definition]}]});
+      const json=join(source.path,'portable.json');
+      const zip=join(source.path,'portable.zip');
+      await source.exchange.export(src.activeDeckId!,json);
+      expect((await source.exchange.export(src.activeDeckId!,zip,'zip')).notices.filter(notice=>notice.kind==='image')).toEqual([]);
+      const inspect=(file:string)=>other.exchange.inspect(dst.id,file,dst.activeDeckId);
+      const apply=(token:string)=>other.exchange.apply({token,characterId:dst.id,deckId:dst.activeDeckId});
+      const card=(await apply((await inspect(json)).token)).library.cards[0];
+      expect(card.imageReference?.sha256).toBe(hash);
+      const preview=await inspect(zip);
+      expect(preview.format).toBe('zip');
+      expect(preview.notices.filter(notice=>notice.kind==='image')).toEqual([]);
+      other.store.db.exec("CREATE TRIGGER fail_zip BEFORE UPDATE OF image_asset_id ON card_definitions BEGIN SELECT RAISE(ABORT,'rollback ZIP'); END");
+      await expect(apply(preview.token)).rejects.toThrow('rollback ZIP');
+      expect(readdirSync(join(other.path,'assets'))).toEqual([]);
+      expect(other.library.getLibrary().cards.find(item=>item.id===card.id)!.imageReference?.sha256).toBe(hash);
+      other.store.db.exec('DROP TRIGGER fail_zip');
+      await apply((await inspect(zip)).token);
+      const repaired=other.library.getLibrary().cards.find(item=>item.id===card.id)!;
+      expect(repaired.imageReference).toBeUndefined();
+      const restored=await other.assets.readAsset(`app://assets/${repaired.imageAssetId}`);
+      expect(restored?.bytes).toEqual(png);
+      expect(await sharp(restored!.bytes).metadata()).toMatchObject({width:37,height:61,hasAlpha:true});
+      const newDeck=await other.exchange.inspect(dst.id,zip);
+      expect(await other.exchange.apply({token:newDeck.token,characterId:dst.id})).toMatchObject({added:1});
+      expect(readdirSync(join(other.path,'assets'))).toHaveLength(1);
+      expect((await other.exchange.inspect(dst.id,zip)).existing).toBe(true);
+      const backup=new BackupService(source.store,'1.4.3');
+      await expect(backup.inspect(zip)).rejects.toThrow(/덱 교환 ZIP/);
+      const backupFile=join(source.path,'backup.zip');
+      await backup.exportTo(backupFile);
+      await expect(inspect(backupFile)).rejects.toThrow(/전체 백업/);
+      const hostile=join(source.path,'invalid.zip');
+      const archive=new ZipFile();
+      archive.addBuffer(Buffer.from('unrecognized entry'),'unexpected.txt');
+      const written=pipeline(archive.outputStream,createWriteStream(hostile));
+      archive.end();
+      await written;
+      await expect(inspect(hostile)).rejects.toThrow(/파일 경로/);
+      const imagePath=other.library.getAsset(repaired.imageAssetId!)!.relative_path;
+      const {unlinkSync}=await import('node:fs');
+      unlinkSync(join(other.path,imagePath));
+      const restore=new BackupService(other.store,'1.4.3');
+      const backupPreview=await restore.inspect(backupFile);
+      expect(await restore.recoverImages(backupPreview.token,other.assets)).toEqual({recovered:2,remaining:0});
+      expect((await other.assets.readAsset(`app://assets/${other.library.getLibrary().cards.find(item=>item.id===card.id)!.imageAssetId}`))?.bytes).toEqual(png);
+    } finally { source.store.close(); other.store.close(); }
   });
 
   it('asks how to resolve differing character rules and never overwrites the existing card', async () => {

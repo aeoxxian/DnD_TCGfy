@@ -1,4 +1,4 @@
-import { open, mkdir, realpath, stat, writeFile } from 'node:fs/promises';
+import { open, mkdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join, resolve, sep } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import sharp from 'sharp';
@@ -8,6 +8,7 @@ import { UserInputError } from './errors';
 
 export const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
 export const MAX_IMAGE_PIXELS = 40_000_000;
+export type PreparedOriginal = { asset: AssetRecord; path: string };
 sharp.cache({ memory: 32, files: 0, items: 32 });
 sharp.concurrency(2);
 
@@ -61,12 +62,83 @@ export class AssetService {
     return path;
   }
   async matchesOriginal(id: string, sha256: string): Promise<boolean> {
+    return !!await this.originalFile(id, sha256);
+  }
+  async originalFile(id: string, sha256: string) {
     const asset = this.library.getAsset(id);
-    if (!asset || asset.sha256 !== sha256) return false;
+    if (!asset || asset.sha256 !== sha256) return;
     try {
-      const bytes = await readBounded(await this.managedPath(asset.relative_path));
-      return createHash('sha256').update(bytes).digest('hex') === sha256;
-    } catch { return false; }
+      const path = await this.managedPath(asset.relative_path);
+      const bytes = await readBounded(path);
+      if (createHash('sha256').update(bytes).digest('hex') === sha256) return { path, mime: asset.mime_type, size: bytes.length };
+    } catch { /* A stale catalog entry is not a verified original. */ }
+  }
+  async findOriginals(hashes: Iterable<string>) {
+    const result = new Map<string, string>();
+    const query = this.library.db.prepare('SELECT id FROM assets WHERE sha256=? AND id NOT IN (SELECT asset_id FROM asset_cleanup) ORDER BY id');
+    for (const sha of hashes) {
+      for (const { id } of query.all(sha) as { id: string }[]) {
+        if (!await this.matchesOriginal(id, sha)) continue;
+        result.set(sha, id);
+        break;
+      }
+    }
+    return result;
+  }
+  async prepareOriginal(source: Buffer | string, sha256: string): Promise<PreparedOriginal> {
+    const bytes = typeof source === 'string' ? await readBounded(source) : source;
+    const format = detectImageFormat(bytes);
+    if (!format || bytes.length > MAX_IMAGE_BYTES || createHash('sha256').update(bytes).digest('hex') !== sha256)
+      throw new UserInputError('원본 이미지와 기록된 이미지가 일치하지 않습니다.');
+    let width: number, height: number;
+    try {
+      const metadata = await sharp(bytes, { failOn: 'warning', limitInputPixels: MAX_IMAGE_PIXELS }).metadata();
+      ({ width, height } = metadata);
+      if (metadata.format !== format || !width || !height || width * height * (metadata.pages ?? 1) > MAX_IMAGE_PIXELS) throw new Error('pixels');
+      await this.thumbnail(bytes);
+    } catch { throw new UserInputError('손상된 이미지이거나 최대 4천만 픽셀을 초과한 이미지입니다.'); }
+    const id = randomUUID();
+    const relative_path = `assets/${id}.${format === 'jpeg' ? 'jpg' : format}`;
+    await mkdir(join(this.userData, 'assets'), { recursive: true });
+    const canonical = await realpath(join(this.userData, 'assets'));
+    if (!canonical.startsWith(`${await realpath(this.userData)}${sep}`)) throw new UserInputError('이미지 보관 폴더 경로가 올바르지 않습니다.');
+    const path = join(canonical, basename(relative_path));
+    const target = await open(path, 'wx');
+    try {
+      try { await target.writeFile(bytes); await target.sync(); } finally { await target.close(); }
+    } catch (error) { await rm(path, { force:true }); throw error; }
+    return { path, asset: { id, relative_path, sha256, mime_type: `image/${format}`, width, height, original_name: basename(relative_path) } };
+  }
+  storeOriginal({asset}: PreparedOriginal) {
+    this.library.db.prepare('INSERT INTO assets(id,relative_path,sha256,mime_type,width,height,original_name) VALUES (?,?,?,?,?,?,?)')
+      .run(asset.id, asset.relative_path, asset.sha256, asset.mime_type, asset.width, asset.height, asset.original_name);
+    return asset.id;
+  }
+  async missingOriginals(hashes?: ReadonlySet<string>) {
+    const rows = this.library.db.prepare(`SELECT c.id,c.image_asset_id AS assetId,a.sha256 AS linkedHash,
+      json_extract(c.attributes_json,'$.imageReference.sha256') AS reference FROM card_definitions c LEFT JOIN assets a ON a.id=c.image_asset_id
+      WHERE c.image_asset_id IS NOT NULL OR json_type(c.attributes_json,'$.imageReference.sha256')='text'`).all() as
+      { id:string; assetId:string|null; linkedHash:string|null; reference:string|null }[];
+    const verified = new Map<string,boolean>();
+    const missing = [];
+    for (const row of rows) {
+      const sha = row.linkedHash ?? row.reference;
+      if (!sha || hashes && !hashes.has(sha)) continue;
+      if (row.assetId) {
+        if (!verified.has(row.assetId)) verified.set(row.assetId, await this.matchesOriginal(row.assetId, sha));
+        if (verified.get(row.assetId)) continue;
+      }
+      missing.push({...row, sha});
+    }
+    return missing;
+  }
+  linkOriginal(row: Awaited<ReturnType<AssetService['missingOriginals']>>[number], id: string) {
+    return !!this.library.db.prepare(`UPDATE card_definitions SET image_asset_id=?,attributes_json=json_remove(attributes_json,'$.imageReference')
+      WHERE id=? AND image_asset_id IS ? AND json_extract(attributes_json,'$.imageReference.sha256') IS ?`)
+      .run(id,row.id,row.assetId,row.reference).changes;
+  }
+  async cleanPrepared(images: Iterable<PreparedOriginal>) {
+    for (const image of images) if (!this.library.getAsset(image.asset.id)) await rm(image.path, { force:true }).catch(() => undefined);
   }
   private async thumbnail(bytes: Buffer): Promise<Buffer> {
     return sharp(bytes, { failOn: 'warning', limitInputPixels: MAX_IMAGE_PIXELS, pages: 1 })

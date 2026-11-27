@@ -47,7 +47,7 @@ const boot = () => page.evaluate(async () => {
   if (!result.ok) throw new Error(result.error);
   return result.value;
 });
-const manager = () => page.getByRole('dialog', { name: '덱 JSON 교환', exact: true });
+const manager = () => page.getByRole('dialog', { name: '덱 JSON·ZIP 교환', exact: true });
 const getPreview = () => manager().getByRole('region', { name: '덱 불러오기 미리보기', exact: true });
 const screenshot = name => page.screenshot({ path: join(run, name), animations: 'disabled' });
 const cardName = '교환 검증 · 별빛 주문';
@@ -157,7 +157,7 @@ try {
   await waitResource(6);
   await page.getByRole('button', { name: '직전 자원 변경 실행 취소', exact: true }).click();
   await waitResource(5);
-  await openManagement(page, '활성 덱에서 빼기');
+  await openManagement(page, '현재 덱에서만 제거');
   await page.getByRole('button', { name: `별빛 충전 · ${cardName} 상태·수정`, exact: true }).waitFor({ state: 'detached' });
   await putInDeck(page, cardName, '보내는 마법사 · 기본 덱');
   await page.getByLabel('활성 캐릭터', { exact: true }).selectOption(source.id);
@@ -167,7 +167,7 @@ try {
   assert.equal(sourceSnapshot.resources.find(item => item.name === '별빛 충전').inactive, false);
   pass('같은 프로필에서 검색·필터, 사용과 회복·실행 취소, 덱 제외와 재추가 후 잔여량 유지');
   await useDialog('save', jsonPath);
-  await openManagement(page, '덱 JSON 교환');
+  await openManagement(page, '덱 JSON·ZIP 교환');
   await manager().getByRole('button', { name: '덱 JSON 내보내기', exact: true }).click();
   await manager().getByText('카드 3장의 덱 JSON을 저장했습니다.', { exact: true }).waitFor();
   await screenshot('01-export.png');
@@ -192,13 +192,13 @@ try {
   await page.reload(); await page.waitForSelector('.board');
   const invalid = join(run, 'unsupported-deck.json');
   await writeFile(invalid, JSON.stringify({ ...document, schemaVersion: 99 }));
-  await openManagement(page, '덱 JSON 교환');
+  await openManagement(page, '덱 JSON·ZIP 교환');
   await useDialog('open', invalid);
-  await manager().getByRole('button', { name: '덱 JSON 파일 선택', exact: true }).click();
+  await manager().getByRole('button', { name: '덱 JSON 또는 ZIP 파일 선택', exact: true }).click();
   await manager().getByRole('alert').filter({ hasText: '지원하지 않는 덱 JSON 버전입니다.' }).waitFor();
   assert.equal((await boot()).cards.length, 0);
   await useDialog('open', jsonPath);
-  await manager().getByRole('button', { name: '덱 JSON 파일 선택', exact: true }).click();
+  await manager().getByRole('button', { name: '덱 JSON 또는 ZIP 파일 선택', exact: true }).click();
   let preview = getPreview();
   await preview.getByRole('heading', { name: '받는 캐릭터 · 기본 덱 (2)' }).waitFor();
   assert.equal(await preview.getByText(/같은 원본 이미지가 없습니다/).count(), 2);
@@ -208,7 +208,7 @@ try {
   await screenshot('02-import-preview.png');
   await preview.getByRole('button', { name: '새 덱 불러오기 확정', exact: true }).click();
   await manager().getByRole('status').filter({ hasText: /기본 덱 \(2\).*덱을 추가했습니다/ }).waitFor();
-  await manager().getByRole('button', { name: '덱 JSON 교환 닫기', exact: true }).click();
+  await manager().getByRole('button', { name: '덱 JSON·ZIP 교환 닫기', exact: true }).click();
   const received = await boot();
   assert.equal(received.schemaVersion, 11);
   const deck = received.decks.find(item => item.name === '기본 덱 (2)');
@@ -240,8 +240,8 @@ try {
 
   await launch(toPath);
   await useDialog('open', jsonPath);
-  await openManagement(page, '덱 JSON 교환');
-  await manager().getByRole('button', { name: '덱 JSON 파일 선택', exact: true }).click();
+  await openManagement(page, '덱 JSON·ZIP 교환');
+  await manager().getByRole('button', { name: '덱 JSON 또는 ZIP 파일 선택', exact: true }).click();
   preview = getPreview();
   await preview.getByText(/이 파일로 만든 기존 덱/).waitFor();
   await screenshot('04-repeat-import.png');
@@ -257,7 +257,7 @@ try {
   assert.deepEqual(roundTrip, { ...document, name: '기본 덱 (2)' });
   assert.deepEqual(errors, []);
   pass('새 덱에서 고유 자원 7→5 차감, 수동 연결 전 사용 차단, 재시작과 같은 파일 재등록 시 5/7 유지, 내보내기 왕복 일치');
-  await manager().getByRole('button', { name: '덱 JSON 교환 닫기', exact: true }).click();
+  await manager().getByRole('button', { name: '덱 JSON·ZIP 교환 닫기', exact: true }).click();
   const zipPath = join(run, 'full-backup.zip');
   await useDialog('save', zipPath);
   await openManagement(page, '백업·복원');
@@ -280,8 +280,8 @@ try {
   assert.deepEqual(await snap(target.id), spent);
   assert.equal((await boot()).decks.find(item => item.id === deck.id).name, '기본 덱 (2)');
   await useDialog('open', jsonPath);
-  await openManagement(page, '덱 JSON 교환');
-  await manager().getByRole('button', { name: '덱 JSON 파일 선택', exact: true }).click();
+  await openManagement(page, '덱 JSON·ZIP 교환');
+  await manager().getByRole('button', { name: '덱 JSON 또는 ZIP 파일 선택', exact: true }).click();
   await getPreview().getByText(/이 파일로 만든 기존 덱/).waitFor();
   assert.deepEqual(errors, []);
   pass('기존 전체 ZIP 백업을 별도 프로필로 복원했을 때 가져온 덱, 5/7 잔여량, 사용 기록과 중복 가져오기 기록 유지');

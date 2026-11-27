@@ -87,7 +87,7 @@ try {
   pass('Acquiring the matching resource enables the existing card and both costs are charged together');
   await page.screenshot({ path: join(run, 'mixed-cost.png') });
 
-  await openManagement(page, '활성 덱에서 빼기');
+  await openManagement(page, '현재 덱에서만 제거');
   await ledger().waitFor({ state: 'detached' });
   const before = (await resources(characterId)).find(item => item.ownedDefinitionId);
   assert.deepEqual([before.remaining, before.inactive], [2, true]);

@@ -116,7 +116,7 @@ check('registering from the main screen saves image, info, tag and a cost rule a
 await openManagement(page, '선택 관리');
 const bar = page.getByRole('region', { name: '카드 선택 관리', exact: true });
 assert.deepEqual(await bar.locator(':scope > .batch-actions button').allTextContents(), ['표시 카드 전체 선택', '카드 선택 해제', '선택 관리 종료']);
-const trashButton = bar.getByRole('button', { name: '선택 카드 휴지통으로 이동', exact: true });
+const trashButton = bar.getByRole('button', { name: '선택한 라이브러리 원본을 휴지통으로 이동', exact: true });
 assert.equal(await trashButton.isVisible(), false, 'hidden while the bulk area is folded');
 assert.equal(await page.locator('.toolbar-switches').getByRole('button', { name: '선택 관리 종료' }).count(), 0, 'end-selection moved out of the hand toolbar');
 const targets = data.cards.filter(card => deck.cardIds.includes(card.id) && card.name !== NEW).slice(0, 2);

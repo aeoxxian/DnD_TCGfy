@@ -40,10 +40,11 @@ export interface RestorePreview {
 export interface BackupStatus { dataPath: string; autoBackupFolder: string; lastAutoBackup?: string; autoBackups: number }
 export type RestoreResult =
   | { mode: 'replace'; restarting: true; preservedIn: string }
+  | { mode: 'images'; recovered: number; remaining: number; library: Library }
   | { mode: 'copy'; added: number; images: number; tagsCreated: number; library: Library };
 
 export const restoreTokenSchema = z.strictObject({ token: z.uuid() });
-export const applyRestoreSchema = z.strictObject({ token: z.uuid(), mode: z.enum(['replace', 'copy']), confirmed: z.literal(true) });
+export const applyRestoreSchema = z.strictObject({ token: z.uuid(), mode: z.enum(['replace', 'copy', 'images']), confirmed: z.literal(true) });
 export type ApplyRestoreInput = z.infer<typeof applyRestoreSchema>;
 
 export interface BackupBridge {

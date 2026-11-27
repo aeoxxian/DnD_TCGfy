@@ -94,14 +94,15 @@ else {
     });
     const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
     safeHandler(IPC.exportDeck, async input => {
-      const { deckId } = deckSelectionSchema.parse(input);
-      const choice = await dialog.showSaveDialog(mainWindow!, { title: '덱 JSON 내보내기', defaultPath: join(app.getPath('documents'), `DnD-TCG-fy-deck-${stamp()}.json`), filters: [{ name: '덱 JSON', extensions: ['json'] }] });
+      const { deckId, format = 'json' } = deckSelectionSchema.parse(input);
+      const label = format === 'zip' ? '이미지 포함 덱 ZIP' : '덱 JSON';
+      const choice = await dialog.showSaveDialog(mainWindow!, { title: `${label} 내보내기`, defaultPath: join(app.getPath('documents'), `DnD-TCG-fy-deck-${stamp()}.${format}`), filters: [{ name: label, extensions: [format] }] });
       if (choice.canceled || !choice.filePath) return { canceled: true };
-      return exchange.export(deckId, choice.filePath.toLowerCase().endsWith('.json') ? choice.filePath : `${choice.filePath}.json`);
+      return exchange.export(deckId, choice.filePath.toLowerCase().endsWith(`.${format}`) ? choice.filePath : `${choice.filePath}.${format}`, format);
     });
     safeHandler(IPC.inspectDeck, async input => {
       const { characterId, deckId } = deckTargetSchema.parse(input);
-      const choice = await dialog.showOpenDialog(mainWindow!, { title: '덱 JSON 불러오기', properties: ['openFile'], filters: [{ name: '덱 JSON', extensions: ['json'] }] });
+      const choice = await dialog.showOpenDialog(mainWindow!, { title: '덱 불러오기', properties: ['openFile'], filters: [{ name: '덱 교환 파일', extensions: ['json','zip'] }] });
       if (choice.canceled || !choice.filePaths[0]) return { canceled: true };
       return exchange.inspect(characterId, choice.filePaths[0], deckId);
     });
@@ -122,6 +123,7 @@ else {
     safeHandler(IPC.discardBackup, input => backup.discard(restoreTokenSchema.parse(input).token));
     safeHandler(IPC.applyBackup, async input => {
       const request = applyRestoreSchema.parse(input);
+      if (request.mode === 'images') return { mode: 'images', ...(await backup.recoverImages(request.token,assets)), library: library.getLibrary() };
       if (request.mode === 'copy') return { mode: 'copy', ...(await backup.importCopies(request.token)), library: library.getLibrary() };
       const preservedIn = await backup.scheduleReplace(request.token);
       // Restart so the swap happens before any store opens the database. Tests opt out of relaunching.

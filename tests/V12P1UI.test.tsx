@@ -34,7 +34,11 @@ describe('v1.2 Phase 1 · scope follows the top selectors (전체 카드/활성 
       getResources: vi.fn().mockImplementation(async (id: string) => ok(emptySnapshot(id))),
       saveLibraryState: vi.fn().mockImplementation(async (state: LibraryState) => ok(state)),
       saveSettings: vi.fn().mockImplementation(async settings => ok(settings)),
-      setDeckCards: vi.fn().mockImplementation(async ({ deckId, cardIds }: { deckId: string; cardIds: string[] }) => ok({ ...structuredClone(boot), decks: boot.decks.map(deck => deck.id === deckId ? { ...deck, cardIds } : deck) })),
+      setDeckCards: vi.fn().mockImplementation(async ({ deckId, cardIds, operation }: { deckId: string; cardIds: string[]; operation: 'add'|'remove' }) => {
+        boot.decks = boot.decks.map(deck => deck.id === deckId ? { ...deck, cardIds: operation === 'add'
+          ? [...new Set([...deck.cardIds,...cardIds])] : deck.cardIds.filter(id=>!cardIds.includes(id)) } : deck);
+        return ok(structuredClone(boot));
+      }),
       previewResource: vi.fn().mockResolvedValue(ok({ changes: [], label: '사용 불가', canUse: false, canOverride: false, reason: '비용 미설정', revision: 3, quote: 'q' })),
       getUseHistory: vi.fn(), changeResource: vi.fn(), getTrash: vi.fn(),
     } as unknown as DesktopBridge;
@@ -74,13 +78,13 @@ describe('v1.2 Phase 1 · scope follows the top selectors (전체 카드/활성 
     fireEvent.click(screen.getByRole('button', { name: '관리' }));
     const menu = screen.getByRole('dialog', { name: '관리 메뉴' });
     const membership = within(menu).getByRole('group', { name: '덱에 넣기·빼기' });
-    expect(within(menu).queryByRole('button', { name: '활성 덱에 추가' })).toBeNull();
+    expect(within(menu).queryByRole('button', { name: '현재 덱에 추가' })).toBeNull();
     fireEvent.click(within(membership).getByRole('button', { name: '아린 · 기본 덱에 넣기' }));
-    await waitFor(() => expect(window.desktop.setDeckCards).toHaveBeenCalledWith({ deckId: 'deck-a', cardIds: ['sample-heal', 'sample-attack', 'sample-utility'] }));
+    await waitFor(() => expect(window.desktop.setDeckCards).toHaveBeenCalledWith({ deckId: 'deck-a', cardIds: ['sample-utility'], operation:'add' }));
     expect(await within(membership).findByRole('button', { name: '아린 · 기본 덱에서 빼기' })).toBeDefined();
     expect(within(membership).getByRole('button', { name: '보른 · 기본 덱에 넣기' })).toBeDefined();
     fireEvent.click(within(membership).getByRole('button', { name: '아린 · 기본 덱에서 빼기' }));
-    await waitFor(() => expect(window.desktop.setDeckCards).toHaveBeenLastCalledWith({ deckId: 'deck-a', cardIds: ['sample-heal', 'sample-attack'] }));
+    await waitFor(() => expect(window.desktop.setDeckCards).toHaveBeenLastCalledWith({ deckId: 'deck-a', cardIds: ['sample-utility'], operation:'remove' }));
   });
 
   it('keeps the active-deck removal for a selected character and explains how to fill an empty deck', async () => {
@@ -88,7 +92,7 @@ describe('v1.2 Phase 1 · scope follows the top selectors (전체 카드/활성 
     fireEvent.click(await screen.findByRole('button', { name: '상처 치료 카드 선택' }));
     fireEvent.click(screen.getByRole('button', { name: '관리' }));
     const menu = screen.getByRole('dialog', { name: '관리 메뉴' });
-    expect(within(menu).getByRole('button', { name: '활성 덱에서 빼기' })).toBeDefined();
+    expect(within(menu).getByRole('button', { name: '현재 덱에서만 제거' })).toBeDefined();
     expect(within(menu).queryByRole('group', { name: '덱에 넣기·빼기' })).toBeNull();
     cleanup();
     mount(library({ activeCharacterId: 'b' }));

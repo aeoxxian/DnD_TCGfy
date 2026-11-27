@@ -103,7 +103,7 @@ async function draftResource(page, dialog, name, { max = 7, dawn = 3 } = {}) {
   let menu = page.getByRole('dialog', { name: '관리 메뉴', exact: true });
   const group = menu.getByRole('group', { name: '덱에 넣기·빼기', exact: true });
   assert.equal(await group.getByRole('listitem').count(), start.decks.length);
-  assert.equal(await menu.getByRole('button', { name: '활성 덱에 추가', exact: true }).count(), 0);
+  assert.equal(await menu.getByRole('button', { name: '현재 덱에 추가', exact: true }).count(), 0);
   await group.getByRole('button', { name: `${owner.name} · ${empty.name}에 넣기`, exact: true }).click();
   await group.getByRole('button', { name: `${owner.name} · ${empty.name}에서 빼기`, exact: true }).waitFor();
   let data = await boot(page);

@@ -18,6 +18,19 @@ Build and maintain a Windows 10/11 x64 offline-first Electron desktop applicatio
 ## Working order
 P0 → P1 → P2 → P3 → P4 → P5 from `IMPLEMENTATION_PLAN.md`. Ship a runnable milestone at each stage. Prefer functionality and persistence correctness over visual polish; then refine card interactions without hiding card text.
 
+## User experience and system consistency
+
+1. Verify that the feature serves the user's actual purpose, including its interactions with existing features.
+2. Keep internal identifiers, data references, and storage details out of ordinary user workflows. Present meaningful names and choices.
+3. Apply consistent behavior across creation, use, editing, sharing, removal, deletion, restoration, and re-registration.
+4. Before confirmation, explain which other cards, decks, characters, or data will be affected by an operation.
+5. Test realistic journeys that combine features as well as individual behaviors. Include repeat operations, re-registration after deletion, cancellation before confirmation, and recovery after failure where relevant.
+6. Review the actual workflow and interface. A count of passing tests is only one part of the evidence.
+7. Protect user data while avoiding unnecessary manual recovery or repeated input.
+8. When fixing a bug, look for the same cause in related features and check their behavior.
+
+Match verification and documentation to the risk of the change. Follow the user's requested approval gates and keep reporting and documentation focused on new evidence.
+
 ## Per-milestone report
 Provide: implemented features; files changed; how to run; commands/tests executed and outcomes; screenshots where feasible; known issues; next milestone. Do not report a `.exe` as tested unless it was actually built and launched.
 

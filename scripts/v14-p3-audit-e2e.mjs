@@ -199,7 +199,7 @@ try {
     await useButton().click();
     await waitOwnedAmount(expected);
   }
-  await openManagement(page, '활성 덱에서 빼기');
+  await openManagement(page, '현재 덱에서만 제거');
   await ledger().waitFor({ state: 'detached' });
   assert.deepEqual([(await own()).remaining, (await own()).inactive], [2, true]);
   await putInDeck(page, ownedCard, `${character} · 기본 덱`);
