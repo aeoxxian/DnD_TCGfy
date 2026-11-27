@@ -52,7 +52,7 @@ try {
   const screenshot = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'));
   await writeFile(join(run, 'play-board.png'), Buffer.from(screenshot, 'base64'));
   const layout = await measure(page);
-  if (renderer.schema === 9) assertLayout(layout, `Windows ${system.dpi * 100}%`);
+  if (renderer.schema >= 9) assertLayout(layout, `Windows ${system.dpi * 100}%`);
   const matrix = [];
   if (process.env.DND_TCG_P5_MATRIX === '1') {
     for (const [width, height] of [[1920, 1080], [1366, 768], [1280, 720], [860, 440]]) {

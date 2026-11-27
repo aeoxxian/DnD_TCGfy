@@ -82,6 +82,11 @@ export function castingLevels(card:Pick<CardDefinition, 'kind' | 'spellLevel'>,o
   const max=Math.min(9,config?.maxSlotLevel??9,config?.allowUpcast===false?base:9);
   return Array.from({length:9},(_,i)=>i+1).filter(level=>level>=min&&level<=max);
 }
+export function canUseHigherSlot(card: Pick<CardDefinition,'kind'|'spellLevel'>, options: CastOption[]): boolean {
+  const base = card.spellLevel;
+  return card.kind==='spell' && !!base && options.some(option=>!option.ritual && option.costs.some(cost=>cost.type==='slot')
+    && castingLevels(card,option).some(level=>level>base));
+}
 export function boundResource(cardId:string,costKey:string,resources:ResourceView[],bindings:CardBinding[],autoSlot?:'standard'|'pact'):ResourceView {
   const matches=bindings.filter(binding=>binding.cardId===cardId&&binding.costKey===costKey);
   if(matches.length===0&&autoSlot){

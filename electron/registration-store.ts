@@ -19,6 +19,7 @@ export class RegistrationStore {
     const parsed = saveCardsSchema.parse(input);
     const { initialRules: rules, ...cardsInput } = parsed;
     if (!rules) return this.library.saveCards(cardsInput);
+    if (parsed.libraryRules) throw new UserInputError('등록 규칙과 라이브러리 수정은 동시에 저장할 수 없습니다.');
     if (parsed.cards.some(card => card.id)) throw new UserInputError('초기 사용 규칙은 새 카드 등록에만 적용할 수 있습니다. 기존 카드는 독립 편집을 사용하세요.');
     // A resource refresh is not a new registration intent. Receipts must still
     // match after a committed response was lost and the client refreshed state.

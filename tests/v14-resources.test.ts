@@ -239,8 +239,8 @@ describe('v1.4 P3 resource lifecycle', () => {
     const f = fixture(path);
     try {
       expect(f.store.db.prepare('SELECT * FROM character_profiles').all()).toEqual(before);
-      expect(f.store.db.prepare('PRAGMA user_version').get()!.user_version).toBe(9);
-      expect(readdirSync(join(path, 'backups'))).toEqual([expect.stringMatching(/^before-v7-to-v9-/)]);
+      expect(f.store.db.prepare('PRAGMA user_version').get()!.user_version).toBe(10);
+      expect(readdirSync(join(path, 'backups'))).toEqual([expect.stringMatching(/^before-v7-to-v10-/)]);
     } finally { f.store.close(); }
   });
 });

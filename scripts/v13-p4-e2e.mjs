@@ -118,9 +118,9 @@ const deckBefore = data.decks.find(d => d.id === druid.activeDeckId).cardIds.len
   await checks(form, '카드 역할', ['보호']); await checks(form, '카드 행동 경제', ['반응 행동']);
   await form.getByRole('radio', { name: '주문 슬롯', exact: true }).check();
   await form.getByLabel('등록 슬롯 계열', { exact: true }).selectOption('standard');
-  await form.getByText('홈브루 예외 허용', { exact: true }).click();
-  await form.getByText('기본 주문 레벨 미만 시전 허용', { exact: true }).click();
-  await form.getByLabel('등록 홈브루 최소 레벨', { exact: true }).fill('1'); await form.getByLabel('등록 홈브루 최대 레벨', { exact: true }).fill('5');
+  await form.getByLabel('등록 허용 슬롯 범위', { exact: true }).selectOption('custom');
+
+  await form.getByLabel('등록 최소 슬롯 레벨', { exact: true }).fill('1'); await form.getByLabel('등록 최대 슬롯 레벨', { exact: true }).fill('5');
   await form.getByRole('button', { name: '카드 저장', exact: true }).click(); await form.waitFor({ state: 'hidden' });
 
   form = await openRegistration(page);
@@ -309,7 +309,7 @@ const deckBefore = data.decks.find(d => d.id === druid.activeDeckId).cardIds.len
   for (const row of originalCards) assert.equal(now.get(row.id), JSON.stringify(row), `original card ${row.name} unchanged`);
   assert.equal(readDb(userData, 'PRAGMA integrity_check')[0].integrity_check, 'ok');
   assert.deepEqual(readDb(userData, 'PRAGMA foreign_key_check'), []);
-  assert.equal(readDb(userData, 'PRAGMA user_version')[0].user_version, 9, 'schema v9 after deck exchange migration');
+  assert.equal(readDb(userData, 'PRAGMA user_version')[0].user_version, 10, 'schema v10 after patch migration');
   check('Data: every original image file and card row is byte-identical; integrity_check ok, no foreign key problems, schema v7 after migration', { originalImages: Object.keys(originalAssets).length, originalCards: originalCards.length });
 }
 

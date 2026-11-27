@@ -10,6 +10,7 @@ import type { ResourceController } from './ResourcePanel';
 import { RegistrationRules, type RegistrationKind } from './RegistrationRules';
 import { Checks } from './FormChecks';
 import { DefaultCard, kindLine } from './CardFace';
+import { canUseHigherSlot } from '../shared/casting';
 import { CardTraits, ImageModeField } from './CardMetadataFields';
 import type { BatchAsset } from '../shared/batch-registration';
 
@@ -184,8 +185,8 @@ function ItemEditor({ item, name, common, tags, target, targetLabel, characterId
   const effective = effectiveItem(item, name, common);
   const rule: BatchRule = item.rule ?? common.rule;
   const setRule = (patch: Partial<BatchRule>) => onChange({ rule: { ...rule, ...patch } });
-  let summary: string[] = [];
-  try { const built = itemRule(effective, item.ids); summary = describeUseRules(built.castOptions, built.bindings, [...resources, ...(draftView ? [draftView] : [])]); } catch (error) { summary = [(error as Error).message]; }
+  let summary: string[] = [];let allowEnhancement=false;
+  try { const built = itemRule(effective, item.ids); allowEnhancement=canUseHigherSlot(effective.card,built.castOptions); summary = describeUseRules(built.castOptions, built.bindings, [...resources, ...(draftView ? [draftView] : [])]); } catch (error) { summary = [(error as Error).message]; }
   return <div className="batch-editor" role="group" aria-label={`${name} 개별 설정`}>
     <label className="checkbox-line"><input type="checkbox" checked={!!card} onChange={event => onChange({ card: event.target.checked ? cardFields(common.card) : undefined })}/>이 카드의 속성을 따로 정하기</label>
     {card ? <div className="batch-editor-card">
@@ -197,7 +198,7 @@ function ItemEditor({ item, name, common, tags, target, targetLabel, characterId
       <Checks title="개별 카드 역할" disabled={false} choices={ROLE_NAMES} values={card.roles} onChange={roles => setCard({ roles })}/>
       <Checks title="개별 카드 행동 경제" disabled={false} choices={ACTION_NAMES} values={card.actions} onChange={actions => setCard({ actions })}/>
       <ImageModeField mode={effective.card.imageMode ?? 'full_card'} onChange={imageMode => setCard({ imageMode })} individual noFile={item.imageless}/>
-      <CardTraits value={card} onChange={setCard} individual/>
+      <CardTraits value={card} onChange={setCard} allowEnhancement={allowEnhancement} individual/>
       <OwnedResourcesEditor definitions={card.ownedResources} onChange={ownedResources => setCard({ ownedResources })}/>
       {tags.length > 0 && <Checks title="개별 카드 태그" disabled={false} choices={Object.fromEntries(tags.map(tag => [tag.id, tag.name]))} values={card.tags} onChange={selected => setCard({ tags: selected })}/>}
     </div> : <p className="muted">공통 설정을 따릅니다: {kindLine(common.card)} · {common.card.roles.map(role => ROLE_NAMES[role]).join('·') || '역할 없음'}</p>}

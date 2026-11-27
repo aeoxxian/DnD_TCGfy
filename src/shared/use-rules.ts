@@ -1,4 +1,5 @@
 import { resourceMatchKeySchema, type CardDefinition, type CastOption } from './contracts';
+import { resolveCostResource } from './casting';
 import type { ResourceSnapshot, ResourceView } from './resources';
 
 // Only independent one-slot alternatives have an unambiguous automatic conversion.
@@ -17,6 +18,30 @@ export function proposeSlotConversion(card:CardDefinition,snapshot:ResourceSnaps
   return {castOptions:[{id:first.id,label:'주문 시전',costs:[{type:'slot',costKey,slotSelection:family,autoBind:false}],casting:{mode:family,allowUpcast:true,allowBelowBase:false}}],bindings:[{costKey,resourceInstanceId:resource.id}]};
 }
 
+type Cost = CastOption['costs'][number];
+
+export function automaticCost(cost: Cost, resource?: ResourceView, suppliedKey?: string): Cost | undefined {
+  const family = resource?.kind === 'slot_track' ? resource.template.slotKind ?? 'generic' : undefined;
+  const slotKind = cost.type === 'slot' ? cost.slotSelection : cost.slotLevel === undefined ? undefined : family ?? cost.requirement?.slotKind;
+  const track = cost.type === 'slot' || cost.slotLevel !== undefined;
+  const compatible = cost.type === 'slot' ? family === slotKind : track ? !!family : resource?.kind === 'counter';
+  const key = suppliedKey ?? (compatible && resource?.overrides.scope === 'character' && !resource.retired && !resource.inactive
+    ? resource.template.matchKey ?? (resource.presetKey?.startsWith('2014:') ? resource.template.key : undefined)
+    : undefined);
+  const parsed = resourceMatchKeySchema.safeParse(key?.trim());
+  if (!parsed.success) return;
+  const requirement = { key: parsed.data, kind: track ? 'track' as const : 'counter' as const, slotKind };
+  return cost.type === 'slot' ? { ...cost, requirement, reconnect: undefined, autoBind: false } : { ...cost, requirement, reconnect: undefined };
+}
+
+export function inferredAutomaticCost(cardId: string, cost: Cost, resource: ResourceView | undefined, resources: ResourceView[]) {
+  const candidate = automaticCost(cost, resource);
+  if (!candidate) return;
+  try {
+    if (resolveCostResource(cardId, candidate, resources, []).id === resource?.id) return candidate;
+  } catch { /* A missing or ambiguous match requires an explicit key. */ }
+}
+
 export type BasicRuleKind='none'|'slots'|'uses'|'points';
 export interface BasicRuleDraft {
   kind:BasicRuleKind; resourceId:string; resourceKey?:string; amount:number; variable:boolean; min:number; max:number; step:number;
@@ -32,8 +57,8 @@ export function inferBasicRule(card:CardDefinition,snapshot:ResourceSnapshot):Ba
   draft.resourceId=binding?.resourceInstanceId??'';
   if (cost.reconnect) return;
   if(cost.type==='slot'){
-    if(cost.slotSelection==='generic'||cost.requirement||card.kind!=='spell'||option.casting&&option.casting.mode!=='homebrew'&&option.casting.mode!==cost.slotSelection)return;
-    return {...draft,kind:'slots',family:cost.slotSelection,automatic:cost.autoBind===true,homebrew:option.casting?.mode==='homebrew',belowBase:option.casting?.allowBelowBase??false,allowUpcast:option.casting?.allowUpcast,minLevel:option.casting?.minSlotLevel,maxLevel:option.casting?.maxSlotLevel};
+    if(cost.slotSelection==='generic'||card.kind!=='spell'||option.casting&&option.casting.mode!=='homebrew'&&option.casting.mode!==cost.slotSelection)return;
+    return {...draft,kind:'slots',family:cost.slotSelection,resourceKey:cost.requirement?.key,automatic:!binding&&(cost.autoBind===true||!!cost.requirement),homebrew:option.casting?.mode==='homebrew',belowBase:option.casting?.allowBelowBase??false,allowUpcast:option.casting?.allowUpcast,minLevel:option.casting?.minSlotLevel,maxLevel:option.casting?.maxSlotLevel};
   }
   // Fixed slot tiers and non-slot casting can carry meaning the basic form cannot infer.
   if(option.casting||cost.slotLevel!==undefined||cost.requirement?.kind==='track')return;
@@ -51,10 +76,12 @@ export function buildBasicRule(card:CardDefinition,draft:BasicRuleDraft,ids:{opt
   if(draft.kind==='slots'){
     if(card.kind!=='spell'||draft.spellLevel===undefined)throw new Error('기본 주문 레벨을 지정해 주세요.');
     if(!Number.isInteger(draft.spellLevel)||draft.spellLevel<0||draft.spellLevel>9)throw new Error('기본 주문 레벨은 0~9입니다.');
-    if(!draft.automatic&&draft.spellLevel!==0&&!draft.resourceId)throw new Error('사용할 슬롯 자원을 선택해 주세요.');
+    const key=draft.resourceKey?.trim();
+    if(key&&!resourceMatchKeySchema.safeParse(key).success)throw new Error('자원 식별 키를 확인해 주세요.');
+    if(!draft.automatic&&draft.spellLevel!==0&&!draft.resourceId&&!key)throw new Error('사용할 슬롯 자원을 선택해 주세요.');
     if(([draft.minLevel,draft.maxLevel].some(level=>level!==undefined&&(!Number.isInteger(level)||level<1||level>9))||draft.minLevel!==undefined&&draft.maxLevel!==undefined&&draft.minLevel>draft.maxLevel))throw new Error('시전 레벨의 최소·최대 범위를 확인해 주세요.');
     const oldCost=card.castOptions.find(option=>option.id===ids.optionId)?.costs.find(cost=>cost.costKey===ids.costKey);
-    option.costs=[{type:'slot',costKey:ids.costKey,slotSelection:draft.family,autoBind:draft.automatic?true:oldCost?.type==='slot'&&oldCost.autoBind===false?false:undefined}];
+    option.costs=[{type:'slot',costKey:ids.costKey,slotSelection:draft.family,...(key?{requirement:{key,kind:'track',slotKind:draft.family}}:{}),autoBind:draft.automatic&&!key?true:oldCost?.type==='slot'&&oldCost.autoBind===false?false:undefined}];
     option.casting={mode:draft.homebrew?'homebrew':draft.family,allowUpcast:draft.allowUpcast??true,allowBelowBase:draft.homebrew&&draft.belowBase,minSlotLevel:draft.minLevel,maxSlotLevel:draft.maxLevel};
     if(draft.spellLevel>0 && Math.max(draft.minLevel??1,option.casting.allowBelowBase?1:draft.spellLevel)>Math.min(draft.maxLevel??9,draft.allowUpcast===false?draft.spellLevel:9))throw new Error('사용 가능한 시전 레벨이 범위에 포함되어야 합니다.');
     if(!draft.automatic&&draft.resourceId&&draft.spellLevel!==0)bindings.push({costKey:ids.costKey,resourceInstanceId:draft.resourceId});

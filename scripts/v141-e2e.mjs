@@ -1,0 +1,214 @@
+import { _electron as electron } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { openManagement, putInDeck, showWholeLibrary } from './navigation-helpers.mjs';
+
+const root=resolve('artifacts');
+await mkdir(root,{recursive:true});
+const run=await mkdtemp(join(root,'v141-windows-'));
+const profile=join(run,'profile');
+const dialogPath=join(run,'deck.json');
+const steps=[];
+const executablePath=process.env.DND_TCG_EXECUTABLE;
+const app=await electron.launch({...(executablePath?{executablePath,args:[]}:{args:['.']}),env:{...process.env,DND_TCG_TEST_USER_DATA:profile},cwd:process.cwd()});
+let page;
+const dialog=name=>page.getByRole('dialog',{name,exact:true});
+const button=(element,name)=>element.getByRole('button',{name,exact:true});
+const screenshot=name=>page.screenshot({path:join(run,`${name}.png`),animations:'disabled'});
+const boot=()=>page.evaluate(async ()=>{const result=await window.desktop.getBootstrap();assertResult(result);return result.value;function assertResult(value){if(!value.ok)throw new Error(value.error);}});
+const snapshot=id=>page.evaluate(async id=>{const result=await window.desktop.getResources(id);if(!result.ok)throw new Error(result.error);return result.value;},id);
+const tile=name=>button(page,`${name} 카드 선택`);
+async function select(name){const card=tile(name);if(await card.getAttribute('aria-pressed')!=='true')await card.click();}
+async function close(name){await button(dialog(name),`${name} 닫기`).click();}
+async function register(name) {
+  await button(page,'카드 등록').click();
+  const form=dialog('카드 등록');
+  await form.getByLabel('카드 이름',{exact:true}).fill(name);
+  return form;
+}
+async function save(form, name='카드 저장'){await button(form,name).click();await form.waitFor({state:'hidden'});}
+async function create(name) {
+  const profiles=dialog('캐릭터와 덱');
+  await profiles.getByLabel('새 캐릭터 이름').fill(name);
+  await button(profiles,'캐릭터 만들기').click();
+  await profiles.getByLabel('관리할 캐릭터').getByRole('option',{name,exact:true}).waitFor({state:'attached'});
+  return (await boot()).profiles.find(profile=>profile.name===name);
+}
+async function addResource(id,name,key) {
+  return page.evaluate(async ({id,name,key})=>{
+    const before=await window.desktop.getResources(id);
+    const result=await window.desktop.changeResource({characterId:id,requestId:crypto.randomUUID(),expectedRevision:before.value.revision,
+      action:{type:'create_resource',scope:'character',template:{name,kind:'counter',matchKey:key,unit:'점',capacity:{type:'fixed',value:6},recovery:[{triggers:['dawn'],amount:{type:'full'}}]}}});
+    if(!result.ok)throw new Error(result.error);return result.value.snapshot.resources.find(item=>item.name===name);
+  },{id,name,key});
+}
+
+try {
+  page=await app.firstWindow();
+  await app.evaluate(({ BrowserWindow })=>BrowserWindow.getAllWindows()[0].setContentSize(1366,850));
+  await page.locator('.board').waitFor();
+  assert.equal((await boot()).appVersion,'1.4.1');
+  assert.equal((await boot()).schemaVersion,10);
+  assert.equal((await boot()).profiles.length,0);
+
+  let form=await register('범위 검증 주문');
+  await form.getByRole('radio',{name:'주문 슬롯',exact:true}).check();
+  await form.getByLabel('등록 기본 주문 레벨').selectOption('3');
+  const range=form.getByLabel('등록 허용 슬롯 범위');
+  const enhancement=form.getByRole('checkbox',{name:'상위 슬롯 효과 강화',exact:true});
+  assert.equal(await range.inputValue(),'default');
+  assert.equal(await enhancement.isChecked(),false);
+  await range.selectOption('fixed');
+  assert.equal(await enhancement.isDisabled(),true);
+  await range.selectOption('custom');
+  await form.getByLabel('등록 최소 슬롯 레벨').fill('2');
+  await form.getByLabel('등록 최대 슬롯 레벨').fill('5');
+  await enhancement.check();
+  await form.getByLabel('등록 슬롯 계열').selectOption('pact');
+  await form.getByLabel('등록 슬롯 자원 식별 키').fill('qa:pact');
+  await range.scrollIntoViewIfNeeded();
+  await screenshot('01-slot-range');
+  await save(form);
+  const spell=(await boot()).cards.find(card=>card.name==='범위 검증 주문');
+  assert.equal(spell.upcastEffect,true);
+  assert.deepEqual(spell.castOptions[0].casting,{mode:'homebrew',allowUpcast:true,allowBelowBase:true,minSlotLevel:2,maxSlotLevel:5});
+  assert.equal(spell.castOptions[0].costs[0].requirement.slotKind,'pact');
+  steps.push('FIX-01: default, fixed, custom, enhancement, pact and downcasting');
+
+  form=await register('외부 불씨');
+  await form.getByRole('radio',{name:'포인트 자원',exact:true}).check();
+  await form.getByLabel('등록 자원 식별 키').fill('qa:spark');
+  await form.getByLabel('등록 사용할 양').fill('2');
+  assert.equal(await form.getByLabel('등록 사용할 자원').count(),0);
+  await form.getByLabel('등록 자원 식별 키').scrollIntoViewIfNeeded();
+  await screenshot('02-library-requirement');
+  await save(form);
+  await select('외부 불씨');
+  await openManagement(page,'정보 수정');
+  form=dialog('카드 정보 수정');
+  await form.getByRole('radio',{name:'포인트 자원',exact:true}).check();
+  await form.getByLabel('등록 자원 식별 키').fill('qa:spark');
+  await form.getByLabel('등록 사용할 양').fill('3');
+  await save(form,'수정 저장');
+  await openManagement(page,'캐릭터·덱');
+  const character=await create('패치 검증');
+  await close('캐릭터와 덱');
+  await putInDeck(page,'외부 불씨','패치 검증 · 기본 덱');
+  await page.getByLabel('활성 캐릭터').selectOption(character.id);
+  await select('외부 불씨');
+  await page.getByText(/필요한 자원.*보유하지/).first().waitFor();
+  const resource=await addResource(character.id,'연결할 불씨','qa:spark');
+  await page.reload();await page.locator('.board').waitFor();await select('외부 불씨');
+  await button(page,'사용 확정').click();
+  await page.waitForFunction(async ({characterId,id})=>(await window.desktop.getResources(characterId)).value.resources.find(r=>r.id===id).remaining===3,{characterId:character.id,id:resource.id});
+  steps.push('FIX-02: library register/edit, unavailable before acquisition, correct auto charge afterward');
+
+  // Make the same card manual first, then convert it with the app's editor.
+  await openManagement(page,'카드 사용 규칙');
+  form=dialog('카드 사용 규칙');
+  await form.getByLabel('사용할 자원',{exact:true}).selectOption(resource.id);
+  await save(form,'사용 규칙 저장');
+  await openManagement(page,'카드 사용 규칙');
+  await button(dialog('카드 사용 규칙'),'수동 비용을 자동 연결로 전환').click();
+  form=dialog('카드 사용 규칙');
+  await button(form,'자동 연결로 전환').click();
+  assert.equal(await form.getByLabel('연결 자원 1-1').inputValue(),'');
+  assert.equal(await form.getByLabel('자원 식별 키 1-1').inputValue(),'qa:spark');
+  await form.getByLabel('자원 식별 키 1-1').scrollIntoViewIfNeeded();
+  await screenshot('03-manual-to-automatic');
+  await save(form,'고급 사용 규칙 저장');
+  const converted=await snapshot(character.id);
+  assert.equal(converted.bindings.length,0);
+  assert.equal(converted.resources.find(r=>r.id===resource.id).remaining,3);
+  assert(converted.events.some(event=>event.changes.some(change=>change.before===6&&change.after===3)));
+  steps.push('FIX-03: manual link converted by key without changing remaining amount or past use');
+
+  await openManagement(page,'자원 관리');
+  await button(dialog('자원 관리'),'연결할 불씨 자원 연결 해제').click();
+  const review=dialog('일괄 변경 미리보기');
+  await review.getByRole('heading',{name:'자원 연결 해제'}).waitFor();
+  await screenshot('04-disconnect-confirmation');
+  await button(review,'일괄 변경 확정').click();
+  await review.waitFor({state:'hidden'});
+  assert.equal((await snapshot(character.id)).resources.some(r=>r.id===resource.id),false);
+  assert((await snapshot(character.id)).templates.some(t=>t.id===resource.templateId));
+  await close('자원 관리');
+  await openManagement(page,'일괄 편집 복원');
+  const history=dialog('일괄 편집 복원');
+  await button(history,'이 작업 복원').first().click();
+  await button(review,'일괄 편집 복원 확정').click();
+  await review.waitFor({state:'hidden'});
+  assert.equal((await snapshot(character.id)).resources.find(r=>r.id===resource.id).remaining,3);
+  await close('일괄 편집 복원');
+  steps.push('FIX-04: immediate confirmation preserves template and restores via existing edit journal');
+
+  await openManagement(page,'캐릭터·덱');
+  const profiles=dialog('캐릭터와 덱');
+  await button(profiles,'기본 덱 삭제').click();
+  const confirmDeck=dialog('덱 삭제 확인');
+  await screenshot('05-deck-trash-confirmation');
+  await button(confirmDeck,'휴지통으로 이동').click();
+  await confirmDeck.waitFor({state:'hidden'});
+  assert((await boot()).cards.some(card=>card.name==='외부 불씨'));
+  assert.equal((await boot()).decks.length,0);
+  await profiles.getByText(/캐릭터·덱 휴지통/).click();
+  await button(profiles,'기본 덱 복원').click();
+  await button(profiles,'기본 덱 삭제').waitFor();
+  await button(profiles,'캐릭터 삭제').click();
+  const confirmProfile=dialog('캐릭터 삭제 확인');
+  await screenshot('06-profile-trash-confirmation');
+  await button(confirmProfile,'휴지통으로 이동').click();
+  await confirmProfile.waitFor({state:'hidden'});
+  assert.equal((await boot()).profiles.length,0);
+  await profiles.getByText(/캐릭터·덱 휴지통/).click();
+  await button(profiles,'패치 검증 복원').click();
+  await button(profiles,'캐릭터 삭제').waitFor();
+  const recipient=await create('깨끗한 대상');
+  await close('캐릭터와 덱');
+  await putInDeck(page,'외부 불씨','깨끗한 대상 · 기본 덱');
+  steps.push('FIX-05: archived and restored original deck and character from management');
+
+  await page.getByLabel('활성 캐릭터').selectOption(recipient.id);
+  await app.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},dialogPath);
+  await openManagement(page,'덱 JSON 교환');
+  const exchange=dialog('덱 JSON 교환');
+  await button(exchange,'덱 JSON 내보내기').click();
+  await exchange.getByText(/덱 JSON을 저장했습니다/).waitFor();
+  const original=JSON.parse(await readFile(dialogPath,'utf8'));
+  assert.equal(original.cards.length,1);
+  const newCard={...original.cards[0],ref:'missing-image',description:'서로 다른 카드',imageMode:'illustration',image:{sha256:'a'.repeat(64)},
+    castOptions:[{id:'manual',label:'수동 재연결',costs:[{type:'fixed',costKey:'manual-key',amount:2,reconnect:'counter'}]}]};
+  await writeFile(dialogPath,JSON.stringify({...original,cards:[original.cards[0],newCard]}));
+  await exchange.getByLabel('가져오는 방식').selectOption('append');
+  await exchange.getByLabel('추가할 덱').selectOption(recipient.activeDeckId);
+  await button(exchange,'덱 JSON 파일 선택').click();
+  let preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
+  await preview.getByRole('heading',{name:'신규 추가 1장'}).waitFor();
+  await preview.getByRole('heading',{name:'중복 1장'}).waitFor();
+  await preview.getByRole('heading',{name:'충돌 1장'}).waitFor();
+  await preview.getByText(/같은 원본 이미지가 없습니다/).waitFor();
+  await preview.getByText(/직접 연결해야 하는 비용/).waitFor();
+  await screenshot('07-deck-append');
+  await preview.getByRole('heading',{name:'신규 추가 1장'}).evaluate(element=>element.scrollIntoView({block:'start'}));
+  await screenshot('08-deck-append-notices');
+  await button(preview,'기존 덱에 추가 확정').click();
+  await exchange.getByText(/덱에 카드 1장을 추가했습니다/).waitFor();
+  const order=(await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds;
+  assert.equal(order.length,2);
+  await button(exchange,'덱 JSON 파일 선택').click();
+  preview=exchange.getByRole('region',{name:'덱 불러오기 미리보기'});
+  await button(preview,'기존 덱 확인').click();
+  assert.deepEqual((await boot()).decks.find(deck=>deck.id===recipient.activeDeckId).cardIds,order);
+  await close('덱 JSON 교환');
+  await showWholeLibrary(page);
+  assert.equal((await boot()).cards.find(card=>card.id===order[1]).description,'서로 다른 카드');
+  steps.push('FIX-06: append preview with duplicate/conflict/missing image/reconnect and idempotent replay');
+  await writeFile(join(run,'report.json'),JSON.stringify({outcome:'PASS',steps,run},null,2));
+  console.log(run);
+} catch(error) {
+  if(page)await screenshot('failure').catch(()=>undefined);
+  await writeFile(join(run,'report.json'),JSON.stringify({outcome:'FAIL',steps,run,message:String(error)},null,2));
+  console.error(run);
+  throw error;
+} finally { await app.close(); }

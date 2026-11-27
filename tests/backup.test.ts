@@ -73,7 +73,7 @@ describe('ZIP backup export', () => {
     const { store, files, zip } = await exported();
     expect([...files.keys()].sort()).toEqual(['assets/img-1.png', 'data/app.sqlite3', 'manifest.json']);
     const manifest = JSON.parse(files.get('manifest.json')!.toString('utf8')) as BackupManifest;
-    expect(manifest).toMatchObject({ format: 'dnd-tcg-fy-backup', formatVersion: 1, appVersion: '0.6.0', schemaVersion: 9, counts: { cards: 2, trashedCards: 1, characters: 1, decks: 1, assets: 1, tags: 1 } });
+    expect(manifest).toMatchObject({ format: 'dnd-tcg-fy-backup', formatVersion: 1, appVersion: '0.6.0', schemaVersion: 10, counts: { cards: 2, trashedCards: 1, characters: 1, decks: 1, assets: 1, tags: 1 } });
     for (const file of manifest.files) expect(sha(files.get(file.path)!)).toBe(file.sha256);
     expect(files.get('assets/img-1.png')).toEqual(readFileSync(join(store.userData, 'assets', 'img-1.png')));
     expect(existsSync(`${zip}.partial`)).toBe(false);

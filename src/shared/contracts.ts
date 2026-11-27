@@ -203,7 +203,7 @@ export const initialRulesSchema = z.strictObject({
 });
 export type InitialRules = z.infer<typeof initialRulesSchema>;
 // v1.3: `addToDeck: false` registers into the library only while still checking `registrationTarget` (the deck the form showed).
-export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional(), addToDeck: z.boolean().optional(), initialRules: initialRulesSchema.optional() });
+export const saveCardsSchema = z.strictObject({ cards: z.array(cardDraftSchema).min(1).max(100), registrationTarget: registrationTargetSchema.nullable().optional(), addToDeck: z.boolean().optional(), initialRules: initialRulesSchema.optional(), libraryRules: z.strictObject({ expectedCardVersion: z.string(), castOptions: cardSchema.shape.castOptions.max(12) }).optional() });
 export const libraryStateSchema = z.strictObject({
   concentration: z.boolean().optional(), ritual: z.boolean().optional(),
   query: z.string().max(200), roles: z.array(roleSchema).max(8), actions: z.array(actionSchema).max(6),
@@ -220,6 +220,8 @@ export interface ImportBatch { assets: AssetPreview[]; errors: { name: string; m
 export interface ProfileSummary { id: string; name: string; activeDeckId?: string; classId?: string; level?: number; ruleset?: 'dnd5e_2014'|'homebrew' }
 export interface Deck { id: string; characterId: string; name: string; cardIds: string[] }
 export const createProfileSchema = z.strictObject({ name: z.string().trim().min(1).max(100) });
+export const profileTrashSchema = z.strictObject({ kind: z.enum(['profile','deck']), id: idSchema, restore: z.boolean() });
+export interface ProfileTrashEntry { kind: 'profile'|'deck'; id: string; name: string; characterName?: string }
 export const createDeckSchema = z.strictObject({ characterId: idSchema, name: z.string().trim().min(1).max(100) });
 export const selectDeckSchema = z.strictObject({ characterId: idSchema, deckId: idSchema });
 export const deckCardsSchema = z.strictObject({ deckId: idSchema, cardIds: z.array(idSchema).max(5000) });
@@ -230,7 +232,7 @@ export const discardImportsSchema = z.array(idSchema).max(200);
 export const assetAlphaSchema = z.array(idSchema).min(1).max(500);
 
 export interface Library {
-  cards: CardDefinition[]; tags: Tag[]; profiles: ProfileSummary[]; decks: Deck[];
+  cards: CardDefinition[]; tags: Tag[]; profiles: ProfileSummary[]; decks: Deck[]; profileTrash?: ProfileTrashEntry[];
   libraryState: LibraryState; warnings: string[];
 }
 
@@ -255,6 +257,7 @@ export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge, 
   saveTag(input: z.infer<typeof tagMutationSchema>): Promise<Result<Library>>;
   deleteTag(id: string): Promise<Result<Library>>;
   createProfile(input: z.infer<typeof createProfileSchema>): Promise<Result<Library>>;
+  changeProfileTrash(input: z.infer<typeof profileTrashSchema>): Promise<Result<Library>>;
   createDeck(input: z.infer<typeof createDeckSchema>): Promise<Result<Library>>;
   selectDeck(input: z.infer<typeof selectDeckSchema>): Promise<Result<Library>>;
   setDeckCards(input: z.infer<typeof deckCardsSchema>): Promise<Result<Library>>;
@@ -264,7 +267,7 @@ export const IPC = {
   previewEdit: 'edits:preview', applyEdit: 'edits:apply', getEditHistory: 'edits:history',
   getBootstrap: 'board:get-bootstrap', saveSettings: 'settings:save', saveLibraryState: 'library:state',
   importImages: 'assets:import', discardImports: 'assets:discard', assetAlpha: 'assets:alpha', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
-  createProfile: 'profiles:create', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
+  createProfile: 'profiles:create', changeProfileTrash: 'profiles:trash', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
   previewClass: 'classes:preview', getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
   exportDeck: 'deck-exchange:export', inspectDeck: 'deck-exchange:inspect', importDeck: 'deck-exchange:import',
   exportBackup: 'backup:export', inspectBackup: 'backup:inspect', applyBackup: 'backup:apply', discardBackup: 'backup:discard', getBackupStatus: 'backup:status',

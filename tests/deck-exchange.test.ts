@@ -87,6 +87,50 @@ function seed(f: Fixture) {
 }
 
 describe('v1.4 P4 deck JSON', () => {
+  it('appends in order, preserves existing cards and spent owned resources, and ignores a repeated file', async () => {
+    const f = fixture();
+    try {
+      const source = seed(f);
+      const path = join(f.path,'append.json');
+      await f.exchange.export(source.deckId,path);
+      const doc = await readDeckDocument(path);
+      const target = f.library.createDeck({characterId:source.id,name:'기존 덱'}).decks.find(deck=>deck.name==='기존 덱')!;
+      f.library.setDeckCards({deckId:target.id,cardIds:[source.c.id]});
+      const before = f.resources.snapshot(source.id).resources.find(resource=>resource.ownedDefinitionId)!;
+      const edited = {...doc.cards[0],ref:'extra',description:'다른 카드',imageMode:'illustration',image:doc.cards[1].image};
+      writeFileSync(path,JSON.stringify({...doc,cards:[doc.cards[1],edited,doc.cards[0]]}));
+      const preview = await f.exchange.inspect(source.id,path,target.id);
+      expect(preview.append).toMatchObject({duplicates:[source.c.name],added:[edited.name,doc.cards[0].name],conflicts:[{card:edited.name}]});
+      const result = await f.exchange.apply({characterId:source.id,deckId:target.id,token:preview.token});
+      expect(result.added).toBe(2);
+      const memberIds = result.library.decks.find(deck=>deck.id===target.id)!.cardIds;
+      expect(memberIds[0]).toBe(source.c.id);
+      expect(result.library.cards.find(card=>card.id===memberIds[1])?.description).toBe('다른 카드');
+      expect(memberIds[2]).toBe(result.library.decks.find(deck=>deck.id===source.deckId)!.cardIds[0]);
+      expect(f.resources.snapshot(source.id).resources.filter(resource=>resource.ownedDefinitionId)).toEqual([before]);
+      const replay = await f.exchange.inspect(source.id,path,target.id);
+      expect(replay.existing).toBe(true);
+      expect((await f.exchange.apply({characterId:source.id,deckId:target.id,token:replay.token})).replayed).toBe(true);
+      expect(f.library.getLibrary()).toEqual(result.library);
+    } finally { f.store.close(); }
+  });
+
+  it('rolls back appended cards and rejects changes after preview', async () => {
+    const source=fixture(); const f=fixture();
+    try {
+      const seeded=seed(source); const dst=newProfile(f,'대상');
+      const path=join(source.path,'rollback.json'); await source.exchange.export(seeded.deckId,path);
+      const preview=await f.exchange.inspect(dst.id,path,dst.activeDeckId);
+      expect(preview.notices.map(notice=>notice.kind)).toEqual(expect.arrayContaining(['image','reconnect']));
+      const before=f.library.getLibrary();
+      f.store.db.exec("CREATE TRIGGER fail_append BEFORE INSERT ON deck_exchange_appends BEGIN SELECT RAISE(ABORT,'forced receipt failure'); END");
+      await expect(f.exchange.apply({characterId:dst.id,deckId:dst.activeDeckId,token:preview.token})).rejects.toThrow('forced receipt failure');
+      expect(f.library.getLibrary()).toEqual(before);
+      expect(f.resources.snapshot(dst.id).resources).toEqual([]);
+      f.library.saveCards({cards:[{...info,name:'미리보기 이후 추가',tags:[]}]});
+      await expect(f.exchange.apply({characterId:dst.id,deckId:dst.activeDeckId,token:preview.token})).rejects.toThrow(/변경/);
+    } finally { source.store.close(); f.store.close(); }
+  });
   it('round-trips advanced definitions, absent requirements and portable overrides in a fresh DB, strips state, and preserves spent state on repeat', async () => {
     const source = fixture(); let target = fixture();
     try {
@@ -238,7 +282,7 @@ describe('v1.4 P4 deck JSON', () => {
     try {
       expect(f.library.getLibrary().profiles[0]).toMatchObject({ id: 'old', level: 5 });
       const migrationBackup = readdirSync(join(path, 'backups'));
-      expect(migrationBackup).toEqual([expect.stringMatching(/^before-v8-to-v9-/)]);
+      expect(migrationBackup).toEqual([expect.stringMatching(/^before-v8-to-v10-/)]);
       const backupDb = new DatabaseSync(join(path, 'backups', migrationBackup[0]), { readOnly: true });
       expect(backupDb.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 8 });
       backupDb.close();

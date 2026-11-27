@@ -78,7 +78,7 @@ try {
   await registration.getByLabel('등록 규칙 적용 범위').selectOption('shared');
   await registration.getByRole('checkbox', { name: '집중', exact: true }).check();
   await registration.getByRole('checkbox', { name: '의식', exact: true }).check();
-  await registration.getByRole('checkbox', { name: '상위 슬롯 효과 강화', exact: true }).check();
+  assert.equal(await registration.getByRole('checkbox', { name: '상위 슬롯 효과 강화', exact: true }).isDisabled(),true);
   await registration.getByRole('region', { name: '등록 카드 사용 규칙' }).evaluate(element => element.scrollIntoView({ block: 'center' }));
   await screenshot('card-registration.png');
   await registration.getByText('카드 고유 자원', { exact: true }).click();
@@ -210,7 +210,7 @@ try {
   await manager().getByRole('status').filter({ hasText: /기본 덱 \(2\).*덱을 추가했습니다/ }).waitFor();
   await manager().getByRole('button', { name: '덱 JSON 교환 닫기', exact: true }).click();
   const received = await boot();
-  assert.equal(received.schemaVersion, 9);
+  assert.equal(received.schemaVersion, 10);
   const deck = received.decks.find(item => item.name === '기본 덱 (2)');
   const card = received.cards.find(item => item.name === cardName);
   assert.equal(received.decks.find(item => item.id === target.activeDeckId).cardIds.length, 0);

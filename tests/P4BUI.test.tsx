@@ -31,7 +31,7 @@ describe('P4-B display preferences do not change game data',()=>{
     const path=mkdtempSync(join(root,'settings-'));let store=new AppStore(path);expect(store.getSettings()).toEqual(DEFAULT_SETTINGS);
     const resourceViews={a:{collapsedGroups:['standard'] as const,priorityIds:['counter-a']},b:{collapsedGroups:[],priorityIds:[]}};
     store.saveSettings({...DEFAULT_SETTINGS,resourceViews:{...resourceViews,a:{...resourceViews.a,collapsedGroups:['standard']}}});
-    const old=JSON.parse((store.db.prepare("SELECT value_json FROM settings WHERE key='preferences'").get() as {value_json:string}).value_json);expect(old).toEqual(DEFAULT_SETTINGS);expect(store.db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);store.close();store=new AppStore(path);expect(store.getSettings().resourceViews).toEqual(resourceViews);store.saveSettings({...DEFAULT_SETTINGS,reducedMotion:true});expect(store.getSettings().resourceViews).toEqual(resourceViews);store.close();
+    const old=JSON.parse((store.db.prepare("SELECT value_json FROM settings WHERE key='preferences'").get() as {value_json:string}).value_json);expect(old).toEqual(DEFAULT_SETTINGS);expect(store.db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);store.close();store=new AppStore(path);expect(store.getSettings().resourceViews).toEqual(resourceViews);store.saveSettings({...DEFAULT_SETTINGS,reducedMotion:true});expect(store.getSettings().resourceViews).toEqual(resourceViews);store.close();
   });
   it('rejects malformed or oversized display settings without altering the last saved data',()=>{
     const store=new AppStore(mkdtempSync(join(root,'invalid-')));const good={...DEFAULT_SETTINGS,resourceViews:{a:{collapsedGroups:['counter'],priorityIds:['p']}}};store.saveSettings(good);

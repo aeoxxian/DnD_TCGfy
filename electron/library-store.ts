@@ -2,10 +2,11 @@ import { moveCardsToTrash } from './trash-store';
 import { randomUUID } from 'node:crypto';
 import {
   cardSchema, saveCardsSchema, libraryStateSchema, DEFAULT_LIBRARY_STATE, tagMutationSchema, idSchema,
-  createProfileSchema, createDeckSchema, selectDeckSchema, deckCardsSchema,
-  type CardDefinition, type Library, type LibraryState, type Tag, type ProfileSummary, type Deck,
+  createProfileSchema, profileTrashSchema, createDeckSchema, selectDeckSchema, deckCardsSchema,
+  type CardDefinition, type Library, type LibraryState, type Tag, type ProfileSummary, type Deck, type ProfileTrashEntry,
 } from '../src/shared/contracts';
 import { normalizeText } from '../src/shared/library';
+import { castingLevels } from '../src/shared/casting';
 import type { AppStore } from './store';
 import { transaction } from './migrations';
 import { UserInputError } from './errors';
@@ -32,7 +33,7 @@ export class LibraryStore {
   }
   saveState(input: unknown): LibraryState {
     const state = libraryStateSchema.parse(input);
-    if (state.activeCharacterId && !this.db.prepare('SELECT id FROM character_profiles WHERE id=?').get(state.activeCharacterId)) throw new UserInputError('캐릭터를 찾을 수 없습니다.');
+    if (state.activeCharacterId && !this.db.prepare('SELECT id FROM character_profiles WHERE id=? AND id NOT IN (SELECT profile_id FROM profile_trash)').get(state.activeCharacterId)) throw new UserInputError('캐릭터를 찾을 수 없습니다.');
     if (state.viewScope === 'deck' && !state.activeCharacterId) throw new UserInputError('먼저 캐릭터를 선택해 주세요.');
     transaction(this.db, () => this.writeState(state));
     return state;
@@ -60,28 +61,52 @@ export class LibraryStore {
     const tags = this.db.prepare(`SELECT t.id,t.name,COUNT(c.id) AS usageCount FROM tags t
       LEFT JOIN card_tags ct ON ct.tag_id=t.id LEFT JOIN card_definitions c ON c.id=ct.card_id AND c.archived_at IS NULL
       GROUP BY t.id ORDER BY t.name`).all() as unknown as Tag[];
-    const profileRows = this.db.prepare('SELECT id,name,active_deck_id,class_id,level,ruleset FROM character_profiles ORDER BY rowid').all() as { id: string; name: string; active_deck_id: string | null; class_id:string|null; level:number;ruleset:'dnd5e_2014'|'homebrew' }[];
+    const profileRows = this.db.prepare('SELECT id,name,active_deck_id,class_id,level,ruleset FROM character_profiles WHERE id NOT IN (SELECT profile_id FROM profile_trash) ORDER BY rowid').all() as { id: string; name: string; active_deck_id: string | null; class_id:string|null; level:number;ruleset:'dnd5e_2014'|'homebrew' }[];
     const profiles: ProfileSummary[] = profileRows.map(row => ({ id: row.id, name: row.name, activeDeckId: row.active_deck_id ?? undefined,classId:row.class_id??undefined,level:row.level,ruleset:row.ruleset }));
-    const decks = (this.db.prepare('SELECT id,character_id,name FROM decks ORDER BY rowid').all() as { id: string; character_id: string; name: string }[]).map(row => ({
+    const decks = (this.db.prepare('SELECT id,character_id,name FROM decks WHERE id NOT IN (SELECT deck_id FROM deck_trash) AND character_id NOT IN (SELECT profile_id FROM profile_trash) ORDER BY rowid').all() as { id: string; character_id: string; name: string }[]).map(row => ({
       id: row.id, characterId: row.character_id, name: row.name,
       cardIds: (this.db.prepare('SELECT dc.card_id FROM deck_cards dc JOIN card_definitions c ON c.id=dc.card_id WHERE dc.deck_id=? AND c.archived_at IS NULL ORDER BY dc.position').all(row.id) as { card_id: string }[]).map(v => v.card_id),
     } satisfies Deck));
-    return { cards, tags, profiles, decks, libraryState: this.getState(), warnings };
+    const profileTrash = this.db.prepare(`
+      SELECT 'profile' AS kind,p.id,p.name,NULL AS characterName FROM profile_trash t JOIN character_profiles p ON p.id=t.profile_id
+      UNION ALL
+      SELECT 'deck',d.id,d.name,p.name FROM deck_trash t JOIN decks d ON d.id=t.deck_id
+      JOIN character_profiles p ON p.id=d.character_id WHERE p.id NOT IN (SELECT profile_id FROM profile_trash)
+    `).all() as unknown as ProfileTrashEntry[];
+    return { cards, tags, profiles, decks, profileTrash, libraryState: this.getState(), warnings };
   }
   saveCards(input: unknown, withinTransaction = false): Library {
-    const { cards: drafts, registrationTarget, addToDeck, initialRules } = saveCardsSchema.parse(input);
+    const { cards: drafts, registrationTarget, addToDeck, initialRules, libraryRules } = saveCardsSchema.parse(input);
     if (initialRules) throw new UserInputError('초기 사용 규칙은 통합 등록 경로에서 저장해 주세요.');
     const ids = drafts.flatMap(card => card.id ? [card.id] : []);
     if (new Set(ids).size !== ids.length) throw new UserInputError('같은 카드를 한 번에 두 번 수정할 수 없습니다.');
     const execute = () => {
       const state = this.getState();
+      if (libraryRules && (state.activeCharacterId || drafts.length !== 1 || !drafts[0].id))
+        throw new UserInputError('전체 라이브러리에서 기존 카드 한 장의 공통 비용을 수정해 주세요.');
       const profile = state.activeCharacterId ? this.db.prepare('SELECT id,active_deck_id FROM character_profiles WHERE id=?').get(state.activeCharacterId) as { id: string; active_deck_id: string | null } | undefined : undefined;
       const currentTarget = profile?.active_deck_id ? { characterId: profile.id, deckId: profile.active_deck_id } : null;
       if (drafts.some(card => !card.id) && registrationTarget !== undefined && (registrationTarget?.characterId !== currentTarget?.characterId || registrationTarget?.deckId !== currentTarget?.deckId)) throw new UserInputError('활성 캐릭터 또는 덱이 바뀌었습니다. 등록 창을 다시 열어 목적지를 확인해 주세요.');
       const target = registrationTarget === undefined ? currentTarget : registrationTarget;
-      if (drafts.some(card => !card.id) && target && !this.db.prepare('SELECT id FROM decks WHERE id=? AND character_id=?').get(target.deckId, target.characterId)) throw new UserInputError('선택한 덱의 소유 캐릭터가 일치하지 않습니다.');
+      if (drafts.some(card => !card.id) && target && !this.db.prepare('SELECT id FROM decks WHERE id=? AND character_id=? AND id NOT IN (SELECT deck_id FROM deck_trash) AND character_id NOT IN (SELECT profile_id FROM profile_trash)').get(target.deckId, target.characterId)) throw new UserInputError('선택한 덱의 소유 캐릭터가 일치하지 않습니다.');
       for (const draft of drafts) {
         const existing = draft.id ? this.getCard(draft.id) : undefined;
+        if (libraryRules) {
+          if (existing?.updatedAt !== libraryRules.expectedCardVersion) throw new UserInputError('카드가 바뀌었습니다. 수정 화면을 다시 열어 주세요.');
+          if (new Set(libraryRules.castOptions.map(option => option.id)).size !== libraryRules.castOptions.length)
+            throw new UserInputError('사용 방식 ID가 중복됩니다.');
+          for (const option of libraryRules.castOptions) {
+            if (option.casting || option.costs.some(cost => cost.type === 'slot')) {
+              try { castingLevels(draft, option); }
+              catch (error) { throw new UserInputError((error as Error).message); }
+            }
+            for (const cost of option.costs) {
+              if (cost.requirement || cost.reconnect || cost.type === 'slot' && (cost.autoBind || draft.spellLevel === 0)) continue;
+              const old = existing.castOptions.find(original => original.id === option.id)?.costs.find(original => original.costKey === cost.costKey);
+              if (JSON.stringify(old) !== JSON.stringify(cost)) throw new UserInputError('새 외부 비용에 자동 연결 식별 키 또는 클래스 슬롯을 지정해 주세요.');
+            }
+          }
+        }
         const imageMode = draft.imageMode ?? (draft.imageAssetId && existing?.imageMode === 'none' ? 'full_card' : existing?.imageMode);
         if (draft.imageMode === 'none' && draft.imageAssetId) throw new UserInputError('이미지 없음과 이미지 파일을 함께 지정할 수 없습니다.');
         const imageAssetId = draft.imageMode === 'none' ? undefined : draft.imageAssetId ?? existing?.imageAssetId;
@@ -96,8 +121,8 @@ export class LibraryStore {
           imageMode, concentration: draft.concentration ?? existing?.concentration,
           ritual: draft.ritual ?? existing?.ritual, upcastEffect: draft.upcastEffect ?? existing?.upcastEffect,
           roles: [...new Set(draft.roles)], actions: [...new Set(draft.actions)], tags: [...new Set(draft.tags)],
-          costStatus: existing?.costStatus,
-          castOptions: existing?.castOptions ?? [{ id: randomUUID(), label: '일반 사용', costs: [] }],
+          costStatus: libraryRules ? 'configured' : existing?.costStatus,
+          castOptions: libraryRules?.castOptions ?? existing?.castOptions ?? [{ id: randomUUID(), label: '일반 사용', costs: [] }],
           createdAt: existing?.createdAt ?? now, updatedAt: now,
         });
         const { id, name, kind, spellLevel, createdAt, updatedAt, imageAssetId: assetId, ...attributes } = card;
@@ -156,9 +181,38 @@ export class LibraryStore {
     });
     return this.getLibrary();
   }
+  changeProfileTrash(input: unknown): Library {
+    const { kind, id, restore } = profileTrashSchema.parse(input);
+    transaction(this.db, () => {
+      if (kind === 'profile') {
+        if (!this.db.prepare('SELECT id FROM character_profiles WHERE id=?').get(id)) throw new UserInputError('캐릭터를 찾을 수 없습니다.');
+        if (restore) this.db.prepare('DELETE FROM profile_trash WHERE profile_id=?').run(id);
+        else {
+          this.db.prepare('INSERT OR IGNORE INTO profile_trash VALUES (?,?)').run(id, new Date().toISOString());
+          const state = this.getState();
+          if (state.activeCharacterId === id) this.writeState({ ...state, activeCharacterId: undefined, viewScope: 'library' });
+        }
+        return;
+      }
+      const deck = this.db.prepare(`SELECT d.character_id,p.active_deck_id FROM decks d JOIN character_profiles p ON d.character_id=p.id
+        WHERE d.id=? AND p.id NOT IN (SELECT profile_id FROM profile_trash)`).get(id) as { character_id: string; active_deck_id: string | null } | undefined;
+      if (!deck) throw new UserInputError('덱을 찾을 수 없습니다. 휴지통의 캐릭터는 먼저 복원해 주세요.');
+      if (restore) {
+        this.db.prepare('DELETE FROM deck_trash WHERE deck_id=?').run(id);
+        if (!deck.active_deck_id) this.db.prepare('UPDATE character_profiles SET active_deck_id=? WHERE id=?').run(id, deck.character_id);
+      } else {
+        this.db.prepare('INSERT OR IGNORE INTO deck_trash VALUES (?,?)').run(id, new Date().toISOString());
+        if (deck.active_deck_id === id) {
+          const replacement = this.db.prepare('SELECT id FROM decks WHERE character_id=? AND id NOT IN (SELECT deck_id FROM deck_trash) ORDER BY rowid LIMIT 1').get(deck.character_id);
+          this.db.prepare('UPDATE character_profiles SET active_deck_id=? WHERE id=?').run(replacement ? String(replacement.id) : null, deck.character_id);
+        }
+      }
+    });
+    return this.getLibrary();
+  }
   createDeck(input: unknown): Library {
     const { characterId, name } = createDeckSchema.parse(input);
-    if (!this.db.prepare('SELECT id FROM character_profiles WHERE id=?').get(characterId)) throw new UserInputError('캐릭터를 찾을 수 없습니다.');
+    if (!this.db.prepare('SELECT id FROM character_profiles WHERE id=? AND id NOT IN (SELECT profile_id FROM profile_trash)').get(characterId)) throw new UserInputError('캐릭터를 찾을 수 없습니다.');
     transaction(this.db, () => {
       const id = randomUUID();
       this.db.prepare('INSERT INTO decks(id,character_id,name) VALUES (?,?,?)').run(id, characterId, name);
@@ -169,13 +223,13 @@ export class LibraryStore {
   }
   selectDeck(input: unknown): Library {
     const { characterId, deckId } = selectDeckSchema.parse(input);
-    if (!this.db.prepare('SELECT id FROM decks WHERE id=? AND character_id=?').get(deckId, characterId)) throw new UserInputError('이 캐릭터의 덱이 아닙니다.');
+    if (!this.db.prepare('SELECT id FROM decks WHERE id=? AND character_id=? AND id NOT IN (SELECT deck_id FROM deck_trash) AND character_id NOT IN (SELECT profile_id FROM profile_trash)').get(deckId, characterId)) throw new UserInputError('이 캐릭터의 덱이 아닙니다.');
     transaction(this.db, () => this.db.prepare('UPDATE character_profiles SET active_deck_id=? WHERE id=?').run(deckId, characterId));
     return this.getLibrary();
   }
   setDeckCards(input: unknown): Library {
     const { deckId, cardIds } = deckCardsSchema.parse(input);
-    if (!this.db.prepare('SELECT id FROM decks WHERE id=?').get(deckId)) throw new UserInputError('덱을 찾을 수 없습니다.');
+    if (!this.db.prepare('SELECT id FROM decks WHERE id=? AND id NOT IN (SELECT deck_id FROM deck_trash) AND character_id NOT IN (SELECT profile_id FROM profile_trash)').get(deckId)) throw new UserInputError('덱을 찾을 수 없습니다.');
     if (new Set(cardIds).size !== cardIds.length) throw new UserInputError('덱에 같은 카드를 두 번 넣을 수 없습니다.');
     transaction(this.db, () => {
       const existing = new Set((this.db.prepare('SELECT card_id FROM deck_cards WHERE deck_id=?').all(deckId) as { card_id: string }[]).map(row => row.card_id));

@@ -182,6 +182,6 @@ describe('v1.3 Phase 1 · single-card registration form', () => {
     expect(within(edit).getByRole('img', { name: '그림 없는 카드 기본 카드 미리보기' })).toBeDefined();
     expect(within(edit).getByText('이미지 선택')).toBeDefined();
     expect(within(edit).queryByRole('checkbox', { name: /에 넣기$/ })).toBeNull();
-    expect(within(edit).queryByRole('region', { name: '등록 카드 사용 규칙' })).toBeNull();
+    expect(within(edit).getByRole('region', { name: '등록 카드 사용 규칙' })).toBeDefined();
   });
 });

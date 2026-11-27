@@ -4,14 +4,15 @@ import { IMAGE_MODE_NAMES } from '../shared/library';
 type Traits = Pick<CardDraft, 'concentration' | 'ritual' | 'upcastEffect'>;
 const traits = { concentration: '집중', ritual: '의식', upcastEffect: '상위 슬롯 효과 강화' } as const;
 
-export function CardTraits({ value, onChange, disabled, individual }: {
-  value: Traits; onChange: (patch: Traits) => void; disabled?: boolean; individual?: boolean;
+export function CardTraits({ value, onChange, disabled, individual, allowEnhancement = true, showEnhancement = true }: {
+  value: Traits; onChange: (patch: Traits) => void; disabled?: boolean; individual?: boolean; allowEnhancement?: boolean; showEnhancement?: boolean;
 }) {
   return <fieldset className="editor-plain" disabled={disabled}>
     <legend>{individual ? '개별 주문 속성' : '주문 속성'}</legend>
     {Object.entries(traits).map(([name, label]) => {
       const key = name as keyof Traits;
-      return <label key={key} className="checkbox-line"><input type="checkbox" checked={!!value[key]} onChange={event => onChange({ [key]: event.target.checked })}/>{individual ? `개별 ${label}` : label}</label>;
+      if (key==='upcastEffect'&&!showEnhancement) return null;
+      return <label key={key} className="checkbox-line"><input type="checkbox" disabled={key === 'upcastEffect' && !allowEnhancement} checked={!!value[key] && (key !== 'upcastEffect' || allowEnhancement)} onChange={event => onChange({ [key]: event.target.checked })}/>{individual ? `개별 ${label}` : label}</label>;
     })}
   </fieldset>;
 }

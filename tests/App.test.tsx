@@ -10,7 +10,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   window.desktop = {
-    getTrash:vi.fn(),previewTrash:vi.fn(),changeTrash:vi.fn(),retryImageCleanup:vi.fn(),getUseHistory:vi.fn(),
+    changeProfileTrash:vi.fn(),getTrash:vi.fn(),previewTrash:vi.fn(),changeTrash:vi.fn(),retryImageCleanup:vi.fn(),getUseHistory:vi.fn(),
     previewEdit:vi.fn(), applyEdit:vi.fn(), getEditHistory:vi.fn(),
     getBootstrap: vi.fn().mockResolvedValue({ ok: true, value: structuredClone(bootstrap) }),
     saveSettings: vi.fn().mockImplementation(async settings => ({ ok: true, value: settings })),

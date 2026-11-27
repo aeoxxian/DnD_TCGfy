@@ -100,10 +100,10 @@ else {
       return exchange.export(deckId, choice.filePath.toLowerCase().endsWith('.json') ? choice.filePath : `${choice.filePath}.json`);
     });
     safeHandler(IPC.inspectDeck, async input => {
-      const { characterId } = deckTargetSchema.parse(input);
+      const { characterId, deckId } = deckTargetSchema.parse(input);
       const choice = await dialog.showOpenDialog(mainWindow!, { title: '덱 JSON 불러오기', properties: ['openFile'], filters: [{ name: '덱 JSON', extensions: ['json'] }] });
       if (choice.canceled || !choice.filePaths[0]) return { canceled: true };
-      return exchange.inspect(characterId, choice.filePaths[0]);
+      return exchange.inspect(characterId, choice.filePaths[0], deckId);
     });
     safeHandler(IPC.importDeck, input => exchange.apply(input));
     safeHandler(IPC.getBackupStatus, input => { z.undefined().parse(input); return backup.status(); });
@@ -142,6 +142,7 @@ else {
     safeHandler(IPC.saveTag, input => library.saveTag(input));
     safeHandler(IPC.deleteTag, input => library.deleteTag(input));
     safeHandler(IPC.createProfile, input => library.createProfile(input));
+    safeHandler(IPC.changeProfileTrash, input => library.changeProfileTrash(input));
     safeHandler(IPC.createDeck, input => library.createDeck(input));
     safeHandler(IPC.selectDeck, input => library.selectDeck(input));
     safeHandler(IPC.setDeckCards, input => library.setDeckCards(input));

@@ -94,6 +94,32 @@ function toCharacterRules(card: CardDefinition, snapshot: ResourceSnapshot) {
   }));
 }
 
+function stableOrder(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableOrder);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value)
+    .filter(([,item]) => item !== undefined).sort(([a],[b]) => a.localeCompare(b))
+    .map(([key,item]) => [key,stableOrder(item)]));
+  return value;
+}
+
+function cardIdentity(card: ExchangeCard, tagNames: Map<string,string>) {
+  const { ref, tags, castOptions, characterRules, ownedResources, ...metadata } = card;
+  void ref;
+  const rules = remapRules(castOptions, characterRules, (prefix,index) => prefix + index);
+  const common = { ...metadata, tags: tags.map(tag => normalizeText(tagNames.get(tag) ?? tag)).sort(),
+    ownedResources: ownedResources?.map(({id,...definition}) => { void id; return definition; }), castOptions: rules.castOptions };
+  return { common: digest(stableOrder(common)), full: digest(stableOrder({ ...common, characterRules: rules.characterRules })) };
+}
+
+type AppendChoice = { card: ExchangeCard; existingId?: string };
+interface ExchangePlan {
+  identity: string;
+  existing?: { id: string; name: string };
+  choices: AppendChoice[];
+  preview: Omit<DeckPreview,'token'>;
+  fingerprint: string;
+}
+
 function noticesFor(card: ExchangeCard, hasImage: boolean, snapshot?: ResourceSnapshot): DeckNotice[] {
   const notices: DeckNotice[] = [];
   if (card.image && !hasImage) notices.push({ card: card.name, kind: 'image', detail: '같은 원본 이미지가 없습니다. 기본 카드로 표시하며 정보 수정에서 이미지를 연결할 수 있습니다.' });
@@ -127,10 +153,21 @@ function noticesFor(card: ExchangeCard, hasImage: boolean, snapshot?: ResourceSn
   return [...notices, ...[...reconnect].map(detail => ({ card: card.name, kind: 'reconnect' as const, detail }))];
 }
 
-type Draft = { token: string; characterId: string; deck: DeckDocument; fingerprint: string };
+type Draft = { token: string; characterId: string; deckId?: string; deck: DeckDocument; fingerprint: string };
 export class DeckExchange {
   private draft?: Draft;
   constructor(private library: LibraryStore, private resources: ResourceStore, private assets: AssetService) {}
+
+  private portableCard(card: CardDefinition, snapshot: ResourceSnapshot, ref: string, tags: string[]): ExchangeCard {
+    const asset = card.imageAssetId ? this.library.getAsset(card.imageAssetId) : undefined;
+    const { name, kind, roles, actions, range, description, spellLevel, concentration, ritual, upcastEffect, imageMode, costStatus } = card;
+    return {
+      ref, name, kind, roles, actions, range, description, spellLevel, concentration, ritual, upcastEffect, imageMode,
+      image: asset ? { sha256: asset.sha256 } : card.imageReference, costStatus, tags,
+      ownedResources: card.ownedResources?.map((entry,n) => ({ ...entry, id: `00000000-0000-4000-8000-${String(n + 1).padStart(12,'0')}` })),
+      ...remapRules(card.castOptions, toCharacterRules(card,snapshot), (prefix,n) => prefix + n),
+    };
+  }
 
   async export(deckId: string, path: string) {
     const source = this.library.getLibrary();
@@ -149,15 +186,7 @@ export class DeckExchange {
         if (!tags.has(tagId)) tags.set(tagId, { ref: `tag${tags.size + 1}`, name: tag.name });
         return tags.get(tagId)!.ref;
       });
-      const asset = card.imageAssetId ? this.library.getAsset(card.imageAssetId) : undefined;
-      const image = asset ? { sha256: asset.sha256 } : card.imageReference;
-      const { name, kind, roles, actions, range, description, spellLevel, concentration, ritual, upcastEffect, imageMode, costStatus } = card;
-      return {
-        ref: `card${index + 1}`, name, kind, roles, actions, range, description, spellLevel, concentration, ritual, upcastEffect,
-        imageMode, image, costStatus, tags: tagRefs,
-        ownedResources: card.ownedResources?.map((entry, n) => ({ ...entry, id: `00000000-0000-4000-8000-${String(n + 1).padStart(12, '0')}` })),
-        ...remapRules(card.castOptions, toCharacterRules(card, snapshot), (prefix, n) => `${prefix}${n}`),
-      };
+      return this.portableCard(card,snapshot,`card${index + 1}`,tagRefs);
     });
     const payload = parseDeckDocument({ format: DECK_FORMAT, schemaVersion: DECK_VERSION, name: deck.name, tags: [...tags.values()], cards });
     const json = Buffer.from(JSON.stringify(payload, null, 2) + '\n', 'utf8');
@@ -185,13 +214,66 @@ export class DeckExchange {
     return result;
   }
 
-  private plan(characterId: string, deck: DeckDocument, images: Map<string, string>) {
+  private appendPlan(targetId: string, characterId: string, characterName: string, deck: DeckDocument, identity: string, images: Map<string,string>, snapshot: ResourceSnapshot): ExchangePlan {
     const db = this.library.db;
-    const profile = db.prepare('SELECT name FROM character_profiles WHERE id=?').get(characterId) as { name: string } | undefined;
+    const target = db.prepare('SELECT name FROM decks WHERE id=? AND character_id=? AND id NOT IN (SELECT deck_id FROM deck_trash)').get(targetId,characterId) as { name: string } | undefined;
+    if (!target) throw new UserInputError('선택한 캐릭터의 활성 덱을 다시 골라 주세요.');
+    const memberIds = (db.prepare('SELECT card_id FROM deck_cards WHERE deck_id=? ORDER BY position').all(targetId) as { card_id: string }[]).map(row => row.card_id);
+    const members = new Set(memberIds);
+    const receipt = db.prepare('SELECT 1 FROM deck_exchange_appends WHERE deck_id=? AND digest=?').get(targetId,identity);
+    const library = this.library.getLibrary();
+    const localTags = new Map(library.tags.map(tag => [tag.id,tag.name]));
+    const importedTags = new Map(deck.tags.map(tag => [tag.ref,tag.name]));
+    const cardsByCommon = new Map<string,{ id: string; full: string }[]>();
+    const localNames = new Set(library.cards.map(card => normalizeText(card.name)));
+    for (const card of library.cards) {
+      const key = cardIdentity(this.portableCard(card,snapshot,'local',card.tags),localTags);
+      const matches = cardsByCommon.get(key.common) ?? [];
+      matches.push({id:card.id,full:key.full});
+      cardsByCommon.set(key.common,matches);
+    }
+    const choices: AppendChoice[] = [];
+    const added: string[] = [];
+    const duplicates: string[] = [];
+    const conflicts: NonNullable<DeckPreview['append']>['conflicts'] = [];
+    const seen = new Set<string>();
+    for (const card of deck.cards) {
+      const key = cardIdentity(card,importedTags);
+      const same = cardsByCommon.get(key.common) ?? [];
+      const exact = same.filter(item => item.full === key.full);
+      if (receipt || seen.has(key.full) || exact.some(item => members.has(item.id))) {
+        duplicates.push(card.name);
+      } else if (exact.length === 1 && !same.some(item => members.has(item.id))) {
+        choices.push({card,existingId:exact[0].id});
+        added.push(card.name);
+      } else if (same.length) {
+        conflicts.push({card:card.name,detail:'같은 카드 정의의 후보가 여러 개이거나 캐릭터 비용이 다릅니다. 기존 설정을 보존하고 건너뜁니다.'});
+      } else {
+        if (localNames.has(normalizeText(card.name))) conflicts.push({card:card.name,detail:'같은 이름의 다른 정의가 있습니다. 별도 카드로 추가합니다.'});
+        choices.push({card});
+        added.push(card.name);
+      }
+      seen.add(key.full);
+    }
+    const notices = choices.flatMap(({card}) => noticesFor(card,!!card.image && images.has(card.image.sha256),snapshot));
+    const preview = {characterName,name:target.name,cards:deck.cards.map(card => card.name),notices,existing:!!receipt,
+      duplicateCardNames:duplicates.length,renamed:false,append:{added,duplicates,conflicts}};
+    return {identity,choices,preview,existing:receipt?{id:targetId,name:target.name}:undefined,
+      fingerprint:digest({preview,memberIds,choices:choices.map(item=>[item.card.ref,item.existingId]),images:[...images]})};
+  }
+
+  private plan(characterId: string, deck: DeckDocument, images: Map<string, string>, targetId?: string): ExchangePlan {
+    const db = this.library.db;
+    const profile = db.prepare('SELECT name FROM character_profiles WHERE id=? AND id NOT IN (SELECT profile_id FROM profile_trash)').get(characterId) as { name: string } | undefined;
     if (!profile) throw new UserInputError('가져올 캐릭터를 다시 선택해 주세요.');
     const identity = digest(deck);
+    const snapshot = this.resources.snapshot(characterId);
+    for (const [sha, id] of images) if (!this.library.getAsset(id)) images.delete(sha);
+    if (targetId) return this.appendPlan(targetId,characterId,profile.name,deck,identity,images,snapshot);
     const existing = db.prepare('SELECT d.id,d.name FROM deck_exchange_imports r JOIN decks d ON d.id=r.deck_id WHERE r.character_id=? AND r.digest=?')
       .get(characterId, identity) as { id: string; name: string } | undefined;
+    if (existing && db.prepare('SELECT 1 FROM deck_trash WHERE deck_id=?').get(existing.id))
+      throw new UserInputError('이미 가져온 덱이 휴지통에 있습니다. 먼저 덱을 복원해 주세요.');
     const deckNames = new Set((db.prepare('SELECT name FROM decks WHERE character_id=?').all(characterId) as { name: string }[]).map(item => normalizeText(item.name)));
     let name = existing?.name ?? deck.name;
     for (let n = 2; !existing && deckNames.has(normalizeText(name)); n++) {
@@ -200,33 +282,30 @@ export class DeckExchange {
     }
     const cardNames = new Set((db.prepare('SELECT name FROM card_definitions WHERE archived_at IS NULL').all() as { name: string }[]).map(card => normalizeText(card.name)));
     const duplicateCardNames = deck.cards.filter(card => cardNames.has(normalizeText(card.name))).length;
-    const snapshot = this.resources.snapshot(characterId);
-    // A managed image queued for deletion cannot be attached to a new card.
-    for (const [sha, id] of images) if (!this.library.getAsset(id)) images.delete(sha);
     const notices = deck.cards.flatMap(card => noticesFor(card, !!card.image && images.has(card.image.sha256), snapshot));
     const preview = { characterName: profile.name, name, cards: deck.cards.map(card => card.name), notices, existing: !!existing, duplicateCardNames, renamed: !existing && name !== deck.name };
-    return { identity, existing, preview, fingerprint: digest({ preview, existing, images: [...images] }) };
+    return { identity, existing, choices:deck.cards.map(card=>({card})), preview, fingerprint: digest({ preview, existing, images: [...images] }) };
   }
 
-  async inspect(characterId: string, path: string): Promise<DeckPreview> {
+  async inspect(characterId: string, path: string, deckId?: string): Promise<DeckPreview> {
     this.draft = undefined;
     const deck = await readDeckDocument(path);
     const images = await this.images(deck);
     const token = randomUUID();
-    const plan = this.plan(characterId, deck, images);
-    this.draft = { token, characterId, deck, fingerprint: plan.fingerprint };
+    const plan = this.plan(characterId, deck, images, deckId);
+    this.draft = { token, characterId, deckId, deck, fingerprint: plan.fingerprint };
     return { ...plan.preview, token };
   }
 
   async apply(input: unknown): Promise<DeckImportResult> {
-    const { token, characterId } = deckApplySchema.parse(input);
+    const { token, characterId, deckId } = deckApplySchema.parse(input);
     const draft = this.draft;
-    if (!draft || draft.token !== token || draft.characterId !== characterId) throw new UserInputError('가져올 파일과 캐릭터를 다시 확인해 주세요.');
+    if (!draft || draft.token !== token || draft.characterId !== characterId || draft.deckId !== deckId) throw new UserInputError('가져올 파일과 캐릭터를 다시 확인해 주세요.');
     const { deck } = draft;
     const images = await this.images(deck);
     if (this.draft !== draft) throw new UserInputError('미리보기가 변경됐습니다. 다시 확인해 주세요.');
     const result = transaction(this.library.db, () => {
-      const plan = this.plan(characterId, deck, images);
+      const plan = this.plan(characterId, deck, images, deckId);
       if (!plan.existing && plan.fingerprint !== draft.fingerprint) throw new UserInputError('대상 덱, 자원 또는 이미지가 변경됐습니다. 파일을 다시 열어 확인해 주세요.');
       // A receipt returns the existing import for this character, without rewriting its current state.
       if (plan.existing) return { deckId: plan.existing.id, name: plan.existing.name, replayed: true, notices: plan.preview.notices };
@@ -234,19 +313,22 @@ export class DeckExchange {
       const now = new Date().toISOString();
       const existingTags = new Map((db.prepare('SELECT id,name FROM tags ORDER BY rowid').all() as { id: string; name: string }[])
         .map(tag => [normalizeText(tag.name), tag.id]));
-      const tagIds = new Map(deck.tags.map(tag => {
+      const usedTags = new Set(plan.choices.filter(choice=>!choice.existingId).flatMap(({card})=>card.tags));
+      const tagIds = new Map(deck.tags.filter(tag=>!deckId||usedTags.has(tag.ref)).map(tag => {
         const existing = existingTags.get(normalizeText(tag.name));
         const id = existing ?? randomUUID();
         if (!existing) db.prepare('INSERT INTO tags(id,name,created_at,updated_at) VALUES (?,?,?,?)').run(id, tag.name, now, now);
         return [tag.ref, id];
       }));
-      const deckId = randomUUID();
-      db.prepare('INSERT INTO decks(id,character_id,name) VALUES (?,?,?)').run(deckId, characterId, plan.preview.name);
+      const destination = deckId ?? randomUUID();
+      if (!deckId) db.prepare('INSERT INTO decks(id,character_id,name) VALUES (?,?,?)').run(destination, characterId, plan.preview.name);
       const insertCard = db.prepare('INSERT INTO card_definitions(id,name,image_asset_id,kind,spell_level,attributes_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)');
       const insertTag = db.prepare('INSERT INTO card_tags(card_id,tag_id) VALUES (?,?)');
       const insertMember = db.prepare('INSERT INTO deck_cards(deck_id,card_id,position) VALUES (?,?,?)');
       const insertOverride = db.prepare('INSERT INTO character_cost_overrides VALUES (?,?,?,?)');
-      for (const [position, card] of deck.cards.entries()) {
+      let position = Number(db.prepare('SELECT COALESCE(MAX(position),-1)+1 AS position FROM deck_cards WHERE deck_id=?').get(destination)!.position);
+      for (const {card,existingId} of plan.choices) {
+        if (existingId) { insertMember.run(destination,existingId,position++); continue; }
         const { image, tags, castOptions, characterRules, ownedResources, ...fields } = card;
         const rules = remapRules(castOptions, characterRules, () => randomUUID());
         const id = randomUUID();
@@ -263,10 +345,11 @@ export class DeckExchange {
         insertCard.run(rowId, name, assetId ?? null, kind, spellLevel ?? null, JSON.stringify(attributes), createdAt, updatedAt);
         for (const tagId of row.tags) insertTag.run(id, tagId);
         if (rules.characterRules) insertOverride.run(characterId, id, JSON.stringify(rules.characterRules), now);
-        insertMember.run(deckId, id, position);
+        insertMember.run(destination, id, position++);
       }
-      db.prepare('INSERT INTO deck_exchange_imports VALUES (?,?,?)').run(characterId, plan.identity, deckId);
-      return { deckId, name: plan.preview.name, replayed: false, notices: plan.preview.notices };
+      if (deckId) db.prepare('INSERT INTO deck_exchange_appends VALUES (?,?)').run(destination,plan.identity);
+      else db.prepare('INSERT INTO deck_exchange_imports VALUES (?,?,?)').run(characterId,plan.identity,destination);
+      return { deckId:destination, name:plan.preview.name, replayed:false, notices:plan.preview.notices, added:deckId?plan.choices.length:undefined };
     });
     return { ...result, library: this.library.getLibrary() };
   }

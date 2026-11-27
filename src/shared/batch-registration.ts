@@ -1,5 +1,6 @@
 import { cardDraftSchema, type AssetPreview, type CardDefinition, type CardDraft, type CastOption, type InitialRules, type RegistrationTarget, type RegistrationTemplate, type Tag } from './contracts';
 import { buildBasicRule, type BasicRuleDraft } from './use-rules';
+import { canUseHigherSlot } from './casting';
 import { bindableCounters, sameResourceName, type NewResourceDraft } from './resource-drafts';
 import type { ResourceView } from './resources';
 
@@ -78,7 +79,8 @@ export function itemRequest(effective: EffectiveItem, ids: BatchItem['ids'], ctx
     castOptions: rule.castOptions, bindings, ...(usesDraft && !ctx.createdDraftId ? { newResources: [ctx.draft!] } : {}),
   };
   const addToDeck = ctx.target && !effective.addToDeck ? false : undefined;
-  return { cards: [effective.card], registrationTarget: ctx.target, ...(addToDeck === false ? { addToDeck } : {}), initialRules, createsDraft: usesDraft && !ctx.createdDraftId };
+  const card = { ...effective.card, upcastEffect: !!effective.card.upcastEffect && canUseHigherSlot(effective.card,rule.castOptions) };
+  return { cards: [card], registrationTarget: ctx.target, ...(addToDeck === false ? { addToDeck } : {}), initialRules, createsDraft: usesDraft && !ctx.createdDraftId };
 }
 /** The request ID for a request: kept while nothing changed (so a re-send hits the receipt), new when it changed. */
 export function attemptFor(item: BatchItem, request: ReturnType<typeof itemRequest>, uuid: () => string = () => crypto.randomUUID()): { signature: string; requestId: string } {
@@ -132,7 +134,7 @@ export function templateFrom(id: string, name: string, common: BatchCommon, reso
     card: cardFields(common.card),
     rule: { kind: rule.kind, scope: rule.scope, family: draft.family, homebrew: draft.homebrew, belowBase: draft.belowBase,
       ...(draft.minLevel !== undefined ? { minLevel: draft.minLevel } : {}), ...(draft.maxLevel !== undefined ? { maxLevel: draft.maxLevel } : {}),
-      ...((rule.kind === 'uses' || rule.kind === 'points') && draft.resourceKey?.trim() ? { resourceKey: draft.resourceKey.trim() } : {}),
+      ...((rule.kind === 'uses' || rule.kind === 'points' || rule.kind === 'slots') && draft.resourceKey?.trim() ? { resourceKey: draft.resourceKey.trim() } : {}),
       ...((rule.kind === 'uses' || rule.kind === 'points') && resource ? { resourceName: resource.name } : {}),
       amount: draft.amount, variable: draft.variable, min: draft.min, max: draft.max, step: draft.step,
       ...(draft.allowUpcast === undefined ? {} : { allowUpcast: draft.allowUpcast }) },

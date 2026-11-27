@@ -34,6 +34,7 @@ const bridge: DesktopBridge = {
   saveTag: input => ipcRenderer.invoke(IPC.saveTag, input),
   deleteTag: id => ipcRenderer.invoke(IPC.deleteTag, id),
   createProfile: input => ipcRenderer.invoke(IPC.createProfile, input),
+  changeProfileTrash: input => ipcRenderer.invoke(IPC.changeProfileTrash, input),
   createDeck: input => ipcRenderer.invoke(IPC.createDeck, input),
   selectDeck: input => ipcRenderer.invoke(IPC.selectDeck, input),
   setDeckCards: input => ipcRenderer.invoke(IPC.setDeckCards, input),

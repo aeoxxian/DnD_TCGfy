@@ -106,17 +106,17 @@ export class EditStore {
       characters = this.names(users); requiresImpact = users.some(id=>id!==action.characterId);
       this.resources.change({requestId:randomUUID(),characterId:action.characterId,expectedRevision:snap.revision,action:{...action.rules,confirmShared:true}},true);
     } else if (action.type === 'disconnect_resources') {
-      const snap = this.resources.snapshot(action.characterId); label = '자원 연결 일괄 해제'; characters = this.names([action.characterId]);
+      const snap = this.resources.snapshot(action.characterId); label = '자원 연결 해제'; characters = this.names([action.characterId]);
       for (const id of action.resourceIds) {
         const r = requireValue(snap.resources.find(r=>r.id===id),'현재 캐릭터에 연결된 자원만 선택하세요.'); if (r.ownedDefinitionId) throw new UserInputError('고유 자원은 카드의 덱 소속으로 관리합니다.');
         targets.push(r.name);
         const count = Number(this.db.prepare('SELECT count(DISTINCT card_id) AS n FROM card_bindings WHERE resource_instance_id=?').get(id)!.n);
-        details.push(`${r.name}: 카드 ${count}장 연결 유지 · 복원 전 사용 불가`);
+        details.push(`${r.name}: 카드 ${count}장 연결 유지 · 수동 연결은 복원 전 사용 불가 · 자동 연결 후보도 다시 확인`);
         this.db.prepare('UPDATE resource_instances SET archived_at=? WHERE id=?').run(new Date().toISOString(),id);
       }
       details.unshift(`${targets.length}개 자원 · 템플릿과 현재량은 보존`); this.barrier(action.characterId,label);
     } else if (action.type === 'archive_templates') {
-      label = '자원 템플릿 일괄 삭제'; const users: string[] = [];
+      label = '자원 템플릿 숨기기'; const users: string[] = [];
       for (const id of action.templateIds) {
         const t = requireValue(this.db.prepare("SELECT * FROM resource_templates WHERE id=? AND archived_at IS NULL AND key NOT LIKE 'card-owned:%'").get(id),'활성 템플릿이 아닙니다.'); targets.push(String(t.name));
         const instances = this.db.prepare('SELECT id,character_id FROM resource_instances WHERE template_id=? AND archived_at IS NULL').all(id) as {id:string;character_id:string}[];

@@ -15,7 +15,7 @@ import { BatchRegistration } from './BatchRegistration';
 import { TemplateBar } from './RegistrationTemplates';
 import { describeDraft, draftResourceView, type NewResourceDraft } from '../shared/resource-drafts';
 import { applyTemplate, batchDuplicates, cardFields, effectiveItem, itemRule, newBatchItem, templateFrom, type BatchAsset, type BatchCommon, type BatchItem } from '../shared/batch-registration';
-import { effectiveCard } from '../shared/casting';
+import { canUseHigherSlot, effectiveCard } from '../shared/casting';
 
 /** v1.3: forget images this dialog imported but did not save. The main process deletes only images imported during this
  *  run that no card, card image history or card back uses, so saved cards are never touched. Best effort. */
@@ -66,11 +66,13 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   const ruleResources=[...(controller?.snapshot?.resources??[]),...(draftView?[draftView]:[])];
   const registrationAttempt=useRef<{signature:string;requestId:string}|undefined>(undefined);
   const saving=useRef(false);
-  const ruleCard:CardDefinition={...draft,id:'registration-draft',name:draft.name||'등록할 카드',castOptions:advancedRules?.castOptions??[{id:ruleIds.optionId,label:'일반 사용',costs:[]}],createdAt:ruleTime,updatedAt:ruleTime};
+  const ruleCard:CardDefinition={...draft,id:card?.id??'registration-draft',name:draft.name||'등록할 카드',castOptions:advancedRules?.castOptions??card?.castOptions??[{id:ruleIds.optionId,label:'일반 사용',costs:[]}],createdAt:ruleTime,updatedAt:ruleTime};
   let proposal:ReturnType<typeof buildBasicRule>|undefined;let ruleError='';
   try{if(ruleKind==='advanced')proposal=advancedRules;else if(ruleKind!=='unconfigured')proposal=buildBasicRule(ruleCard,{...ruleDraft,kind:ruleKind,spellLevel:draft.spellLevel},ruleIds);}catch(error){ruleError=(error as Error).message;}
+  const existingOptions = card ? [...card.castOptions,...effectiveCard(card,controller?.snapshot).castOptions] : [];
+  const allowEnhancement = canUseHigherSlot(ruleCard,proposal?.castOptions??existingOptions);
   function updateRule(patch:Partial<BasicRuleDraft>){setRuleDraft(current=>({...current,...patch}));if('spellLevel' in patch)setDraft(current=>({...current,spellLevel:patch.spellLevel}));setError('');}
-  function chooseRule(kind:RegistrationKind){setRuleKind(kind);if(kind==='slots')setDraft(current=>({...current,kind:'spell'}));setError('');}
+  function chooseRule(kind:RegistrationKind){if(kind!==ruleKind&&(kind==='slots'||ruleKind==='slots'))setRuleDraft(current=>({...current,resourceKey:undefined,resourceId:'',automatic:true}));setRuleKind(kind);if(kind==='slots')setDraft(current=>({...current,kind:'spell'}));setError('');}
   const multiple = !card && assets.length > 1;
   /** The defaults of a batch (and what a template saves): the card fields, the basic use rule and the deck link. */
   const common: BatchCommon = { card: cardFields(draft), rule: { kind: ruleKind === 'advanced' ? 'unconfigured' : ruleKind, draft: ruleDraft, scope: ruleScope }, addToDeck: linkDeck };
@@ -165,22 +167,23 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
     const picked = assets.at(-1);
     const imageAssetId = draft.imageMode === 'none' ? undefined : picked?.thumbnailUrl ? picked.id : draft.imageAssetId;
     if (draft.imageMode && draft.imageMode !== 'none' && !imageAssetId && !card?.imageReference) { setError('선택한 표시 방식에 사용할 이미지 파일을 골라 주세요.'); return; }
-    const candidate = { ...draft, imageAssetId };
+    const candidate = { ...draft, imageAssetId, upcastEffect: card && ruleKind==='unconfigured' ? draft.upcastEffect : allowEnhancement && !!draft.upcastEffect };
     if (!imageAssetId) delete candidate.imageAssetId;
     const candidates = [candidate];
     const parsed = candidates.map(value => cardDraftSchema.safeParse(value));
     const invalid = parsed.find(result => !result.success);
     if (invalid && !invalid.success) { setError(invalid.error.issues[0].message); return; }
-    if(!card&&ruleError){setError(ruleError);return;}
+    if(ruleError){setError(ruleError);return;}
     const boundDraft=newResource&&proposal?.bindings.some(binding=>binding.resourceInstanceId===newResource.draftId)?newResource:undefined;
     const initial = card?undefined:{configured:ruleKind!=='unconfigured',scope:ruleScope,characterId,expectedRevision:controller?.snapshot?.revision,castOptions:proposal?.castOptions??[{id:ruleIds.optionId,label:'비용 미설정',costs:[]}],bindings:proposal?.bindings??[],newResources:boundDraft?[boundDraft]:undefined};
     // The form's deck is always sent (the store rejects it if the active deck changed meanwhile); unchecking only skips the link.
     const destination=card?undefined:target;const addToDeck=!card&&target&&!linkDeck?false:undefined;
     const signature=JSON.stringify({cards:candidates,registrationTarget:destination,addToDeck,initial:initial?{...initial,expectedRevision:undefined}:undefined});
     if(!registrationAttempt.current||registrationAttempt.current.signature!==signature)registrationAttempt.current={signature,requestId:crypto.randomUUID()};
+    const libraryRules=card&&!characterId&&proposal?{expectedCardVersion:card.updatedAt,castOptions:proposal.castOptions}:undefined;
     saving.current=true;setBusy(true); setError('');
     try {
-      const result = await window.desktop.saveCards({ cards: candidates, registrationTarget: destination,addToDeck,initialRules:initial?{...initial,requestId:registrationAttempt.current.requestId}:undefined });
+      const result = await window.desktop.saveCards({ cards: candidates, registrationTarget: destination,addToDeck,libraryRules,initialRules:initial?{...initial,requestId:registrationAttempt.current.requestId}:undefined });
       if (!result.ok) { setError(result.error); return; }
       onLibrary(result.value); finish();
     } catch { setError('카드를 저장하지 못했습니다. 기존 카드는 유지됩니다.'); } finally { saving.current=false;setBusy(false); }
@@ -188,7 +191,7 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   if(advancedOpen){
     const snapshot={...(controller?.snapshot??{characterId:characterId??'registration',revision:0,resources:[],templates:[],bindings:[],events:[],warnings:[]}),resources:ruleResources,bindings:(proposal?.bindings??[]).map(binding=>({...binding,id:binding.costKey,cardId:ruleCard.id,characterId:characterId??'registration'}))};
     const draftController:ResourceController={...(controller??{busy:false,error:'',perform:async()=>false,refresh:async()=>{}}),snapshot};
-    return <AdvancedCardCostEditor card={{...ruleCard,castOptions:proposal?.castOptions??ruleCard.castOptions}} controller={draftController} initialScope={ruleScope} onSaved={async()=>{}} onClose={()=>setAdvancedOpen(false)} onBasic={()=>setAdvancedOpen(false)} onDraft={value=>{setAdvancedRules(value);setRuleScope(value.scope);setRuleKind('advanced');setAdvancedOpen(false);}}/>;
+    return <AdvancedCardCostEditor card={{...ruleCard,castOptions:proposal?.castOptions??ruleCard.castOptions}} controller={draftController} initialScope={ruleScope} libraryOnly={!characterId} onSaved={async()=>{}} onClose={()=>setAdvancedOpen(false)} onBasic={()=>setAdvancedOpen(false)} onDraft={value=>{setAdvancedRules(value);setRuleScope(value.scope);setRuleKind('advanced');setAdvancedOpen(false);}}/>;
   }
   const locked = busy || batchRunning;
   const single = !card && assets.length === 1 ? assets[0] : undefined;
@@ -250,11 +253,11 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
             {!multiple && <label className="form-field">카드 이름<input autoFocus value={nameValue} required maxLength={200} disabled={busy} onChange={event => setName(event.target.value)} /></label>}
             <div className="form-columns">
               <label className="form-field">카드 유형<select aria-label="카드 유형" value={draft.kind} disabled={busy} onChange={event => setDraft({ ...draft, kind: event.target.value as CardDraft['kind'], spellLevel: event.target.value === 'spell' ? draft.spellLevel : undefined })}>{Object.entries(KIND_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
-              {draft.kind === 'spell' && <label className="form-field">주문 레벨 (선택)<select aria-label="주문 레벨 (선택)" value={draft.spellLevel ?? ''} disabled={busy} onChange={event => setDraft({ ...draft, spellLevel: event.target.value === '' ? undefined : Number(event.target.value) })}><option value="">미지정</option>{Array.from({ length: 10 }, (_, i) => <option key={i} value={i}>{i === 0 ? '0 · 소마법' : i}</option>)}</select></label>}
+              {draft.kind === 'spell' && ruleKind!=='slots' && <label className="form-field">주문 레벨 (선택)<select aria-label="주문 레벨 (선택)" value={draft.spellLevel ?? ''} disabled={busy} onChange={event => setDraft({ ...draft, spellLevel: event.target.value === '' ? undefined : Number(event.target.value) })}><option value="">미지정</option>{Array.from({ length: 10 }, (_, i) => <option key={i} value={i}>{i === 0 ? '0 · 소마법' : i}</option>)}</select></label>}
             </div>
             <Checks title="카드 역할" disabled={busy} choices={ROLE_NAMES} values={draft.roles} onChange={roles => setDraft({ ...draft, roles })} />
             <Checks title="카드 행동 경제" disabled={busy} choices={ACTION_NAMES} values={draft.actions} onChange={actions => setDraft({ ...draft, actions })} />
-            <CardTraits value={draft} disabled={busy} onChange={patch => setDraft(current => ({ ...current, ...patch }))}/>
+            <CardTraits value={draft} disabled={busy} allowEnhancement={allowEnhancement} showEnhancement={ruleKind!=='slots'||draft.spellLevel===0} onChange={patch => setDraft(current => ({ ...current, ...patch }))}/>
             <OwnedResourcesEditor definitions={draft.ownedResources} disabled={locked} onChange={ownedResources => setDraft(current => ({ ...current, ownedResources }))}/>
             <p className="muted editor-hint">유형은 카드의 종류, 역할은 효과입니다. 예: 공격 주문 = 유형 ‘주문’ · 역할 ‘공격’.</p>
           </section>
@@ -262,7 +265,7 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
             <Checks title="카드 태그" disabled={busy} choices={Object.fromEntries(tags.map(tag => [tag.id, tag.name]))} values={draft.tags} onChange={selected => setDraft({ ...draft, tags: selected })} />
             <div className="inline-form"><label>새 태그<input maxLength={60} value={newTag} disabled={busy} onChange={event => setNewTag(event.target.value)} /></label><button type="button" disabled={busy || !newTag.trim()} onClick={() => void addTag()}>태그 추가</button></div>
           </section>
-          {!card&&<fieldset disabled={busy} className="registration-rules-shell"><RegistrationRules hasOwned={!!draft.ownedResources?.length} advanced={!multiple} kind={multiple&&ruleKind==='advanced'?'unconfigured':ruleKind} onKind={chooseRule} draft={{...ruleDraft,spellLevel:draft.spellLevel}} onChange={updateRule} scope={ruleScope} onScope={setRuleScope} characterId={characterId} snapshot={controller?.snapshot} busy={busy} onAdvanced={()=>setAdvancedOpen(true)} summary={proposal?describeUseRules(proposal.castOptions,proposal.bindings,ruleResources):ruleError?[ruleError]:[]} pending={draftView} pendingNote={newResource?describeDraft(newResource):undefined} characterName={characterName} onNewResource={characterId&&controller?.snapshot?()=>setResourceFormOpen(true):undefined} onDiscardPending={()=>{if(newResource&&ruleDraft.resourceId===newResource.draftId)updateRule({resourceId:''});setNewResource(undefined);}}/>{controller?.error&&<p role="alert">{controller.error}</p>}<button type="button" disabled={busy||!controller} onClick={()=>void controller?.refresh()}>연결 자원 다시 불러오기</button></fieldset>}
+          {(!card||!characterId)&&<fieldset disabled={busy} className="registration-rules-shell">{card&&<p className="rule-help">기존 공통 규칙을 유지하려면 지금 선택을 그대로 두세요. 현재 규칙을 수정하려면 고급 규칙 편집을 여세요.</p>}<RegistrationRules editing={!!card} enhancement={{enabled:allowEnhancement,checked:!!draft.upcastEffect,onChange:upcastEffect=>setDraft(current=>({...current,upcastEffect}))}} hasOwned={!!draft.ownedResources?.length} advanced={!multiple} kind={multiple&&ruleKind==='advanced'?'unconfigured':ruleKind} onKind={chooseRule} draft={{...ruleDraft,spellLevel:draft.spellLevel}} onChange={updateRule} scope={ruleScope} onScope={setRuleScope} characterId={characterId} snapshot={controller?.snapshot} busy={busy} onAdvanced={()=>setAdvancedOpen(true)} summary={proposal?describeUseRules(proposal.castOptions,proposal.bindings,ruleResources):ruleError?[ruleError]:[]} pending={draftView} pendingNote={newResource?describeDraft(newResource):undefined} characterName={characterName} onNewResource={characterId&&controller?.snapshot?()=>setResourceFormOpen(true):undefined} onDiscardPending={()=>{if(newResource&&ruleDraft.resourceId===newResource.draftId)updateRule({resourceId:''});setNewResource(undefined);}}/>{characterId&&<>{controller?.error&&<p role="alert">{controller.error}</p>}<button type="button" disabled={busy||!controller} onClick={()=>void controller?.refresh()}>연결 자원 다시 불러오기</button></>}</fieldset>}
           <details className="editor-advanced"><summary>{multiple ? '세부 설정 · 사거리' : '세부 설정 · 사거리 / 설명'}</summary>
             <div className="form-columns"><label className="form-field">사거리<select aria-label="사거리" value={draft.range.kind} disabled={busy} onChange={event => setDraft({ ...draft, range: { ...draft.range, kind: event.target.value as CardDraft['range']['kind'] } })}>{Object.entries(RANGE_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label><label className="form-field">거리 (ft, 선택)<input type="number" min={0} max={100000} step={1} value={draft.range.feet ?? ''} disabled={busy} onChange={event => setDraft({ ...draft, range: { ...draft.range, feet: event.target.value === '' ? undefined : Number(event.target.value) } })} /></label></div>
             {!multiple && <label className="form-field">설명 (선택)<textarea maxLength={10000} value={draft.description ?? ''} disabled={busy} rows={3} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label>}

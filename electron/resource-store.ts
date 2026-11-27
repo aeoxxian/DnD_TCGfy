@@ -32,7 +32,7 @@ export class ResourceStore {
   private classes() { return new ClassStore(this.db,id=>this.snapshot(id)); }
   previewClass(input:unknown) { try{const value=z.strictObject({characterId:idSchema,configuration:classInputSchema}).parse(input); return this.classes().preview(value.characterId,value.configuration);}catch(error){if(error instanceof ResourceError)throw new UserInputError(error.message);throw error;} }
   private profile(id: string): CapacityProfile {
-    const row = this.db.prepare('SELECT level,ability_scores_json FROM character_profiles WHERE id=?').get(id) as { level: number; ability_scores_json: string | null } | undefined;
+    const row = this.db.prepare('SELECT level,ability_scores_json FROM character_profiles WHERE id=? AND id NOT IN (SELECT profile_id FROM profile_trash)').get(id) as { level: number; ability_scores_json: string | null } | undefined;
     if (!row) throw new UserInputError('먼저 캐릭터를 선택해 주세요.');
     return { level: row.level, abilityScores: row.ability_scores_json ? JSON.parse(row.ability_scores_json) : undefined };
   }

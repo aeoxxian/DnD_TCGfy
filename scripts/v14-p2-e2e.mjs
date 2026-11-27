@@ -53,12 +53,12 @@ const select = async name => { await search(name); await tile(name).click(); };
 
 try {
   await launch();
-  assert.equal((await bootstrap()).schemaVersion, 9);
+  assert.equal((await bootstrap()).schemaVersion, 10);
   assert.deepEqual(query(dbPath, 'SELECT * FROM card_definitions ORDER BY id'), originalCards);
   assert.deepEqual(query(dbPath, 'SELECT * FROM play_events ORDER BY id'), originalEvents);
   assert.deepEqual(query(dbPath, 'SELECT * FROM card_trash ORDER BY card_id'), originalTrash);
   const backups = join(userData, 'backups');
-  const before = (await readdir(backups)).filter(name => name.startsWith('before-v6-to-v9-'));
+  const before = (await readdir(backups)).filter(name => name.startsWith('before-v6-to-v10-'));
   assert.equal(before.length, 1);
   assert.equal(query(join(backups, before[0]), 'PRAGMA user_version')[0].user_version, 6);
   pass('v1.3 database migrates once while preserving original card, event and trash rows and saving a v6 backup');
@@ -205,7 +205,7 @@ try {
   const neither = cards.find(item => item.name === 'P2 속성 없음');
   assert.deepEqual([single.concentration, single.ritual, single.actions], [true, false, ['reaction']]);
   assert.deepEqual([neither.concentration, neither.ritual, neither.actions], [false, false, ['bonus_action']]);
-  assert.equal((await readdir(backups)).filter(name => name.startsWith('before-v6-to-v9-')).length, 1);
+  assert.equal((await readdir(backups)).filter(name => name.startsWith('before-v6-to-v10-')).length, 1);
   assert.deepEqual(query(dbPath,'PRAGMA foreign_key_check'),[]);
   assert.deepEqual(pageErrors,[]);
   await search('P2 일괄');
