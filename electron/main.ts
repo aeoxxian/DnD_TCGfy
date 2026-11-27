@@ -15,6 +15,8 @@ import { LibraryStore } from './library-store';
 import { AssetService } from './assets';
 import { UserInputError } from './errors';
 import { ResourceStore } from './resource-store';
+import { DeckExchange } from './deck-exchange';
+import { deckSelectionSchema, deckTargetSchema } from '../src/shared/deck-exchange';
 import { BackupService, applyPendingRestore } from './backup';
 import { applyRestoreSchema, restoreTokenSchema } from '../src/shared/backup';
 
@@ -47,6 +49,7 @@ else {
     const library = new LibraryStore(store);
     const assets = new AssetService(app.getPath('userData'), library);
     const resources = new ResourceStore(store);
+    const exchange = new DeckExchange(library, resources, assets);
     const registration = new RegistrationStore(store, library, resources);
     const edits = new EditStore(store);
     const trash = new TrashStore(store);
@@ -90,6 +93,19 @@ else {
       return { settings: store!.getSettings(), ...current, warnings: [...startupWarnings, ...current.warnings], notices: startupNotices, appVersion: app.getVersion(), schemaVersion: SCHEMA_VERSION };
     });
     const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    safeHandler(IPC.exportDeck, async input => {
+      const { deckId } = deckSelectionSchema.parse(input);
+      const choice = await dialog.showSaveDialog(mainWindow!, { title: '덱 JSON 내보내기', defaultPath: join(app.getPath('documents'), `DnD-TCG-fy-deck-${stamp()}.json`), filters: [{ name: '덱 JSON', extensions: ['json'] }] });
+      if (choice.canceled || !choice.filePath) return { canceled: true };
+      return exchange.export(deckId, choice.filePath.toLowerCase().endsWith('.json') ? choice.filePath : `${choice.filePath}.json`);
+    });
+    safeHandler(IPC.inspectDeck, async input => {
+      const { characterId } = deckTargetSchema.parse(input);
+      const choice = await dialog.showOpenDialog(mainWindow!, { title: '덱 JSON 불러오기', properties: ['openFile'], filters: [{ name: '덱 JSON', extensions: ['json'] }] });
+      if (choice.canceled || !choice.filePaths[0]) return { canceled: true };
+      return exchange.inspect(characterId, choice.filePaths[0]);
+    });
+    safeHandler(IPC.importDeck, input => exchange.apply(input));
     safeHandler(IPC.getBackupStatus, input => { z.undefined().parse(input); return backup.status(); });
     safeHandler(IPC.exportBackup, async input => {
       z.undefined().parse(input);

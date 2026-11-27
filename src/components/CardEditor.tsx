@@ -164,7 +164,7 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
     event.preventDefault(); if (busy || saving.current || multiple) return;
     const picked = assets.at(-1);
     const imageAssetId = draft.imageMode === 'none' ? undefined : picked?.thumbnailUrl ? picked.id : draft.imageAssetId;
-    if (draft.imageMode && draft.imageMode !== 'none' && !imageAssetId) { setError('선택한 표시 방식에 사용할 이미지 파일을 골라 주세요.'); return; }
+    if (draft.imageMode && draft.imageMode !== 'none' && !imageAssetId && !card?.imageReference) { setError('선택한 표시 방식에 사용할 이미지 파일을 골라 주세요.'); return; }
     const candidate = { ...draft, imageAssetId };
     if (!imageAssetId) delete candidate.imageAssetId;
     const candidates = [candidate];
@@ -198,7 +198,7 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
   const focused = multiple ? assets.find(asset => asset.id === focus) : undefined;
   const previewImage = replacement ?? single ?? focused;
   const pickedImages = assets.filter(asset => asset.thumbnailUrl);
-  const imageMode = draft.imageMode ?? (pickedImages.length || draft.imageAssetId ? 'full_card' : 'none');
+  const imageMode = draft.imageMode ?? (pickedImages.length || draft.imageAssetId || card?.imageReference ? 'full_card' : 'none');
   const focusedItem = focused ? batch[focused.id] : undefined;
   const focusedCard = focusedItem && focused ? effectiveItem(focusedItem, names[focused.id] ?? focused.name, common) : undefined;
   let previewOptions = proposal?.castOptions ?? (card ? effectiveCard(card, controller?.snapshot).castOptions : undefined);
@@ -231,6 +231,7 @@ export function CardEditor({ card, initialAssets = [], tags, onLibrary, onClose,
           {singleDuplicate && <p className="batch-warning">같은 이미지가 이미 ‘{singleDuplicate.existing.join('’, ‘')}’ 카드에 있습니다{singleDuplicate.trashed ? '(휴지통 포함)' : ''}. 그대로 등록할 수도 있습니다.</p>}
           <div className="drop-zone" onDragOver={event => event.preventDefault()} onDrop={drop}>
             <label className="file-button">{pickLabel}<input type="file" aria-label={card ? '교체 이미지 파일' : '카드 이미지 파일'} accept=".png,.jpg,.jpeg,.webp" multiple={!card} disabled={locked} onChange={event => { void importFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} /></label>
+            {card?.imageReference && !replacement?.thumbnailUrl && imageMode !== 'none' && <p className="muted">원본 이미지를 연결하려면 이미지 선택을 누르세요.</p>}
             <ImageModeField mode={imageMode} disabled={locked} onChange={imageMode => setDraft(current => ({ ...current, imageMode }))}/>
             {!card && <button type="button" disabled={locked || assets.length >= 100} onClick={addImageless}>이미지 없는 카드 추가</button>}
             {single && <button type="button" disabled={locked} onClick={() => removeAsset(single.id)}>이미지 빼기</button>}

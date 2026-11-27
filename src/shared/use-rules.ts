@@ -30,6 +30,7 @@ export function inferBasicRule(card:CardDefinition,snapshot:ResourceSnapshot):Ba
   if(option.costs.length!==1)return;
   const cost=option.costs[0];const binding=snapshot.bindings.find(binding=>binding.cardId===card.id&&binding.costKey===cost.costKey);
   draft.resourceId=binding?.resourceInstanceId??'';
+  if (cost.reconnect) return;
   if(cost.type==='slot'){
     if(cost.slotSelection==='generic'||cost.requirement||card.kind!=='spell'||option.casting&&option.casting.mode!=='homebrew'&&option.casting.mode!==cost.slotSelection)return;
     return {...draft,kind:'slots',family:cost.slotSelection,automatic:cost.autoBind===true,homebrew:option.casting?.mode==='homebrew',belowBase:option.casting?.allowBelowBase??false,allowUpcast:option.casting?.allowUpcast,minLevel:option.casting?.minSlotLevel,maxLevel:option.casting?.maxSlotLevel};
@@ -76,7 +77,7 @@ export function buildBasicRule(card:CardDefinition,draft:BasicRuleDraft,ids:{opt
 }
 export function describeUseRules(options:CastOption[],bindings:{costKey:string;resourceInstanceId:string}[],resources:ResourceView[]):string[]{
   return options.map(option=>`${option.label}: ${option.costs.length?option.costs.map(cost=>{
-    const id=bindings.find(binding=>binding.costKey===cost.costKey)?.resourceInstanceId;const resource=resources.find(resource=>resource.id===id);const name=resource?.name??(cost.requirement?`자원 키 ${cost.requirement.key}`:'기존 연결 확인 필요');
+    const id=bindings.find(binding=>binding.costKey===cost.costKey)?.resourceInstanceId;const resource=resources.find(resource=>resource.id===id);const name=resource?.name??(cost.reconnect?'가져온 비용 · 직접 연결 필요':cost.requirement?`자원 키 ${cost.requirement.key}`:'기존 연결 확인 필요');
     if(cost.type==='slot')return `${cost.slotSelection==='standard'?'일반 주문':cost.slotSelection==='pact'?'계약 마법':'사용자 정의'} 슬롯 1개 · 사용할 때 레벨 선택${cost.autoBind?' · 클래스에서 자동 연결':` · ${name}`}`;
     const amount=cost.type==='fixed'?String(cost.amount):`${cost.min}~${cost.max} (간격 ${cost.step})`;
     return `${name}${cost.slotLevel!==undefined?` ${cost.slotLevel}레벨`:''} ${amount}${resource?.unit??''}`;

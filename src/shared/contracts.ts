@@ -1,5 +1,6 @@
 import type { TrashBridge } from './trash';
 import type { BackupBridge } from './backup';
+import type { DeckExchangeBridge } from './deck-exchange';
 import type { EditBridge } from './bulk';
 import { z } from 'zod';
 import type { ResourceBridge } from './resources';
@@ -78,7 +79,11 @@ export const ownedResourcesSchema = z.array(z.strictObject({
 }, '같은 회복 조건을 두 번 정의할 수 없습니다.')).max(12)
   .refine(definitions => new Set(definitions.map(definition => definition.id)).size === definitions.length, '고유 자원 ID가 중복됩니다.');
 export type OwnedResource = z.infer<typeof ownedResourcesSchema>[number];
-export const resourceRequirementSchema = z.strictObject({ kind: z.enum(['counter', 'track']), key: resourceMatchKeySchema });
+const slotFamilySchema = z.enum(['standard', 'pact', 'generic']);
+export const resourceRequirementSchema = z.strictObject({
+  kind: z.enum(['counter', 'track']), key: resourceMatchKeySchema, slotKind: slotFamilySchema.optional(),
+}).refine(requirement => requirement.kind === 'track' || requirement.slotKind === undefined);
+export const deckImageReferenceSchema = z.strictObject({ sha256: z.string().regex(/^[0-9a-f]{64}$/) });
 export const imageModeSchema = z.enum(['full_card', 'illustration', 'none']);
 export type ImageMode = z.infer<typeof imageModeSchema>;
 const cardMetadata = {
@@ -135,14 +140,17 @@ export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = { viewMode: 'hand', reducedMotion: false, resourcePanelCollapsed: false };
 
 const costKeySchema = z.string().min(1);
+const reconnectSchema = z.enum(['unknown', 'counter', 'generic', 'standard', 'pact']);
 export const costSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('fixed'), costKey: costKeySchema, amount: z.number().int().nonnegative(), slotLevel: z.number().int().min(1).max(9).optional(), requirement: resourceRequirementSchema.optional() }),
-  z.strictObject({ type: z.literal('slot'), costKey: costKeySchema, slotSelection: z.enum(['standard', 'pact', 'generic']), autoBind: z.boolean().optional(), requirement: resourceRequirementSchema.optional() }),
-  z.strictObject({ type: z.literal('variable'), costKey: costKeySchema, min: z.number().int().nonnegative(), max: z.number().int().nonnegative(), step: z.number().int().positive(), slotLevel: z.number().int().min(1).max(9).optional(), requirement: resourceRequirementSchema.optional() }).refine(v => v.min <= v.max),
+  z.strictObject({ type: z.literal('fixed'), costKey: costKeySchema, amount: z.number().int().nonnegative(), slotLevel: z.number().int().min(1).max(9).optional(), requirement: resourceRequirementSchema.optional(), reconnect: reconnectSchema.optional() }),
+  z.strictObject({ type: z.literal('slot'), costKey: costKeySchema, slotSelection: z.enum(['standard', 'pact', 'generic']), autoBind: z.boolean().optional(), requirement: resourceRequirementSchema.optional(), reconnect: reconnectSchema.optional() }),
+  z.strictObject({ type: z.literal('variable'), costKey: costKeySchema, min: z.number().int().nonnegative(), max: z.number().int().nonnegative(), step: z.number().int().positive(), slotLevel: z.number().int().min(1).max(9).optional(), requirement: resourceRequirementSchema.optional(), reconnect: reconnectSchema.optional() }).refine(v => v.min <= v.max),
 ]).superRefine((cost, ctx) => {
   if (!cost.requirement) return;
   const kind = cost.type === 'slot' || cost.slotLevel !== undefined ? 'track' : 'counter';
-  if (cost.requirement.kind !== kind) ctx.addIssue({ code: 'custom', message: '요구 자원 종류와 슬롯 레벨을 확인해 주세요.' });
+  if (cost.requirement.kind !== kind || cost.type === 'slot' && cost.requirement.slotKind && cost.requirement.slotKind !== cost.slotSelection) {
+    ctx.addIssue({ code: 'custom', message: '요구 자원 종류와 슬롯 레벨을 확인해 주세요.' });
+  }
 });
 const castingSchema = z.strictObject({
   mode: z.enum(['standard', 'pact', 'homebrew']), allowUpcast: z.boolean().default(true), allowBelowBase: z.boolean().default(false),
@@ -151,6 +159,7 @@ const castingSchema = z.strictObject({
   .refine(v => v.minSlotLevel === undefined || v.maxSlotLevel === undefined || v.minSlotLevel <= v.maxSlotLevel);
 export const cardSchema = z.strictObject({
   ...cardMetadata,
+  imageReference: deckImageReferenceSchema.optional(),
   ownedResources: ownedResourcesSchema.optional(),
   id: z.string().min(1), name: z.string().min(1), imageAssetId: z.string().min(1).optional(),
   kind: kindSchema,
@@ -234,7 +243,7 @@ export interface Bootstrap extends Library {
   notices?: string[];
 }
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge, BackupBridge {
+export interface DesktopBridge extends ResourceBridge, EditBridge, TrashBridge, BackupBridge, DeckExchangeBridge {
   getBootstrap(): Promise<Result<Bootstrap>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   saveLibraryState(state: LibraryState): Promise<Result<LibraryState>>;
@@ -257,5 +266,6 @@ export const IPC = {
   importImages: 'assets:import', discardImports: 'assets:discard', assetAlpha: 'assets:alpha', saveCards: 'cards:save', archiveCard: 'cards:archive', saveTag: 'tags:save', deleteTag: 'tags:delete',
   createProfile: 'profiles:create', createDeck: 'decks:create', selectDeck: 'decks:select', setDeckCards: 'decks:cards',
   previewClass: 'classes:preview', getResources: 'resources:get', previewResource: 'resources:preview', changeResource: 'resources:change',
+  exportDeck: 'deck-exchange:export', inspectDeck: 'deck-exchange:inspect', importDeck: 'deck-exchange:import',
   exportBackup: 'backup:export', inspectBackup: 'backup:inspect', applyBackup: 'backup:apply', discardBackup: 'backup:discard', getBackupStatus: 'backup:status',
 } as const;

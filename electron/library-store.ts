@@ -85,12 +85,13 @@ export class LibraryStore {
         const imageMode = draft.imageMode ?? (draft.imageAssetId && existing?.imageMode === 'none' ? 'full_card' : existing?.imageMode);
         if (draft.imageMode === 'none' && draft.imageAssetId) throw new UserInputError('이미지 없음과 이미지 파일을 함께 지정할 수 없습니다.');
         const imageAssetId = draft.imageMode === 'none' ? undefined : draft.imageAssetId ?? existing?.imageAssetId;
-        if (imageMode && (imageMode === 'none') === !!imageAssetId) throw new UserInputError('이미지 표시 방식과 파일을 확인해 주세요.');
+        const imageReference = imageMode !== 'none' && !imageAssetId ? existing?.imageReference : undefined;
+        if (imageMode && (imageMode === 'none') === !!(imageAssetId || imageReference)) throw new UserInputError('이미지 표시 방식과 파일을 확인해 주세요.');
         if (imageAssetId && !this.getAsset(imageAssetId)) throw new UserInputError('가져온 이미지를 찾을 수 없습니다. 이미지를 다시 선택해 주세요.');
         for (const tag of draft.tags) if (!this.db.prepare('SELECT id FROM tags WHERE id=?').get(tag)) throw new UserInputError('삭제되었거나 존재하지 않는 태그입니다.');
         const now = new Date().toISOString();
         const card = cardSchema.parse({
-          ...draft, id: existing?.id ?? randomUUID(), imageAssetId,
+          ...draft, id: existing?.id ?? randomUUID(), imageAssetId, imageReference,
           ownedResources: draft.ownedResources ?? existing?.ownedResources,
           imageMode, concentration: draft.concentration ?? existing?.concentration,
           ritual: draft.ritual ?? existing?.ritual, upcastEffect: draft.upcastEffect ?? existing?.upcastEffect,

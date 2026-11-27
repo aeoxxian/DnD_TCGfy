@@ -15,12 +15,15 @@ export function resolveCostResource(cardId: string, cost: Cost, resources: Resou
   }
   const slot = cost.type === 'slot' ? cost.slotSelection : undefined;
   const requirement = cost.requirement;
+  const binding = bindings.some(item => item.cardId === cardId && item.costKey === cost.costKey);
+  if (cost.reconnect && !binding) throw new Error('가져온 비용을 카드 사용 규칙에서 자원에 직접 연결해 주세요.');
+  const family = slot ?? requirement?.slotKind ?? 'generic';
   let resource: ResourceView;
-  if (requirement && !bindings.some(binding => binding.cardId === cardId && binding.costKey === cost.costKey)) {
+  if (requirement && !binding) {
     const keyed = resources.filter(item => !item.ownedDefinitionId && item.overrides.scope === 'character'
       && (item.template.matchKey === requirement.key || item.template.key === requirement.key));
     const matches = keyed.filter(item => requirement.kind === 'counter' ? item.kind === 'counter'
-      : item.kind === 'slot_track' && (item.template.slotKind ?? 'generic') === (slot ?? 'generic'));
+      : item.kind === 'slot_track' && (item.template.slotKind ?? 'generic') === family);
     if (!keyed.length) throw new ResourceRequirementError(`필요한 자원 ‘${requirement.key}’을(를) 보유하지 않았습니다.`, 'missing');
     if (!matches.length) throw new Error('식별 키에 맞는 자원의 종류가 다릅니다.');
     if (matches.length > 1) throw new Error('같은 자원 후보가 여러 개입니다. 카드 사용 규칙에서 직접 연결해 주세요.');
@@ -31,7 +34,7 @@ export function resolveCostResource(cardId: string, cost: Cost, resources: Resou
   if (resource.inactive) throw new ResourceRequirementError('연결된 카드 고유 자원이 비활성 상태입니다.', 'missing');
   if (slot && (resource.kind !== 'slot_track' || (resource.template.slotKind ?? 'generic') !== slot)) throw new Error('슬롯의 연결 종류가 다릅니다. 일반, 계약, 사용자 정의 슬롯 설정을 확인해 주세요.');
   if (requirement && (requirement.kind === 'counter' ? resource.kind !== 'counter'
-    : resource.kind !== 'slot_track' || (resource.template.slotKind ?? 'generic') !== (slot ?? 'generic'))) throw new Error('요구 자원과 수동 연결의 종류가 다릅니다.');
+    : resource.kind !== 'slot_track' || (resource.template.slotKind ?? 'generic') !== family)) throw new Error('요구 자원과 수동 연결의 종류가 다릅니다.');
   return resource;
 }
 
@@ -62,13 +65,14 @@ export function resolveCastOption(card: CardDefinition, optionId: string, ritual
   const costs = option.costs.filter(cost => {
     if (cost.type === 'slot') return false;
     if (cost.slotLevel === undefined) return true;
+    if (cost.requirement?.slotKind === 'standard' || cost.requirement?.slotKind === 'pact' || cost.reconnect === 'standard' || cost.reconnect === 'pact') return false;
     // Legacy fixed/variable costs also address a specific tier. Keep non-spell tracks and surface stale bindings.
     const resource = resolveCostResource(card.id, cost, resources, bindings);
     return resource.kind !== 'slot_track' || !['standard', 'pact'].includes(resource.template.slotKind ?? '');
   });
   return { ...option, label: option.ritual ? option.label : `의식 시전 · ${option.label}`, costs: [...costs, ...ownedCosts], casting: undefined, ritual: true };
 }
-export function castingLevels(card:CardDefinition,option:CastOption):number[] {
+export function castingLevels(card:Pick<CardDefinition, 'kind' | 'spellLevel'>,option:CastOption):number[] {
   if(card.kind!=='spell'||card.spellLevel===undefined)throw new Error('주문 카드에 기본 주문 레벨을 지정해 주세요.');
   const base=card.spellLevel;
   if(base===0)return [0];
@@ -92,7 +96,7 @@ export function boundResource(cardId:string,costKey:string,resources:ResourceVie
   if(resource.overrides.scope==='card'&&resource.overrides.ownerCardId!==cardId)throw new Error('다른 카드 전용 자원입니다.');
   return resource;
 }
-export function slotLevels(card:CardDefinition,option:CastOption,costKey:string,resources:ResourceView[],bindings:CardBinding[]):number[] {
+export function slotLevels(card:Pick<CardDefinition, 'id' | 'kind' | 'spellLevel'>,option:CastOption,costKey:string,resources:ResourceView[],bindings:CardBinding[]):number[] {
   const cost=option.costs.find(cost=>cost.costKey===costKey&&cost.type==='slot');
   if(!cost||cost.type!=='slot')throw new Error('슬롯 비용을 찾을 수 없습니다.');
   if(card.kind==='spell'&&card.spellLevel===0)return [];

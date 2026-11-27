@@ -1,7 +1,7 @@
 import type { CardDefinition, ImageMode, LibraryState, Role } from './contracts';
 
-export function cardImageMode(card: Pick<CardDefinition, 'imageMode' | 'imageAssetId'>): ImageMode {
-  return card.imageMode ?? (card.imageAssetId ? 'full_card' : 'none');
+export function cardImageMode(card: Pick<CardDefinition, 'imageMode' | 'imageAssetId' | 'imageReference'>): ImageMode {
+  return card.imageMode ?? (card.imageAssetId || card.imageReference ? 'full_card' : 'none');
 }
 export const IMAGE_MODE_NAMES: Record<ImageMode, string> = { full_card: '완성 카드', illustration: '삽화만', none: '이미지 없음' };
 

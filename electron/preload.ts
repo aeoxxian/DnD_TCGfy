@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC, type DesktopBridge, type Settings } from '../src/shared/contracts';
 
 const bridge: DesktopBridge = {
+  exportDeck: input => ipcRenderer.invoke(IPC.exportDeck, input),
+  inspectDeck: input => ipcRenderer.invoke(IPC.inspectDeck, input),
+  importDeck: input => ipcRenderer.invoke(IPC.importDeck, input),
   exportBackup: () => ipcRenderer.invoke(IPC.exportBackup),
   inspectBackup: () => ipcRenderer.invoke(IPC.inspectBackup),
   applyBackup: input => ipcRenderer.invoke(IPC.applyBackup, input),

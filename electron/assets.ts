@@ -60,6 +60,14 @@ export class AssetService {
     if (!path.startsWith(`${root}${sep}`)) throw new UserInputError('허용되지 않은 이미지 경로입니다.');
     return path;
   }
+  async matchesOriginal(id: string, sha256: string): Promise<boolean> {
+    const asset = this.library.getAsset(id);
+    if (!asset || asset.sha256 !== sha256) return false;
+    try {
+      const bytes = await readBounded(await this.managedPath(asset.relative_path));
+      return createHash('sha256').update(bytes).digest('hex') === sha256;
+    } catch { return false; }
+  }
   private async thumbnail(bytes: Buffer): Promise<Buffer> {
     return sharp(bytes, { failOn: 'warning', limitInputPixels: MAX_IMAGE_PIXELS, pages: 1 })
       .autoOrient().resize({ width: 420, height: 640, fit: 'inside', withoutEnlargement: true }).webp({ quality: 88 }).toBuffer();

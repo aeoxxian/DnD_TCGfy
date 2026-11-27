@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 export const migrations = [{
   version: 1,
   sql: `
@@ -142,6 +142,16 @@ export const migrations = [{
       UPDATE resource_revisions SET revision=revision+1 WHERE character_id IN
         (SELECT character_id FROM card_owned_resources WHERE card_id=NEW.id);
     END;
+  `,
+}, {
+  version: 9,
+  sql: `
+    CREATE TABLE deck_exchange_imports (
+      character_id TEXT NOT NULL REFERENCES character_profiles(id),
+      digest TEXT NOT NULL,
+      deck_id TEXT NOT NULL UNIQUE REFERENCES decks(id) ON DELETE CASCADE,
+      PRIMARY KEY(character_id, digest)
+    );
   `,
 }];
 

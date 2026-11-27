@@ -54,7 +54,7 @@ export class RegistrationStore {
       }
       for (const draft of parsed.cards) for (const option of rules.castOptions) {
         if(option.casting || option.costs.some(cost=>cost.type==='slot')) {
-          try { castingLevels({...draft,id:'registration',castOptions:rules.castOptions,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},option); }
+          try { castingLevels(draft,option); }
           catch(error) { throw new UserInputError((error as Error).message); }
         }
       }

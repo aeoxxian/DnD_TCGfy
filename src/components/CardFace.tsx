@@ -30,7 +30,7 @@ export type DefaultCardInfo = Pick<CardDefinition, 'name' | 'kind' | 'spellLevel
  * emblem and the kind/action lines. It never says that an image is missing; a card whose image file cannot be read
  * (a real error) gets a small notice strip instead.
  */
-export function DefaultCard({ card, artwork, broken = false, placeholder = false }: { card: DefaultCardInfo; artwork?: ReactNode; broken?: boolean; placeholder?: boolean }) {
+export function DefaultCard({ card, artwork, broken = false, missingImage = false, placeholder = false }: { card: DefaultCardInfo; artwork?: ReactNode; broken?: boolean; missingImage?: boolean; placeholder?: boolean }) {
   const actions = card.actions.map(action => ACTION_NAMES[action]).filter(Boolean).join(' · ');
   const costs = card.castOptions?.find(option => !option.ritual)?.costs;
   const cost = costs?.map(value => value.type === 'slot' || value.slotLevel !== undefined ? '슬롯' : value.type === 'fixed' ? String(value.amount) : `${value.min}–${value.max}`).join(' + ');
@@ -40,7 +40,7 @@ export function DefaultCard({ card, artwork, broken = false, placeholder = false
       <div className={artwork ? 'dc-artwork' : 'dc-emblem'}>{artwork ?? <KindIcon kind={card.kind}/>}</div>
       <div className="dc-type"><span className="dc-kind">{kindLine(card)}</span>{actions && <span className="dc-actions">{actions}</span>}{artwork && cost && card.costStatus !== 'unconfigured' && <span className="dc-actions dc-cost" title={`비용 ${cost}`}>비용 {cost}</span>}</div>
     </div>
-    {broken && <p className="dc-broken">이미지 파일을 읽을 수 없습니다.</p>}
+    {(broken || missingImage) && <p className="dc-broken">{missingImage ? '원본 이미지 연결 필요' : '이미지 파일을 읽을 수 없습니다.'}</p>}
   </div>;
 }
 
@@ -83,6 +83,7 @@ function CardFaceContent({ card, original = false, overlay }: CardFaceProps) {
   const mode = cardImageMode(card);
   const assetId = mode === 'none' ? undefined : card.imageAssetId;
   const alphaAssetId = mode === 'full_card' ? assetId : undefined;
+  const missing = mode !== 'none' && !!card.imageReference && !assetId;
   const maskId = useId();
   const [failed, setFailed] = useState(false);
   const [alpha, setAlpha] = useState(() => alphaAssetId ? alphaCache.get(alphaAssetId) : undefined);
@@ -103,7 +104,7 @@ function CardFaceContent({ card, original = false, overlay }: CardFaceProps) {
   const illustrated = mode === 'illustration' && !!image;
   return <div className={`card-face ${fullImage ? 'image-face' : 'default-face'} ${alpha && fullImage ? 'has-alpha' : ''} role-${card.roles[0] ?? 'other'}`}>
     {fullImage ? image
-      : <div className="default-face-art" role="img" aria-label={`${card.name} ${illustrated ? '삽화 카드' : '기본 카드'} · ${kindLine(card)}${failed ? ' · 이미지 파일을 읽을 수 없음' : ''}`}><DefaultCard card={card} artwork={illustrated ? image : undefined} broken={failed}/></div>}
+      : <div className="default-face-art" role="img" aria-label={`${card.name} ${illustrated ? '삽화 카드' : '기본 카드'} · ${kindLine(card)}${missing ? ' · 원본 이미지 연결 필요' : failed ? ' · 이미지 파일을 읽을 수 없음' : ''}`}><DefaultCard card={card} artwork={illustrated ? image : undefined} broken={failed} missingImage={missing}/></div>}
     {masked && <svg aria-hidden="true" focusable="false" className="card-alpha-mask" width="0" height="0">
       <defs><mask id={maskId} maskContentUnits="objectBoundingBox" style={{ maskType: 'alpha' }}>
         <svg width="1" height="1" viewBox="0 0 100 145.8" preserveAspectRatio="none">
